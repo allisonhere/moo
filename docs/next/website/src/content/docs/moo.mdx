@@ -161,10 +161,12 @@ git pull
 Maintainers release from a clean, pushed `master` checkout:
 
 ```sh
-./deploy.sh patch
+./deploy.sh
 ```
 
-Use `minor`, `major`, or an explicit version such as `1.2.3` instead of `patch` when needed. `./deploy.sh --dry-run patch` validates the source and shows the selected version without changing files, commits, or tags.
+The full-screen release console shows repository readiness and the release pipeline. Choose a patch, minor, or major bump, toggle dry-run mode if needed, then run **Validate**, **Commit**, **Push**, and **Tag & release** in order. **Commit** includes tracked changes and the Cargo version bump. Untracked scratch files are shown but ignored.
+
+For scripting, pass `patch`, `minor`, `major`, or an explicit version such as `1.2.3` directly. `./deploy.sh --dry-run patch` validates the source and shows the selected version without changing files, commits, or tags.
 
 The script updates the Cargo package version, runs `just check`, commits the version files, and pushes an annotated tag. The Moo release workflow builds Linux, macOS, and Windows assets, includes the Windows ConPTY runtime, writes `SHA256SUMS`, and publishes the GitHub release.
 

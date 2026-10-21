@@ -27,12 +27,12 @@ fn windows_powershell_encoded_hook_command_preserves_script_invocation() {
     let bytes = base64::engine::general_purpose::STANDARD
         .decode(encoded)
         .expect("base64 payload");
-    let mut chunks = bytes.chunks_exact(2);
+    let (chunks, remainder) = bytes.as_chunks::<2>();
     let utf16 = chunks
-        .by_ref()
-        .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
+        .iter()
+        .map(|chunk| u16::from_le_bytes(*chunk))
         .collect::<Vec<_>>();
-    assert!(chunks.remainder().is_empty(), "UTF-16LE payload");
+    assert!(remainder.is_empty(), "UTF-16LE payload");
     assert_eq!(
         String::from_utf16(&utf16).expect("PowerShell script"),
         r"& 'C:\Users\O''Neil λ\App Data\hooks\herdr-agent-state.ps1' session"

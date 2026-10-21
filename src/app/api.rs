@@ -2676,7 +2676,7 @@ mod tests {
         record(4, "c", AgentStatus::Blocked);
         record(5, "c", AgentStatus::Working);
 
-        let mut panes = |app: &mut App| -> Vec<String> {
+        let panes = |app: &mut App| -> Vec<String> {
             let response = app.handle_api_request(crate::api::schema::Request {
                 id: "attention".into(),
                 method: Method::AgentAttentionList(EmptyParams::default()),

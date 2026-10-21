@@ -122,6 +122,9 @@ impl NativeEndpointTransport {
 }
 
 impl EndpointTransport for NativeEndpointTransport {
+    // Rust 1.99 renamed this atomic operation; keep the pinned-toolchain name
+    // until the project's minimum Rust version provides `try_update`.
+    #[allow(deprecated)]
     fn send(&mut self, message: &ClientMessage) -> io::Result<()> {
         if self.stopped.load(Ordering::Acquire) {
             return Err(io::Error::new(

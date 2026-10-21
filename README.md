@@ -40,7 +40,7 @@ moo
 
 ## releases
 
-From a clean, pushed `master`, run `./deploy.sh patch` (or `minor`, `major`, or an explicit version). The script checks the source, bumps the Cargo version, runs `just check`, and pushes an immutable tag that builds the GitHub release. Preview the operation without changing anything with `./deploy.sh --dry-run patch`.
+From `master`, run `./deploy.sh` to open the release console. Choose the version bump, optionally enable dry-run mode, then run **Validate**, **Commit**, **Push**, and **Tag & release** in order. **Commit** includes tracked changes and the Cargo version bump; untracked local scratch files are displayed but ignored. The final step pushes an immutable tag that builds the GitHub release. Direct commands such as `./deploy.sh patch` and `./deploy.sh --dry-run patch` remain available for scripting.
 
 ## docs
 

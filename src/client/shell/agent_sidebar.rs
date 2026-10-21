@@ -341,20 +341,6 @@ fn folder_name_from_cwd(cwd: &str) -> Option<&str> {
         .filter(|folder| !folder.is_empty())
 }
 
-#[cfg(test)]
-mod folder_tests {
-    use super::folder_name_from_cwd;
-
-    #[test]
-    fn folder_name_supports_local_and_remote_path_styles() {
-        assert_eq!(folder_name_from_cwd("/work/first"), Some("first"));
-        assert_eq!(folder_name_from_cwd("/work/second/"), Some("second"));
-        assert_eq!(folder_name_from_cwd(r"C:\work\second"), Some("second"));
-        assert_eq!(folder_name_from_cwd("/"), Some("/"));
-        assert_eq!(folder_name_from_cwd(""), None);
-    }
-}
-
 pub(super) fn render_agent_row(
     buffer: &mut Buffer,
     rect: Rect,
@@ -440,5 +426,19 @@ fn sidebar_status_text(status: crate::api::schema::AgentStatus) -> &'static str 
         AgentStatus::Done => "done",
         AgentStatus::Working => "working",
         AgentStatus::Idle | AgentStatus::Unknown => "idle",
+    }
+}
+
+#[cfg(test)]
+mod folder_tests {
+    use super::folder_name_from_cwd;
+
+    #[test]
+    fn folder_name_supports_local_and_remote_path_styles() {
+        assert_eq!(folder_name_from_cwd("/work/first"), Some("first"));
+        assert_eq!(folder_name_from_cwd("/work/second/"), Some("second"));
+        assert_eq!(folder_name_from_cwd(r"C:\work\second"), Some("second"));
+        assert_eq!(folder_name_from_cwd("/"), Some("/"));
+        assert_eq!(folder_name_from_cwd(""), None);
     }
 }

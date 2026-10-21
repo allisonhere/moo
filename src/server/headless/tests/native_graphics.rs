@@ -999,7 +999,7 @@ async fn native_file_render_scale_profile() {
             // each submission; no timing includes producer/base64 construction.
             let mut rgba = vec![0u8; IMAGE_WIDTH as usize * IMAGE_HEIGHT as usize * 4];
             let mut noise = 0x1234_5678u32;
-            for pixel in rgba.chunks_exact_mut(4) {
+            for pixel in rgba.as_chunks_mut::<4>().0 {
                 noise = noise.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
                 pixel[..3].copy_from_slice(&noise.to_le_bytes()[..3]);
                 pixel[3] = 255;
