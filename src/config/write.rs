@@ -5,6 +5,10 @@ pub(crate) enum ConfigEdit<'a> {
     TabAgentPill(bool),
     Sound(bool),
     ToastDelivery(super::ToastDelivery),
+    /// Toasts off, sound on.
+    AudioOnly,
+    /// Toasts off, sound off.
+    Silent,
 }
 
 impl ConfigEdit<'_> {
@@ -15,6 +19,7 @@ impl ConfigEdit<'_> {
             Self::TabAgentPill(_) => "tab pill setting",
             Self::Sound(_) => "sound setting",
             Self::ToastDelivery(_) => "toast setting",
+            Self::AudioOnly | Self::Silent => "notification setting",
         }
     }
 
@@ -46,6 +51,10 @@ impl ConfigEdit<'_> {
                 };
                 let content = super::upsert_section_value(content, "ui.toast", "delivery", value);
                 super::remove_section_key(&content, "ui.toast", "enabled")
+            }
+            Self::AudioOnly | Self::Silent => {
+                let content = Self::ToastDelivery(super::ToastDelivery::Off).apply(content);
+                Self::Sound(matches!(self, Self::AudioOnly)).apply(&content)
             }
         }
     }
@@ -82,6 +91,20 @@ pub(crate) fn write_edit(edit: ConfigEdit<'_>) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn audio_only_and_silent_set_toast_delivery_and_sound_together() {
+        let start = "[ui.toast]\ndelivery = \"system\"\n\n[ui.sound]\nenabled = false\n";
+        let audio = ConfigEdit::AudioOnly.apply(start);
+        let audio: toml::Value = toml::from_str(&audio).unwrap();
+        assert_eq!(audio["ui"]["toast"]["delivery"].as_str(), Some("off"));
+        assert_eq!(audio["ui"]["sound"]["enabled"].as_bool(), Some(true));
+
+        let silent = ConfigEdit::Silent.apply("");
+        let silent: toml::Value = toml::from_str(&silent).unwrap();
+        assert_eq!(silent["ui"]["toast"]["delivery"].as_str(), Some("off"));
+        assert_eq!(silent["ui"]["sound"]["enabled"].as_bool(), Some(false));
+    }
 
     #[test]
     fn update_file_at_does_not_move_a_leading_bom_into_the_file() {

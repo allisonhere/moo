@@ -1715,6 +1715,16 @@ impl ClientShellState {
             }
             return;
         }
+        if matches!(self.overlay, Some(ClientShellOverlay::SessionReplay(_))) {
+            match mouse.kind {
+                MouseEventKind::ScrollUp => self.scroll_session_replay(-3),
+                MouseEventKind::ScrollDown => self.scroll_session_replay(3),
+                MouseEventKind::Down(MouseButton::Left) => self.overlay = None,
+                _ => return,
+            }
+            outcome.repaint = true;
+            return;
+        }
         if self.overlay.is_some() {
             if mouse.kind != MouseEventKind::Down(MouseButton::Left) {
                 return;

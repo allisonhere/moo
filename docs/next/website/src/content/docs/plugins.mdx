@@ -24,7 +24,7 @@ There is no separate plugin SDK or restricted command set. The entire Herdr CLI
 is the plugin API. Every command in the
 [CLI reference](/docs/cli-reference/) is available to a plugin, and a plugin can
 run anything you can run yourself as `herdr ...`. Most plugins should call Herdr
-through `HERDR_BIN_PATH`, which points at the running Herdr binary. That keeps
+through `MOO_BIN_PATH`, which points at the running Herdr binary. That keeps
 plugins portable across Unix sockets and Windows named pipes. Use the
 [socket API](/docs/socket-api/) when you want to send raw JSON requests yourself.
 
@@ -146,12 +146,12 @@ contexts = ["workspace"]
 command = ["node", "index.js"]
 ```
 
-Inside the command, call back into Herdr with `HERDR_BIN_PATH`:
+Inside the command, call back into Herdr with `MOO_BIN_PATH`:
 
 ```js
 const { spawnSync } = require("node:child_process");
 
-const herdr = process.env.HERDR_BIN_PATH ?? "herdr";
+const herdr = process.env.MOO_BIN_PATH ?? "herdr";
 const result = spawnSync(herdr, ["workspace", "list"], {
   encoding: "utf8",
   stdio: ["ignore", "pipe", "pipe"],
@@ -256,43 +256,43 @@ server.
 Startup hooks are one-shot initialization commands rather than supervised
 daemons. A hook should restore plugin-owned state, call any required Herdr APIs,
 and exit. For example, a plugin can save a declarative Agent view under
-`HERDR_PLUGIN_STATE_DIR`, then read and reapply that view from its startup hook.
+`MOO_PLUGIN_STATE_DIR`, then read and reapply that view from its startup hook.
 
 Startup hooks receive the normal runtime plugin environment and
-`HERDR_PLUGIN_EVENT=startup`. The install preview lists every startup command so
+`MOO_PLUGIN_EVENT=startup`. The install preview lists every startup command so
 users can review code that will run automatically.
 
 ## Commands and environment
 
 Runtime commands run with the plugin directory as their working directory. Herdr
-injects `HERDR_SOCKET_PATH`, `HERDR_BIN_PATH`, `HERDR_ENV=1`,
-`HERDR_PLUGIN_ID`, `HERDR_PLUGIN_ROOT`, `HERDR_PLUGIN_CONFIG_DIR`,
-`HERDR_PLUGIN_STATE_DIR`, `HERDR_PLUGIN_CONTEXT_JSON`, and any available
-`HERDR_WORKSPACE_ID`, `HERDR_TAB_ID`, and `HERDR_PANE_ID`. Action commands also
-receive `HERDR_PLUGIN_ACTION_ID`; startup and event hooks receive
-`HERDR_PLUGIN_EVENT` (`startup` for startup hooks), event hooks additionally
-receive `HERDR_PLUGIN_EVENT_JSON`, and pane commands receive
-`HERDR_PLUGIN_ENTRYPOINT_ID`.
+injects `MOO_SOCKET_PATH`, `MOO_BIN_PATH`, `MOO_ENV=1`,
+`MOO_PLUGIN_ID`, `MOO_PLUGIN_ROOT`, `MOO_PLUGIN_CONFIG_DIR`,
+`MOO_PLUGIN_STATE_DIR`, `MOO_PLUGIN_CONTEXT_JSON`, and any available
+`MOO_WORKSPACE_ID`, `MOO_TAB_ID`, and `MOO_PANE_ID`. Action commands also
+receive `MOO_PLUGIN_ACTION_ID`; startup and event hooks receive
+`MOO_PLUGIN_EVENT` (`startup` for startup hooks), event hooks additionally
+receive `MOO_PLUGIN_EVENT_JSON`, and pane commands receive
+`MOO_PLUGIN_ENTRYPOINT_ID`.
 
-`HERDR_PLUGIN_ROOT` is the installed or linked plugin directory. Do not store
+`MOO_PLUGIN_ROOT` is the installed or linked plugin directory. Do not store
 user credentials or durable state there, because GitHub-installed plugin roots
 are managed source checkouts. Put user-editable config such as `.env` files
-under `HERDR_PLUGIN_CONFIG_DIR`, and put local runtime state under
-`HERDR_PLUGIN_STATE_DIR`. Herdr creates those directories and seeds
-`HERDR_PLUGIN_CONFIG_DIR` from the legacy plugin config locations when present,
+under `MOO_PLUGIN_CONFIG_DIR`, and put local runtime state under
+`MOO_PLUGIN_STATE_DIR`. Herdr creates those directories and seeds
+`MOO_PLUGIN_CONFIG_DIR` from the legacy plugin config locations when present,
 but it does not validate, sync, or delete their contents. The plugin owns the
 file format and lifecycle.
 
-`HERDR_PLUGIN_CONTEXT_JSON` can include workspace, tab, focused pane, worktree,
+`MOO_PLUGIN_CONTEXT_JSON` can include workspace, tab, focused pane, worktree,
 agent, selected text, clicked URL, and link handler fields when they are
 available for that invocation. Shell plugins can read the individual env vars
 for common ids, or parse the context JSON for the full shape.
 
-Use `HERDR_BIN_PATH` when a plugin needs to call Herdr portably from Node,
+Use `MOO_BIN_PATH` when a plugin needs to call Herdr portably from Node,
 PowerShell, Bash, or another runtime. The raw socket transport behind
-`HERDR_SOCKET_PATH` is OS-specific: Unix clients connect to a Unix socket path,
+`MOO_SOCKET_PATH` is OS-specific: Unix clients connect to a Unix socket path,
 while Windows clients connect to a named pipe. CLI calls through
-`HERDR_BIN_PATH` avoid that transport difference. See the
+`MOO_BIN_PATH` avoid that transport difference. See the
 [CLI reference](/docs/cli-reference/) for available commands and
 [socket API](/docs/socket-api/) for raw request shapes.
 
@@ -332,8 +332,8 @@ pane ownership attached to the underlying pane when it moves across tabs or
 workspaces. A popup is a singleton session resource rather than a Herdr pane:
 it has no pane ID, does not change plugin focus context, emits no pane lifecycle
 events, and does not participate in pane, layout, persistence, or agent APIs.
-Its process does not receive `HERDR_PANE_ID`; the underlying tiled pane remains
-available through `HERDR_PLUGIN_CONTEXT_JSON`.
+Its process does not receive `MOO_PANE_ID`; the underlying tiled pane remains
+available through `MOO_PLUGIN_CONTEXT_JSON`.
 Opening a popup returns `ui_busy` while Settings, Copy mode, or another Herdr
 modal is active, and `plugin.pane.open` returns an `ok` result after launch.
 
@@ -364,8 +364,8 @@ click. `pattern` is a Rust regular expression matched against the clicked URL,
 and `action` must
 name an action declared by the same plugin. Link handler actions receive
 `invocation_source = "link_click"`, `clicked_url`, and `link_handler_id` in
-`HERDR_PLUGIN_CONTEXT_JSON`; shell plugins can also read
-`HERDR_PLUGIN_CLICKED_URL` and `HERDR_PLUGIN_LINK_HANDLER_ID`. Handlers are
+`MOO_PLUGIN_CONTEXT_JSON`; shell plugins can also read
+`MOO_PLUGIN_CLICKED_URL` and `MOO_PLUGIN_LINK_HANDLER_ID`. Handlers are
 checked in manifest order inside each plugin.
 
 Link clicks invoke plugins only while `ui.mouse_capture` is enabled. Matching handlers run first. A launch failure shows an error and stops. Without a matching handler, only HTTP(S) links open externally. When capture is disabled, the outer terminal handles explicit hyperlinks using its own shortcuts and warnings. See [mouse controls](/docs/quick-start/#use-the-mouse) for the Windows Terminal URL detection caveat.

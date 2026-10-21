@@ -343,7 +343,7 @@ herdr pane report-agent w1:p1 \
 User hooks that run next to a Herdr-managed integration should use metadata instead of `report-agent`. Metadata changes presentation without taking over the integration's `idle`, `working`, `blocked`, or session restore authority. `--agent` and `--applies-to-source` guard only presentation fields (`--title`, `--display-agent`, and `--state-label`). Token patches always apply; their reporter owns clearing or TTL refresh. `--display-agent` changes the visible name.
 
 ```bash
-herdr pane report-metadata "$HERDR_PANE_ID" \
+herdr pane report-metadata "$MOO_PANE_ID" \
   --source user:claude-title \
   --agent claude \
   --title "Refactor auth middleware" \

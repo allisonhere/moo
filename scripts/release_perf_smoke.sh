@@ -10,7 +10,7 @@ candidate=$(cd "$(dirname "$1")" && pwd)/$(basename "$1")
 [[ -x "$candidate" ]] || { echo "candidate binary is not executable: $candidate" >&2; exit 1; }
 script_dir=$(cd "$(dirname "$0")" && pwd)
 repo_root=$(cd "$script_dir/.." && pwd)
-baseline=${HERDR_PERF_BASELINE_BIN:-}
+baseline=${MOO_PERF_BASELINE_BIN:-}
 for command in jq lsof perl tmux; do
   command -v "$command" >/dev/null || { echo "required command not found: $command" >&2; exit 1; }
 done
@@ -49,8 +49,8 @@ fi
 [[ -x "$baseline" ]] || { echo "baseline binary is not executable: $baseline" >&2; exit 1; }
 
 case_script="$script_dir/release_perf_case.sh"
-seconds=${HERDR_PERF_SAMPLE_SECONDS:-10}
-warmup=${HERDR_PERF_WARMUP_SECONDS:-3}
+seconds=${MOO_PERF_SAMPLE_SECONDS:-10}
+warmup=${MOO_PERF_WARMUP_SECONDS:-3}
 
 for round in 1 2; do
   if [[ $round -eq 1 ]]; then variants="baseline candidate"; else variants="candidate baseline"; fi

@@ -139,7 +139,7 @@ function git(root: string, args: string[]) {
 function runScript(root: string, args: string[]) {
   execFileSync('node', [script, ...args], {
     cwd: root,
-    env: { ...process.env, HERDR_DOCS_REPO_ROOT: root },
+    env: { ...process.env, MOO_DOCS_REPO_ROOT: root },
     stdio: 'pipe',
   });
 }

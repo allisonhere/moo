@@ -286,6 +286,7 @@ pub(super) enum ClientShellOverlayKind {
     Rename,
     ConfirmClose,
     Help,
+    SessionReplay,
     Navigator,
     WorktreeCreate,
     WorktreeOpen,
@@ -636,6 +637,16 @@ pub(super) struct ClientConfirmCloseOverlay {
     pub(super) detail: String,
 }
 
+/// Status timeline of one agent pane, oldest transition first. `entries` is
+/// `None` until the `agent.history` response arrives; `back` is how many
+/// entries the view is scrolled back from the newest.
+#[derive(Debug)]
+pub(super) struct ClientSessionReplayOverlay {
+    pub(super) pane_id: String,
+    pub(super) entries: Option<Vec<crate::api::schema::AgentHistoryEntry>>,
+    pub(super) back: usize,
+}
+
 #[derive(Debug)]
 pub(super) enum ClientShellOverlay {
     Onboarding,
@@ -644,6 +655,7 @@ pub(super) enum ClientShellOverlay {
     Rename(ClientRenameOverlay),
     ConfirmClose(ClientConfirmCloseOverlay),
     Help(ClientHelpOverlay),
+    SessionReplay(ClientSessionReplayOverlay),
     Navigator(ClientNavigatorOverlay),
     WorktreeCreate(ClientWorktreeCreateOverlay),
     WorktreeOpen(ClientWorktreeOpenOverlay),
@@ -662,6 +674,7 @@ impl ClientShellOverlay {
             Self::Rename(_) => ClientShellOverlayKind::Rename,
             Self::ConfirmClose(_) => ClientShellOverlayKind::ConfirmClose,
             Self::Help(_) => ClientShellOverlayKind::Help,
+            Self::SessionReplay(_) => ClientShellOverlayKind::SessionReplay,
             Self::Navigator(_) => ClientShellOverlayKind::Navigator,
             Self::WorktreeCreate(_) => ClientShellOverlayKind::WorktreeCreate,
             Self::WorktreeOpen(_) => ClientShellOverlayKind::WorktreeOpen,
@@ -685,6 +698,7 @@ pub(super) enum PendingEndpointKind {
     ReloadConfig,
     IntegrationList,
     IntegrationInstall,
+    AgentHistory,
     PrepareWorktreeCreate {
         workspace_id: String,
     },

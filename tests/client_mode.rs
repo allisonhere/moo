@@ -127,14 +127,14 @@ fn spawn_client_process_with_args_and_env(
     let mut cmd = CommandBuilder::new(env!("CARGO_BIN_EXE_moo"));
     support::isolate_herdr_test_process(&mut cmd);
     cmd.args(args);
-    cmd.env("HERDR_DISABLE_SOUND", "1");
+    cmd.env("MOO_DISABLE_SOUND", "1");
     cmd.env("XDG_STATE_HOME", runtime_dir.join("state"));
     cmd.env("XDG_CONFIG_HOME", config_home);
     cmd.env("XDG_RUNTIME_DIR", runtime_dir);
-    cmd.env("HERDR_SOCKET_PATH", api_socket_path);
-    cmd.env_remove("HERDR_CLIENT_SOCKET_PATH");
+    cmd.env("MOO_SOCKET_PATH", api_socket_path);
+    cmd.env_remove("MOO_CLIENT_SOCKET_PATH");
     cmd.env("SHELL", "/bin/sh");
-    cmd.env_remove("HERDR_ENV");
+    cmd.env_remove("MOO_ENV");
     for (key, value) in extra_env {
         cmd.env(key, value);
     }
@@ -190,10 +190,10 @@ fn spawn_server_with_config(
     cmd.arg("server");
     cmd.env("XDG_CONFIG_HOME", config_home);
     cmd.env("XDG_RUNTIME_DIR", runtime_dir);
-    cmd.env("HERDR_SOCKET_PATH", api_socket_path);
-    cmd.env_remove("HERDR_CLIENT_SOCKET_PATH");
+    cmd.env("MOO_SOCKET_PATH", api_socket_path);
+    cmd.env_remove("MOO_CLIENT_SOCKET_PATH");
     cmd.env("SHELL", "/bin/sh");
-    cmd.env_remove("HERDR_ENV");
+    cmd.env_remove("MOO_ENV");
 
     let child = pair.slave.spawn_command(cmd).unwrap();
     register_spawned_herdr_pid(child.process_id());
@@ -264,8 +264,8 @@ fn client_connects_and_receives_pane_surface() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("moo.sock");
+    let client_socket = runtime_dir.join("moo-client.sock");
 
     let spawned = spawn_server(&config_home, &runtime_dir, &api_socket, &client_socket);
     wait_for_socket(&api_socket, Duration::from_secs(10));
@@ -288,8 +288,8 @@ fn direct_attach_initial_mouse_capture_follows_config() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("moo.sock");
+    let client_socket = runtime_dir.join("moo-client.sock");
     let config_path = config_home.join(app_dir_name()).join("config.toml");
 
     let spawned_server = spawn_server_with_config(
@@ -410,8 +410,8 @@ fn client_sees_headless_startup_config_diagnostic() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("moo.sock");
+    let client_socket = runtime_dir.join("moo-client.sock");
 
     let app_dir = support::app_dir_name();
     fs::create_dir_all(config_home.join(app_dir)).unwrap();
@@ -437,10 +437,10 @@ fn client_sees_headless_startup_config_diagnostic() {
     cmd.arg("server");
     cmd.env("XDG_CONFIG_HOME", &config_home);
     cmd.env("XDG_RUNTIME_DIR", &runtime_dir);
-    cmd.env("HERDR_SOCKET_PATH", &api_socket);
-    cmd.env_remove("HERDR_CLIENT_SOCKET_PATH");
+    cmd.env("MOO_SOCKET_PATH", &api_socket);
+    cmd.env_remove("MOO_CLIENT_SOCKET_PATH");
     cmd.env("SHELL", "/bin/sh");
-    cmd.env_remove("HERDR_ENV");
+    cmd.env_remove("MOO_ENV");
 
     let child = pair.slave.spawn_command(cmd).unwrap();
     register_spawned_herdr_pid(child.process_id());
@@ -483,7 +483,7 @@ fn server_unreachable_shows_clear_error() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
+    let api_socket = runtime_dir.join("moo.sock");
 
     fs::create_dir_all(config_home.join(support::app_dir_name())).unwrap();
     fs::create_dir_all(&runtime_dir).unwrap();
@@ -498,13 +498,13 @@ fn server_unreachable_shows_clear_error() {
 
     let output = std::process::Command::new(env!("CARGO_BIN_EXE_moo"))
         .arg("client")
-        .env("HERDR_DISABLE_SOUND", "1")
+        .env("MOO_DISABLE_SOUND", "1")
         .env("XDG_CONFIG_HOME", &config_home)
         .env("XDG_RUNTIME_DIR", &runtime_dir)
         .env("XDG_STATE_HOME", runtime_dir.join("state"))
-        .env("HERDR_SOCKET_PATH", &api_socket)
-        .env_remove("HERDR_CLIENT_SOCKET_PATH")
-        .env_remove("HERDR_ENV")
+        .env("MOO_SOCKET_PATH", &api_socket)
+        .env_remove("MOO_CLIENT_SOCKET_PATH")
+        .env_remove("MOO_ENV")
         .output()
         .expect("client command should run");
 
@@ -518,7 +518,7 @@ fn server_unreachable_shows_clear_error() {
         "stderr should mention connection failure: {stderr}"
     );
     assert!(
-        stderr.contains("Is herdr server running?"),
+        stderr.contains("Is moo server running?"),
         "stderr should include actionable guidance: {stderr}"
     );
     assert!(
@@ -537,8 +537,8 @@ fn server_crash_after_attach_causes_lost_connection_error() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("moo.sock");
+    let client_socket = runtime_dir.join("moo-client.sock");
 
     let mut spawned = spawn_server(&config_home, &runtime_dir, &api_socket, &client_socket);
     wait_for_socket(&api_socket, Duration::from_secs(10));
@@ -721,8 +721,8 @@ fn sigwinch_refreshes_host_palette_without_resizing() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("moo.sock");
+    let client_socket = runtime_dir.join("moo-client.sock");
     let server = spawn_server_with_config(
         &config_home,
         &runtime_dir,
@@ -910,7 +910,7 @@ fn federated_launch_opens_local_directly_while_saved_ssh_is_unavailable() {
         let base = unique_test_dir();
         let config_home = base.join("config");
         let runtime_dir = base.join("runtime");
-        let api_socket = runtime_dir.join("herdr.sock");
+        let api_socket = runtime_dir.join("moo.sock");
         fs::create_dir_all(config_home.join(app_dir_name())).unwrap();
         fs::write(
             config_home.join(app_dir_name()).join("config.toml"),
@@ -997,12 +997,12 @@ fn federated_client_starts_without_local_and_survives_its_restart() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("moo.sock");
+    let client_socket = runtime_dir.join("moo-client.sock");
     let remote_config = base.join("remote-config");
     let remote_runtime = base.join("remote-runtime");
-    let remote_api = remote_runtime.join("herdr.sock");
-    let remote_client = remote_runtime.join("herdr-client.sock");
+    let remote_api = remote_runtime.join("moo.sock");
+    let remote_client = remote_runtime.join("moo-client.sock");
     let mut remote_server =
         spawn_server(&remote_config, &remote_runtime, &remote_api, &remote_client);
     wait_for_socket(&remote_api, Duration::from_secs(10));
@@ -1046,7 +1046,7 @@ fn federated_client_starts_without_local_and_survives_its_restart() {
     let ssh_commands = base.join("ssh-commands");
     let bridge_pid = base.join("bridge-pid");
     fs::write(bin.join("ssh"), format!(
-        "#!/bin/sh\nexport HOME={} XDG_CONFIG_HOME={} XDG_RUNTIME_DIR={} HERDR_SOCKET_PATH={}\nunset HERDR_CLIENT_SOCKET_PATH HERDR_SESSION\ncontrol=; previous=; configuration=\nfor arg do\n  if [ \"$previous\" = -S ]; then control=$arg; fi\n  if [ \"$arg\" = -G ]; then configuration=yes; fi\n  previous=$arg; last=$arg\ndone\nif [ -n \"$configuration\" ]; then printf 'controlpath %s\\n' \"$control\"; exit 0; fi\nprintf '%s\\n' \"$last\" >> {}\ncase \"$last\" in *remote-client-bridge*) printf '%s\\n' \"$$\" > {};; esac\nexec /bin/sh -c \"$last\"\n",
+        "#!/bin/sh\nexport HOME={} XDG_CONFIG_HOME={} XDG_RUNTIME_DIR={} MOO_SOCKET_PATH={}\nunset MOO_CLIENT_SOCKET_PATH MOO_SESSION\ncontrol=; previous=; configuration=\nfor arg do\n  if [ \"$previous\" = -S ]; then control=$arg; fi\n  if [ \"$arg\" = -G ]; then configuration=yes; fi\n  previous=$arg; last=$arg\ndone\nif [ -n \"$configuration\" ]; then printf 'controlpath %s\\n' \"$control\"; exit 0; fi\nprintf '%s\\n' \"$last\" >> {}\ncase \"$last\" in *remote-client-bridge*) printf '%s\\n' \"$$\" > {};; esac\nexec /bin/sh -c \"$last\"\n",
         quote(&base.join("home")), quote(&remote_config), quote(&remote_runtime), quote(&remote_api), quote(&ssh_commands), quote(&bridge_pid),
     )).unwrap();
     fs::set_permissions(bin.join("ssh"), fs::Permissions::from_mode(0o700)).unwrap();
@@ -1290,8 +1290,8 @@ fn client_shell_detaches_restores_and_freshly_reattaches_to_current_state() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("moo.sock");
+    let client_socket = runtime_dir.join("moo-client.sock");
 
     let mut server = spawn_server(&config_home, &runtime_dir, &api_socket, &client_socket);
     wait_for_socket(&api_socket, Duration::from_secs(10));
@@ -1465,8 +1465,8 @@ fn configured_window_title_tracks_all_tokens_and_focused_osc_only() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("moo.sock");
+    let client_socket = runtime_dir.join("moo-client.sock");
     let (server, client, output) = attach_thin_client_with_config(
         &config_home,
         &runtime_dir,
@@ -1611,8 +1611,8 @@ fn assert_client_restores_terminal(trigger: impl FnOnce(&mut SpawnedHerdr, &mut 
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("moo.sock");
+    let client_socket = runtime_dir.join("moo-client.sock");
 
     let (mut spawned_server, mut thin_client, pty_output) =
         attach_thin_client(&config_home, &runtime_dir, &api_socket, &client_socket);
@@ -1704,8 +1704,8 @@ fn client_exits_cleanly_when_terminal_and_transport_hang_up() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("moo.sock");
+    let client_socket = runtime_dir.join("moo-client.sock");
 
     let mut spawned_server = spawn_server(&config_home, &runtime_dir, &api_socket, &client_socket);
     wait_for_socket(&api_socket, Duration::from_secs(10));
@@ -1763,8 +1763,8 @@ fn client_exits_cleanly_when_terminal_hangs_up() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("moo.sock");
+    let client_socket = runtime_dir.join("moo-client.sock");
 
     let spawned_server = spawn_server(&config_home, &runtime_dir, &api_socket, &client_socket);
     wait_for_socket(&api_socket, Duration::from_secs(10));
@@ -1810,8 +1810,8 @@ fn client_receives_pane_surface_after_pane_output() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("moo.sock");
+    let client_socket = runtime_dir.join("moo-client.sock");
 
     let spawned = spawn_server(&config_home, &runtime_dir, &api_socket, &client_socket);
     wait_for_socket(&api_socket, Duration::from_secs(10));
@@ -1876,8 +1876,8 @@ fn unavailable_restored_pane_keeps_saved_cwd_in_server() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("moo.sock");
+    let client_socket = runtime_dir.join("moo-client.sock");
     let data_dir = config_home.join(app_dir_name());
     let missing_cwd = base.join("missing-cwd-for-test");
     let missing_cwd = missing_cwd.to_str().expect("test cwd should be UTF-8");
@@ -1994,8 +1994,8 @@ fn graceful_shutdown_sends_server_shutdown_to_client() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("moo.sock");
+    let client_socket = runtime_dir.join("moo-client.sock");
 
     let mut spawned = spawn_server(&config_home, &runtime_dir, &api_socket, &client_socket);
     wait_for_socket(&api_socket, Duration::from_secs(10));
@@ -2051,8 +2051,8 @@ fn client_receives_notify_on_agent_state_change() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("moo.sock");
+    let client_socket = runtime_dir.join("moo-client.sock");
 
     // Enable toast and sound in config so the server produces notifications.
     fs::create_dir_all(config_home.join(app_dir_name())).unwrap();
@@ -2080,10 +2080,10 @@ fn client_receives_notify_on_agent_state_change() {
     cmd.arg("server");
     cmd.env("XDG_CONFIG_HOME", &config_home);
     cmd.env("XDG_RUNTIME_DIR", &runtime_dir);
-    cmd.env("HERDR_SOCKET_PATH", &api_socket);
-    cmd.env_remove("HERDR_CLIENT_SOCKET_PATH");
+    cmd.env("MOO_SOCKET_PATH", &api_socket);
+    cmd.env_remove("MOO_CLIENT_SOCKET_PATH");
     cmd.env("SHELL", "/bin/sh");
-    cmd.env_remove("HERDR_ENV");
+    cmd.env_remove("MOO_ENV");
 
     let child = pair.slave.spawn_command(cmd).unwrap();
     register_spawned_herdr_pid(child.process_id());

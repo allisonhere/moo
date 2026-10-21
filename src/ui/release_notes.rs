@@ -270,11 +270,11 @@ mod tests {
     #[test]
     fn release_notes_inline_code_spans_are_styled_without_backticks() {
         let palette = Palette::catppuccin();
-        let lines = release_notes_lines("- `herdr pane run ...` now works", &palette);
+        let lines = release_notes_lines("- `moo pane run ...` now works", &palette);
 
         assert_eq!(lines.len(), 1);
-        assert_eq!(line_text(&lines[0].1), " • herdr pane run ... now works");
-        assert_eq!(lines[0].1.spans[1].content.as_ref(), "herdr pane run ...");
+        assert_eq!(line_text(&lines[0].1), " • moo pane run ... now works");
+        assert_eq!(lines[0].1.spans[1].content.as_ref(), "moo pane run ...");
         assert_eq!(lines[0].1.spans[1].style.fg, Some(palette.accent));
         assert_eq!(lines[0].1.spans[1].style.bg, Some(palette.surface0));
     }

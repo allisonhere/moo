@@ -112,10 +112,10 @@ fn spawn_server(
     cmd.arg("server");
     cmd.env("XDG_CONFIG_HOME", config_home);
     cmd.env("XDG_RUNTIME_DIR", runtime_dir);
-    cmd.env("HERDR_SOCKET_PATH", api_socket_path);
-    cmd.env_remove("HERDR_CLIENT_SOCKET_PATH");
+    cmd.env("MOO_SOCKET_PATH", api_socket_path);
+    cmd.env_remove("MOO_CLIENT_SOCKET_PATH");
     cmd.env("SHELL", "/bin/sh");
-    cmd.env_remove("HERDR_ENV");
+    cmd.env_remove("MOO_ENV");
 
     let child = pair.slave.spawn_command(cmd).unwrap();
     register_spawned_herdr_pid(child.process_id());
@@ -159,10 +159,10 @@ fn spawn_herdr_auto(
     // No subcommand → auto-detect launch.
     cmd.env("XDG_CONFIG_HOME", config_home);
     cmd.env("XDG_RUNTIME_DIR", runtime_dir);
-    cmd.env("HERDR_SOCKET_PATH", api_socket_path);
-    cmd.env_remove("HERDR_CLIENT_SOCKET_PATH");
+    cmd.env("MOO_SOCKET_PATH", api_socket_path);
+    cmd.env_remove("MOO_CLIENT_SOCKET_PATH");
     cmd.env("SHELL", "/bin/sh");
-    cmd.env_remove("HERDR_ENV");
+    cmd.env_remove("MOO_ENV");
 
     let child = pair.slave.spawn_command(cmd).unwrap();
     register_spawned_herdr_pid(child.process_id());
@@ -208,9 +208,9 @@ fn wait_for_log_contains(path: &Path, needle: &str, timeout: Duration) {
 fn run_cli(socket_path: &Path, args: &[&str]) -> std::process::Output {
     let mut command = Command::new(env!("CARGO_BIN_EXE_moo"));
     command.args(args);
-    command.env("HERDR_SOCKET_PATH", socket_path);
-    command.env_remove("HERDR_ENV");
-    command.env_remove("HERDR_PRODUCT_ID");
+    command.env("MOO_SOCKET_PATH", socket_path);
+    command.env_remove("MOO_ENV");
+    command.env_remove("MOO_PRODUCT_ID");
     command.output().unwrap()
 }
 
@@ -264,14 +264,14 @@ fn session_attach_without_terminal_leaves_no_session() {
             .args(args)
             .env("XDG_CONFIG_HOME", &config_home)
             .env("XDG_RUNTIME_DIR", &runtime_dir)
-            .env_remove("HERDR_CONFIG_PATH")
-            .env_remove("HERDR_ENV")
-            .env_remove("HERDR_SESSION")
-            .env_remove("HERDR_SOCKET_PATH")
-            .env_remove("HERDR_CLIENT_SOCKET_PATH")
-            .env_remove("HERDR_WORKSPACE_ID")
-            .env_remove("HERDR_TAB_ID")
-            .env_remove("HERDR_PANE_ID");
+            .env_remove("MOO_CONFIG_PATH")
+            .env_remove("MOO_ENV")
+            .env_remove("MOO_SESSION")
+            .env_remove("MOO_SOCKET_PATH")
+            .env_remove("MOO_CLIENT_SOCKET_PATH")
+            .env_remove("MOO_WORKSPACE_ID")
+            .env_remove("MOO_TAB_ID")
+            .env_remove("MOO_PANE_ID");
         // Piped stdio alone can still leave /dev/tty usable. Match noninteractive
         // SSH by detaching the child from the test runner's controlling terminal.
         unsafe {
@@ -316,8 +316,8 @@ fn auto_detect_no_server_spawns_server_and_attaches() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("moo.sock");
+    let client_socket = runtime_dir.join("moo-client.sock");
 
     // Ensure no server is running initially.
     assert!(
@@ -365,8 +365,8 @@ fn auto_detect_server_running_attaches_directly() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("moo.sock");
+    let client_socket = runtime_dir.join("moo-client.sock");
 
     // Start a server explicitly.
     let server = spawn_server(&config_home, &runtime_dir, &api_socket, &client_socket);
@@ -409,7 +409,7 @@ fn auto_detect_server_running_attaches_directly() {
 }
 
 /// Socket path resolution is consistent between server and client.
-/// Both derive the client socket from the `HERDR_SOCKET_PATH` override,
+/// Both derive the client socket from the `MOO_SOCKET_PATH` override,
 /// so overriding the API socket keeps both endpoints aligned.
 #[test]
 fn auto_detect_socket_path_consistency() {
@@ -417,8 +417,8 @@ fn auto_detect_socket_path_consistency() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("moo.sock");
+    let client_socket = runtime_dir.join("moo-client.sock");
 
     // Run `herdr` with custom socket paths.
     let herdr = spawn_herdr_auto(&config_home, &runtime_dir, &api_socket, &client_socket);
@@ -459,8 +459,8 @@ fn cli_subcommands_work_through_server() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("moo.sock");
+    let client_socket = runtime_dir.join("moo-client.sock");
 
     // Start a server.
     let server = spawn_server(&config_home, &runtime_dir, &api_socket, &client_socket);
@@ -505,8 +505,8 @@ fn auto_detect_server_persists_and_reattaches() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("moo.sock");
+    let client_socket = runtime_dir.join("moo-client.sock");
 
     // Run `herdr` — auto-detect spawns server + attaches client.
     let mut client1 = spawn_herdr_auto(&config_home, &runtime_dir, &api_socket, &client_socket);
@@ -574,11 +574,11 @@ fn auto_detect_default_socket_path_from_config_dir() {
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
 
-    // Don't set HERDR_SOCKET_PATH or HERDR_CLIENT_SOCKET_PATH.
+    // Don't set MOO_SOCKET_PATH or MOO_CLIENT_SOCKET_PATH.
     // The default paths should come from the app config directory, not XDG_RUNTIME_DIR.
     let app_dir_name = support::app_dir_name();
-    let api_socket = config_home.join(app_dir_name).join("herdr.sock");
-    let client_socket = config_home.join(app_dir_name).join("herdr-client.sock");
+    let api_socket = config_home.join(app_dir_name).join("moo.sock");
+    let client_socket = config_home.join(app_dir_name).join("moo-client.sock");
 
     // Spawn server with XDG_RUNTIME_DIR set to a different directory to prove it is ignored.
     fs::create_dir_all(config_home.join(app_dir_name)).unwrap();
@@ -605,10 +605,10 @@ fn auto_detect_default_socket_path_from_config_dir() {
     cmd.env("XDG_CONFIG_HOME", &config_home);
     cmd.env("XDG_RUNTIME_DIR", &runtime_dir);
     cmd.env("SHELL", "/bin/sh");
-    cmd.env_remove("HERDR_ENV");
+    cmd.env_remove("MOO_ENV");
     // Explicitly remove socket overrides to test default path resolution.
-    cmd.env_remove("HERDR_SOCKET_PATH");
-    cmd.env_remove("HERDR_CLIENT_SOCKET_PATH");
+    cmd.env_remove("MOO_SOCKET_PATH");
+    cmd.env_remove("MOO_CLIENT_SOCKET_PATH");
 
     let child = pair.slave.spawn_command(cmd).unwrap();
     register_spawned_herdr_pid(child.process_id());
@@ -645,8 +645,8 @@ fn auto_detect_writes_client_and_server_logs_to_separate_files() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("moo.sock");
+    let client_socket = runtime_dir.join("moo-client.sock");
 
     let spawned = spawn_herdr_auto(&config_home, &runtime_dir, &api_socket, &client_socket);
     wait_for_socket(&api_socket, Duration::from_secs(10));
@@ -654,9 +654,9 @@ fn auto_detect_writes_client_and_server_logs_to_separate_files() {
 
     let app_dir_name = support::app_dir_name();
     let log_dir = config_home.join(app_dir_name);
-    let client_log = log_dir.join("herdr-client.log");
-    let server_log = log_dir.join("herdr-server.log");
-    let monolith_log = log_dir.join("herdr.log");
+    let client_log = log_dir.join("moo-client.log");
+    let server_log = log_dir.join("moo-server.log");
+    let monolith_log = log_dir.join("moo.log");
 
     wait_for_log_contains(
         &client_log,
@@ -672,7 +672,7 @@ fn auto_detect_writes_client_and_server_logs_to_separate_files() {
     let monolith_content = fs::read_to_string(&monolith_log).unwrap_or_default();
     assert!(
         !monolith_content.contains("subsystem=\"client\""),
-        "persistent client logs should not land in herdr.log: {monolith_content}"
+        "persistent client logs should not land in moo.log: {monolith_content}"
     );
 
     cleanup_spawned_herdr(spawned, base);
@@ -684,8 +684,8 @@ fn auto_detect_respects_nested_guard_before_auto_attach() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("moo.sock");
+    let client_socket = runtime_dir.join("moo-client.sock");
 
     let server = spawn_server(&config_home, &runtime_dir, &api_socket, &client_socket);
     wait_for_socket(&api_socket, Duration::from_secs(10));
@@ -708,10 +708,10 @@ fn auto_detect_respects_nested_guard_before_auto_attach() {
     let output = Command::new(env!("CARGO_BIN_EXE_moo"))
         .env("XDG_CONFIG_HOME", &config_home)
         .env("XDG_RUNTIME_DIR", &runtime_dir)
-        .env("HERDR_SOCKET_PATH", &api_socket)
-        .env_remove("HERDR_CLIENT_SOCKET_PATH")
-        .env("HERDR_ENV", "1")
-        .env("HERDR_PRODUCT_ID", "moo")
+        .env("MOO_SOCKET_PATH", &api_socket)
+        .env_remove("MOO_CLIENT_SOCKET_PATH")
+        .env("MOO_ENV", "1")
+        .env("MOO_PRODUCT_ID", "moo")
         .output()
         .unwrap();
 

@@ -168,7 +168,7 @@ fn existing_permissions_and_new_file_defaults_are_preserved() {
 #[test]
 fn writable_directory_does_not_bypass_read_only_config() {
     use std::os::unix::{fs::PermissionsExt, process::CommandExt};
-    const CHILD: &str = "HERDR_CONFIG_READ_ONLY_TEST";
+    const CHILD: &str = "MOO_CONFIG_READ_ONLY_TEST";
     if let Some(path) = std::env::var_os(CHILD) {
         let error = write_config(Path::new(&path), b"must not replace").unwrap_err();
         assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
@@ -202,7 +202,7 @@ fn writable_directory_does_not_bypass_read_only_config() {
 #[cfg(unix)]
 #[test]
 fn partial_write_errors_preserve_files_and_do_not_remove_collisions() {
-    const CHILD: &str = "HERDR_CONFIG_PARTIAL_WRITE_TEST";
+    const CHILD: &str = "MOO_CONFIG_PARTIAL_WRITE_TEST";
     if let Some(path) = std::env::var_os(CHILD) {
         let dir = PathBuf::from(path);
         // This process runs only this test. A collision must neither be used nor removed.

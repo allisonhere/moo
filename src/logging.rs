@@ -19,7 +19,7 @@ pub(crate) fn init_file_logging(file_name: &str) {
         return;
     };
 
-    let filter = EnvFilter::try_from_env("HERDR_LOG")
+    let filter = EnvFilter::try_from_env("MOO_LOG")
         .unwrap_or_else(|_| EnvFilter::new(concat!(env!("CARGO_CRATE_NAME"), "=info")));
 
     let _ = tracing_subscriber::fmt()
@@ -33,8 +33,8 @@ pub(crate) fn init_file_logging(file_name: &str) {
 pub(crate) fn help_log_paths_summary() -> String {
     let dir = crate::session::data_dir();
     format!(
-        "{} (plus herdr-client.log, herdr-server.log)",
-        dir.join("herdr.log").display()
+        "{} (plus moo-client.log, moo-server.log)",
+        dir.join("moo.log").display()
     )
 }
 
@@ -570,16 +570,13 @@ mod tests {
                 .unwrap()
                 .as_nanos()
         );
-        std::env::temp_dir().join(unique).join("herdr.log")
+        std::env::temp_dir().join(unique).join("moo.log")
     }
 
     #[test]
     fn rotated_log_path_appends_numeric_suffix() {
-        let path = PathBuf::from("/tmp/herdr.log");
-        assert_eq!(
-            rotated_log_path(&path, 2),
-            PathBuf::from("/tmp/herdr.log.2")
-        );
+        let path = PathBuf::from("/tmp/moo.log");
+        assert_eq!(rotated_log_path(&path, 2), PathBuf::from("/tmp/moo.log.2"));
     }
 
     #[test]
@@ -618,7 +615,7 @@ mod tests {
         let dir = path.parent().unwrap().to_path_buf();
         fs::create_dir_all(&dir).unwrap();
 
-        let writer = RotatingFileMakeWriter::new(dir.clone(), "herdr.log", 8, 0).unwrap();
+        let writer = RotatingFileMakeWriter::new(dir.clone(), "moo.log", 8, 0).unwrap();
         {
             let mut guard = writer.make_writer();
             guard.write_all(b"12345678").unwrap();

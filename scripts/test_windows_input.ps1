@@ -144,7 +144,7 @@ function Get-GauntletClientTrace($Plan) {
     # The client writes its mapper trace into the named session's data directory.
     # The client log grows independently of the transport log, so this keeps its
     # own cursor rather than reusing the transport line count.
-    $log = Join-Path $Plan.config_home "herdr/sessions/$($Plan.session)/herdr-client.log"
+    $log = Join-Path $Plan.config_home "herdr/sessions/$($Plan.session)/moo-client.log"
     if (-not (Test-Path -LiteralPath $log)) { return $null }
     $lines = @(Get-Content -LiteralPath $log | Where-Object { $_ -like '*windows input trace: input batch*' })
     $since = if ($Plan.ContainsKey('client_trace_lines')) { [int]$Plan.client_trace_lines } else { 0 }

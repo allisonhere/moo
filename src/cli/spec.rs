@@ -611,7 +611,7 @@ mod tests {
                     .render_long_help()
                     .to_string()
                     .contains("--json"),
-                "herdr worktree {subcommand} should not advertise --json"
+                "moo worktree {subcommand} should not advertise --json"
             );
         }
     }
@@ -743,7 +743,7 @@ mod tests {
         let pane_send_text = long_help(&["pane", "send-text"]);
         assert!(
             pane_send_text.contains(
-                "next: herdr pane run <PANE_ID> <COMMAND> sends text and Enter in one call"
+                "next: moo pane run <PANE_ID> <COMMAND> sends text and Enter in one call"
             ),
             "pane send-text is missing its next-step hint: {pane_send_text}"
         );

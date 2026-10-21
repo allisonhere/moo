@@ -1,9 +1,9 @@
 use std::io;
 
-pub(crate) const HERDR_ENV_VAR: &str = "HERDR_ENV";
-pub(crate) const HERDR_ENV_VALUE: &str = "1";
-pub(crate) const HERDR_PRODUCT_ENV_VAR: &str = "HERDR_PRODUCT_ID";
-const NESTED_HERDR_MESSAGES: [&str; 6] = [
+pub(crate) const MOO_ENV_VAR: &str = "MOO_ENV";
+pub(crate) const MOO_ENV_VALUE: &str = "1";
+pub(crate) const MOO_PRODUCT_ENV_VAR: &str = "MOO_PRODUCT_ID";
+const NESTED_MOO_MESSAGES: [&str; 6] = [
     "inception detected. we need to go deeper... said no one ever.",
     "recursion is a pathway to many abilities some consider to be... unnatural.",
     "you were so preoccupied with whether you could, you didn't stop to think if you should. — dr. malcolm",
@@ -453,11 +453,11 @@ pane_history = false
 const SKILL: &str = include_str!("../skills/herdr/SKILL.md");
 
 fn should_block_nested(config: &config::Config) -> bool {
-    should_block_nested_for_env(config, std::env::var(HERDR_ENV_VAR).ok().as_deref())
+    should_block_nested_for_env(config, std::env::var(MOO_ENV_VAR).ok().as_deref())
 }
 
 fn should_block_nested_for_env(config: &config::Config, herdr_env: Option<&str>) -> bool {
-    !config.experimental.allow_nested && herdr_env == Some(HERDR_ENV_VALUE)
+    !config.experimental.allow_nested && herdr_env == Some(MOO_ENV_VALUE)
 }
 
 fn random_nested_message() -> &'static str {
@@ -467,8 +467,8 @@ fn random_nested_message() -> &'static str {
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.subsec_nanos() as usize)
         .unwrap_or(0);
-    let index = (nanos ^ (std::process::id() as usize)) % NESTED_HERDR_MESSAGES.len();
-    NESTED_HERDR_MESSAGES[index]
+    let index = (nanos ^ (std::process::id() as usize)) % NESTED_MOO_MESSAGES.len();
+    NESTED_MOO_MESSAGES[index]
 }
 
 fn exit_if_nested_disabled(config: &config::Config) {
@@ -731,7 +731,7 @@ fn main() -> io::Result<()> {
         println!();
         println!("Config: {}", config::config_path().display());
         println!("Logs:   {}", logging::help_log_paths_summary());
-        println!("Env:    HERDR_CONFIG_PATH overrides config file path");
+        println!("Env:    MOO_CONFIG_PATH overrides config file path");
         println!("Home:   https://herdr.dev");
         println!();
         println!("{}", cli::AGENT_HELP_FOOTER);
@@ -823,13 +823,13 @@ fn main() -> io::Result<()> {
 }
 
 fn inherited_socket_belongs_to_another_product() -> bool {
-    let inherited_socket = std::env::var_os("HERDR_SOCKET_PATH").is_some()
-        || std::env::var_os("HERDR_CLIENT_SOCKET_PATH").is_some();
-    let managed_pane = std::env::var(HERDR_ENV_VAR).ok().as_deref() == Some(HERDR_ENV_VALUE);
+    let inherited_socket = std::env::var_os("MOO_SOCKET_PATH").is_some()
+        || std::env::var_os("MOO_CLIENT_SOCKET_PATH").is_some();
+    let managed_pane = std::env::var(MOO_ENV_VAR).ok().as_deref() == Some(MOO_ENV_VALUE);
     socket_product_mismatch(
         inherited_socket,
         managed_pane,
-        std::env::var(HERDR_PRODUCT_ENV_VAR).ok().as_deref(),
+        std::env::var(MOO_PRODUCT_ENV_VAR).ok().as_deref(),
     )
 }
 
@@ -862,14 +862,14 @@ mod tests {
     #[test]
     fn nested_herdr_blocks_when_env_is_set() {
         let config = config::Config::default();
-        assert!(should_block_nested_for_env(&config, Some(HERDR_ENV_VALUE)));
+        assert!(should_block_nested_for_env(&config, Some(MOO_ENV_VALUE)));
     }
 
     #[test]
     fn nested_herdr_does_not_block_when_allowed() {
         let config: config::Config =
             toml::from_str("[experimental]\nallow_nested = true\n").unwrap();
-        assert!(!should_block_nested_for_env(&config, Some(HERDR_ENV_VALUE)));
+        assert!(!should_block_nested_for_env(&config, Some(MOO_ENV_VALUE)));
     }
 
     #[test]
@@ -890,12 +890,12 @@ mod tests {
     #[test]
     fn random_nested_message_comes_from_known_set() {
         let message = random_nested_message();
-        assert!(NESTED_HERDR_MESSAGES.contains(&message));
+        assert!(NESTED_MOO_MESSAGES.contains(&message));
     }
 
     #[test]
     fn nested_message_strings_no_longer_repeat_herdr_prefix() {
-        assert!(NESTED_HERDR_MESSAGES
+        assert!(NESTED_MOO_MESSAGES
             .iter()
             .all(|message| !message.starts_with("herdr:")));
     }

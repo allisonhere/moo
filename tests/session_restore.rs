@@ -67,7 +67,7 @@ fn server_restores_while_git_metadata_is_blocked() {
         let base = fs::canonicalize(base).unwrap();
         let config_home = base.join("config");
         let runtime_dir = base.join("runtime");
-        let socket_path = runtime_dir.join("herdr.sock");
+        let socket_path = runtime_dir.join("moo.sock");
         let data_dir = config_home.join(support::app_dir_name());
         let repo = base.join("repo");
         fs::create_dir_all(repo.join(".git/objects")).unwrap();
@@ -127,12 +127,12 @@ fn server_restores_while_git_metadata_is_blocked() {
             .arg("server")
             .env("XDG_CONFIG_HOME", &config_home)
             .env("XDG_RUNTIME_DIR", &runtime_dir)
-            .env("HERDR_SOCKET_PATH", &socket_path)
+            .env("MOO_SOCKET_PATH", &socket_path)
             .env("SHELL", "/bin/sh")
-            .env_remove("HERDR_CLIENT_SOCKET_PATH")
-            .env_remove("HERDR_STARTUP_CWD")
-            .env_remove("HERDR_SESSION")
-            .env_remove("HERDR_ENV")
+            .env_remove("MOO_CLIENT_SOCKET_PATH")
+            .env_remove("MOO_STARTUP_CWD")
+            .env_remove("MOO_SESSION")
+            .env_remove("MOO_ENV")
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null())

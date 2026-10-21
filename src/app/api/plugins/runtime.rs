@@ -42,44 +42,44 @@ impl App {
                 crate::api::SOCKET_PATH_ENV_VAR.to_string(),
                 crate::api::socket_path().display().to_string(),
             ),
-            ("HERDR_ENV".to_string(), "1".to_string()),
+            ("MOO_ENV".to_string(), "1".to_string()),
             (
-                crate::HERDR_PRODUCT_ENV_VAR.to_string(),
+                crate::MOO_PRODUCT_ENV_VAR.to_string(),
                 crate::product_identity::APP_DIR_NAME.to_string(),
             ),
-            ("HERDR_PLUGIN_ID".to_string(), plugin.plugin_id.clone()),
-            ("HERDR_PLUGIN_CONTEXT_JSON".to_string(), context_json),
+            ("MOO_PLUGIN_ID".to_string(), plugin.plugin_id.clone()),
+            ("MOO_PLUGIN_CONTEXT_JSON".to_string(), context_json),
         ]);
         if let Ok(current_exe) = crate::platform::launch_executable() {
             env.push((
-                "HERDR_BIN_PATH".to_string(),
+                "MOO_BIN_PATH".to_string(),
                 current_exe.display().to_string(),
             ));
         }
         if let Some(action_id) = action_id.as_ref() {
-            env.push(("HERDR_PLUGIN_ACTION_ID".to_string(), action_id.clone()));
+            env.push(("MOO_PLUGIN_ACTION_ID".to_string(), action_id.clone()));
         }
         if let Some(event) = event.as_ref() {
-            env.push(("HERDR_PLUGIN_EVENT".to_string(), event.clone()));
+            env.push(("MOO_PLUGIN_EVENT".to_string(), event.clone()));
         }
         if let Some(event_json) = event_json {
-            env.push(("HERDR_PLUGIN_EVENT_JSON".to_string(), event_json));
+            env.push(("MOO_PLUGIN_EVENT_JSON".to_string(), event_json));
         }
         if let Some(workspace_id) = context.workspace_id.as_ref() {
-            env.push(("HERDR_WORKSPACE_ID".to_string(), workspace_id.clone()));
+            env.push(("MOO_WORKSPACE_ID".to_string(), workspace_id.clone()));
         }
         if let Some(tab_id) = context.tab_id.as_ref() {
-            env.push(("HERDR_TAB_ID".to_string(), tab_id.clone()));
+            env.push(("MOO_TAB_ID".to_string(), tab_id.clone()));
         }
         if let Some(pane_id) = context.focused_pane_id.as_ref() {
-            env.push(("HERDR_PANE_ID".to_string(), pane_id.clone()));
+            env.push(("MOO_PANE_ID".to_string(), pane_id.clone()));
         }
         if let Some(clicked_url) = context.clicked_url.as_ref() {
-            env.push(("HERDR_PLUGIN_CLICKED_URL".to_string(), clicked_url.clone()));
+            env.push(("MOO_PLUGIN_CLICKED_URL".to_string(), clicked_url.clone()));
         }
         if let Some(link_handler_id) = context.link_handler_id.as_ref() {
             env.push((
-                "HERDR_PLUGIN_LINK_HANDLER_ID".to_string(),
+                "MOO_PLUGIN_LINK_HANDLER_ID".to_string(),
                 link_handler_id.clone(),
             ));
         }

@@ -207,7 +207,7 @@ exits. `width` and `height` are optional; omit them for the default half-size
 popup, use numbers for terminal cells, or use strings like `"80%"` for a
 percentage of the terminal area. Dimensions include the popup border, and
 values smaller than the popup minimum are clamped. Popup commands do not receive
-`HERDR_PANE_ID`; use `HERDR_ACTIVE_PANE_ID` for the underlying tiled pane.
+`MOO_PANE_ID`; use `MOO_ACTIVE_PANE_ID` for the underlying tiled pane.
 
 On Unix and macOS, a popup command can also provide an ad-hoc terminal without
 adding a split or tab:
@@ -242,9 +242,9 @@ description = "apply layout"
 
 `description` is optional. When set, it appears in the keybind help panel (opened with `prefix+?`) instead of the default `'custom command'` label.
 
-Custom commands receive `HERDR_SOCKET_PATH`, `HERDR_BIN_PATH`, `HERDR_ACTIVE_WORKSPACE_ID`, `HERDR_ACTIVE_TAB_ID`, `HERDR_ACTIVE_PANE_ID`, and `HERDR_ACTIVE_PANE_CWD` when those values are available. Shell commands run from the focused pane's working directory when Herdr can detect it.
+Custom commands receive `MOO_SOCKET_PATH`, `MOO_BIN_PATH`, `MOO_ACTIVE_WORKSPACE_ID`, `MOO_ACTIVE_TAB_ID`, `MOO_ACTIVE_PANE_ID`, and `MOO_ACTIVE_PANE_CWD` when those values are available. Shell commands run from the focused pane's working directory when Herdr can detect it.
 
-On Windows, custom command strings use `cmd.exe /d /c`, so environment variables use `%HERDR_BIN_PATH%` syntax. To run PowerShell syntax, invoke it explicitly, for example `powershell.exe -NoProfile -Command "..."`.
+On Windows, custom command strings use `cmd.exe /d /c`, so environment variables use `%MOO_BIN_PATH%` syntax. To run PowerShell syntax, invoke it explicitly, for example `powershell.exe -NoProfile -Command "..."`.
 
 ## Theme
 
@@ -502,7 +502,7 @@ delay_seconds = 1
 position = "bottom-right"
 ```
 
-Choose `herdr` for an in-app toast, `terminal` for an outer-terminal notification that also works over SSH, `system` for the local OS notification service, or `off` to disable popups. Herdr suppresses popups for the active tab. Search `ui.toast` in the [Config reference](/docs/config-reference/) for positions, delay behavior, and clipboard feedback settings.
+Choose `herdr` for an in-app toast, `terminal` for an outer-terminal notification that also works over SSH, `system` for the local OS notification service, or `off` to disable popups. For sound without popups, set `delivery = "off"` and `[ui.sound] enabled = true`; Settings has this as **audio only**, and choosing **off** there mutes sound as well. Herdr suppresses popups for the active tab. Search `ui.toast` in the [Config reference](/docs/config-reference/) for positions, delay behavior, and clipboard feedback settings.
 
 On macOS, `system` tries `terminal-notifier` first and falls back to `/usr/bin/osascript` when it is unavailable or fails. The fallback appears as Script Editor in Notification Center and cannot activate the hosting terminal. Install `terminal-notifier` with `brew install terminal-notifier`. For a supported, detected terminal, it can activate the terminal app when you click the notification. Alternatively, choose `terminal` to let a supported outer terminal own the notification.
 
@@ -603,12 +603,12 @@ On Windows, support is currently limited to the Korean IME. With an IME for any 
 
 | Variable | Purpose |
 | --- | --- |
-| `HERDR_CONFIG_PATH` | Override the config file path. |
-| `HERDR_SESSION` | Select a named session for CLI commands. |
-| `HERDR_SOCKET_PATH` | Low-level socket path override. |
-| `HERDR_PROCESS_DETECTION` | Linux process detection strategy: `native` (default) or opt-in `child-groups`. |
-| `HERDR_LOG` | Set log filtering, for example `HERDR_LOG=moo=debug`. |
-| `HERDR_DISABLE_SOUND` | Disable sound playback even when `[ui.sound] enabled = true`. |
+| `MOO_CONFIG_PATH` | Override the config file path. |
+| `MOO_SESSION` | Select a named session for CLI commands. |
+| `MOO_SOCKET_PATH` | Low-level socket path override. |
+| `MOO_PROCESS_DETECTION` | Linux process detection strategy: `native` (default) or opt-in `child-groups`. |
+| `MOO_LOG` | Set log filtering, for example `MOO_LOG=herdr=debug`. |
+| `MOO_DISABLE_SOUND` | Disable sound playback even when `[ui.sound] enabled = true`. |
 
 ## Logs
 
@@ -617,9 +617,9 @@ Logs are useful when diagnosing startup warnings, integration state, or socket A
 Common log files:
 
 ```text
-~/.config/herdr/herdr.log
-~/.config/herdr/herdr-client.log
-~/.config/herdr/herdr-server.log
+~/.config/herdr/moo.log
+~/.config/herdr/moo-client.log
+~/.config/herdr/moo-server.log
 ```
 
 Logs rotate automatically. Include the current log and rotated siblings when reporting issues.

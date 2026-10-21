@@ -208,7 +208,7 @@ pub(super) fn caller_pane_id() -> Option<String> {
     if is_remote() {
         return None;
     }
-    std::env::var("HERDR_PANE_ID")
+    std::env::var("MOO_PANE_ID")
         .ok()
         .filter(|value| !value.trim().is_empty())
 }
@@ -274,7 +274,7 @@ pub(super) fn resolve_machine<'a>(
         let mut matches = profiles.iter().filter(|profile| profile.label == selector);
         let profile = matches
             .next()
-            .ok_or_else(|| format!("unknown machine '{selector}'; use `herdr machine list`"))?;
+            .ok_or_else(|| format!("unknown machine '{selector}'; use `moo machine list`"))?;
         if matches.next().is_some() {
             return Err(format!(
                 "machine label '{selector}' is ambiguous; use its profile ID"

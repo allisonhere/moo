@@ -627,7 +627,7 @@ fn print_report(report: &Report) {
         total.herdr_owned
     );
 
-    if let Ok(path) = std::env::var("HERDR_INPUT_CONFORMANCE_FAILURES") {
+    if let Ok(path) = std::env::var("MOO_INPUT_CONFORMANCE_FAILURES") {
         let lines: Vec<String> = report
             .failures
             .iter()
@@ -1138,7 +1138,7 @@ fn split_read_robustness() {
         pct(idle_mismatch.len()),
         idle_mismatch.len()
     );
-    if let Ok(path) = std::env::var("HERDR_INPUT_CONFORMANCE_FAILURES") {
+    if let Ok(path) = std::env::var("MOO_INPUT_CONFORMANCE_FAILURES") {
         let lines: Vec<String> = burst_mismatch
             .iter()
             .chain(&reply_burst_mismatch)

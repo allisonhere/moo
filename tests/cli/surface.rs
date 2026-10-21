@@ -4,7 +4,7 @@ use super::harness::*;
 fn pane_run_sends_one_send_input_request_with_enter_key() {
     let base = unique_test_dir();
     fs::create_dir_all(&base).unwrap();
-    let socket_path = base.join("herdr.sock");
+    let socket_path = base.join("moo.sock");
     let listener = UnixListener::bind(&socket_path).unwrap();
 
     let server = thread::spawn(move || {
@@ -71,7 +71,7 @@ fn pane_run_sends_one_send_input_request_with_enter_key() {
 fn workspace_report_metadata_sends_token_patch() {
     let base = unique_test_dir();
     fs::create_dir_all(&base).unwrap();
-    let socket_path = base.join("herdr.sock");
+    let socket_path = base.join("moo.sock");
     let listener = UnixListener::bind(&socket_path).unwrap();
 
     let server = thread::spawn(move || {
@@ -123,7 +123,7 @@ fn workspace_report_metadata_sends_token_patch() {
 fn pane_report_metadata_sends_presentation_request() {
     let base = unique_test_dir();
     fs::create_dir_all(&base).unwrap();
-    let socket_path = base.join("herdr.sock");
+    let socket_path = base.join("moo.sock");
     let listener = UnixListener::bind(&socket_path).unwrap();
 
     let server = thread::spawn(move || {
@@ -278,9 +278,9 @@ fn root_and_command_group_help_point_agents_to_plain_text_docs() {
     for args in [&["--help"][..], &["agent", "--help"][..]] {
         let output = Command::new(env!("CARGO_BIN_EXE_moo"))
             .args(args)
-            .env_remove("HERDR_SOCKET_PATH")
-            .env_remove("HERDR_CLIENT_SOCKET_PATH")
-            .env_remove("HERDR_ENV")
+            .env_remove("MOO_SOCKET_PATH")
+            .env_remove("MOO_CLIENT_SOCKET_PATH")
+            .env_remove("MOO_ENV")
             .output()
             .unwrap();
         assert!(output.status.success(), "herdr {} failed", args.join(" "));
@@ -326,9 +326,9 @@ fn subcommand_help_explains_automation_semantics_without_a_server() {
     for (args, expected) in cases {
         let output = Command::new(env!("CARGO_BIN_EXE_moo"))
             .args(*args)
-            .env_remove("HERDR_SOCKET_PATH")
-            .env_remove("HERDR_CLIENT_SOCKET_PATH")
-            .env_remove("HERDR_ENV")
+            .env_remove("MOO_SOCKET_PATH")
+            .env_remove("MOO_CLIENT_SOCKET_PATH")
+            .env_remove("MOO_ENV")
             .output()
             .unwrap();
         assert!(
@@ -360,7 +360,7 @@ fn removed_wait_and_agent_send_commands_are_rejected() {
         .arg("--help")
         .output()
         .unwrap();
-    assert!(!String::from_utf8_lossy(&help.stdout).contains("herdr wait <subcommand>"));
+    assert!(!String::from_utf8_lossy(&help.stdout).contains("moo wait <subcommand>"));
 
     let send = Command::new(env!("CARGO_BIN_EXE_moo"))
         .args(["agent", "send", "reviewer", "hello"])
@@ -369,7 +369,7 @@ fn removed_wait_and_agent_send_commands_are_rejected() {
     assert_eq!(send.status.code(), Some(2));
     let stderr = String::from_utf8_lossy(&send.stderr);
     assert!(stderr.contains("unrecognized subcommand 'send'"));
-    assert!(!stderr.contains("herdr agent send <"));
+    assert!(!stderr.contains("moo agent send <"));
 }
 
 #[test]
@@ -405,7 +405,7 @@ fn agent_cli_rejects_invalid_wait_and_rename_grammar_locally() {
     ] {
         let output = Command::new(env!("CARGO_BIN_EXE_moo"))
             .args(args)
-            .env("HERDR_SOCKET_PATH", "/nonexistent/herdr.sock")
+            .env("MOO_SOCKET_PATH", "/nonexistent/herdr.sock")
             .output()
             .unwrap();
         assert_eq!(
@@ -423,9 +423,9 @@ fn agent_cli_rejects_invalid_wait_and_rename_grammar_locally() {
 fn completion_command_prints_zsh_script_without_session_startup() {
     let output = Command::new(env!("CARGO_BIN_EXE_moo"))
         .args(["completion", "zsh"])
-        .env_remove("HERDR_SOCKET_PATH")
-        .env_remove("HERDR_CLIENT_SOCKET_PATH")
-        .env_remove("HERDR_ENV")
+        .env_remove("MOO_SOCKET_PATH")
+        .env_remove("MOO_CLIENT_SOCKET_PATH")
+        .env_remove("MOO_ENV")
         .output()
         .unwrap();
 
@@ -527,7 +527,7 @@ fn api_schema_json_prints_bundled_schema() {
 fn api_snapshot_prints_live_session_snapshot() {
     let base = unique_test_dir();
     fs::create_dir_all(&base).unwrap();
-    let socket_path = base.join("herdr.sock");
+    let socket_path = base.join("moo.sock");
     let listener = UnixListener::bind(&socket_path).unwrap();
 
     let server = thread::spawn({
@@ -593,9 +593,9 @@ fn explicit_client_command_respects_nested_guard() {
 
     let output = Command::new(env!("CARGO_BIN_EXE_moo"))
         .arg("client")
-        .env("HERDR_ENV", "1")
+        .env("MOO_ENV", "1")
         .env("XDG_CONFIG_HOME", &base)
-        .env_remove("HERDR_CONFIG_PATH")
+        .env_remove("MOO_CONFIG_PATH")
         .output()
         .unwrap();
 
@@ -613,7 +613,7 @@ fn explicit_client_command_respects_nested_guard() {
 fn removed_show_changelog_flag_fails_before_nested_guard() {
     let output = Command::new(env!("CARGO_BIN_EXE_moo"))
         .arg("--show-changelog")
-        .env("HERDR_ENV", "1")
+        .env("MOO_ENV", "1")
         .output()
         .unwrap();
 

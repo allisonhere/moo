@@ -204,22 +204,22 @@ fn windows_virtual_terminal_input_mode_sets_only_vti_bit() {
 fn windows_win32_input_mode_defaults_to_win32_and_honors_probe() {
     let _guard = env_lock().lock().unwrap();
     let _removed =
-        EnvVarsRemovedGuard::new(&["HERDR_WINDOWS_INPUT_PROBE", "SSH_CONNECTION", "SSH_TTY"]);
+        EnvVarsRemovedGuard::new(&["MOO_WINDOWS_INPUT_PROBE", "SSH_CONNECTION", "SSH_TTY"]);
 
     assert!(windows_win32_input_mode_enabled());
     {
         let _ssh = EnvVarGuard::set("SSH_CONNECTION", "1 2 3 4");
         assert!(windows_win32_input_mode_enabled());
-        let _probe = EnvVarGuard::set("HERDR_WINDOWS_INPUT_PROBE", "WiN32");
+        let _probe = EnvVarGuard::set("MOO_WINDOWS_INPUT_PROBE", "WiN32");
         assert!(windows_win32_input_mode_enabled());
     }
     {
         let _ssh = EnvVarGuard::set("SSH_TTY", "terminal");
         assert!(windows_win32_input_mode_enabled());
-        let _probe = EnvVarGuard::set("HERDR_WINDOWS_INPUT_PROBE", "vT");
+        let _probe = EnvVarGuard::set("MOO_WINDOWS_INPUT_PROBE", "vT");
         assert!(!windows_win32_input_mode_enabled());
     }
-    let _probe = EnvVarGuard::set("HERDR_WINDOWS_INPUT_PROBE", "win32");
+    let _probe = EnvVarGuard::set("MOO_WINDOWS_INPUT_PROBE", "win32");
     assert!(windows_win32_input_mode_enabled());
 }
 
@@ -611,7 +611,7 @@ fn client_error_display_connection_failed() {
         "should mention connection failure: {msg}"
     );
     assert!(
-        msg.contains("herdr server"),
+        msg.contains("moo server"),
         "should suggest starting server: {msg}"
     );
 }

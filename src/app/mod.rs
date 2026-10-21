@@ -1604,7 +1604,7 @@ mod tests {
         crate::release_notes::save_pending("99.99.99", "### Changed\n- One").unwrap();
         app.handle_internal_event(AppEvent::UpdateReady {
             version: "99.99.99".into(),
-            install_command: "herdr update".into(),
+            install_command: "moo update".into(),
         });
 
         assert_eq!(
@@ -3415,7 +3415,7 @@ mod tests {
             app.event_tx
                 .try_send(AppEvent::UpdateReady {
                     version: format!("9.9.{i}"),
-                    install_command: "herdr update".into(),
+                    install_command: "moo update".into(),
                 })
                 .unwrap();
         }

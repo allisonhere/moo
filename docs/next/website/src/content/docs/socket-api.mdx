@@ -106,7 +106,7 @@ Raw socket method names use dot notation:
 | Pane | `pane.split`, `pane.swap`, `pane.move`, `pane.zoom`, `pane.layout`, `pane.process_info`, `pane.neighbor`, `pane.edges`, `pane.focus_direction`, `pane.resize`, `pane.list`, `pane.current`, `pane.get`, `pane.rename`, `pane.send_text`, `pane.send_keys`, `pane.send_input`, `pane.read`, `pane.report_agent`, `pane.report_agent_session`, `pane.report_metadata`, `pane.clear_agent_authority`, `pane.release_agent`, `pane.close`, `pane.wait_for_output` |
 | Popup | `popup.close` |
 | Layout | `layout.export`, `layout.apply`, `layout.set_split_ratio` |
-| Agent | `agent.list`, `agent.get`, `agent.read`, `agent.explain`, `agent.send_keys`, `agent.prompt`, `agent.wait`, `agent.rename`, `agent.focus`, `agent.start`, `agent.view.set`, `agent.view.clear` |
+| Agent | `agent.list`, `agent.get`, `agent.read`, `agent.explain`, `agent.send_keys`, `agent.prompt`, `agent.wait`, `agent.rename`, `agent.history`, `agent.focus`, `agent.start`, `agent.view.set`, `agent.view.clear` |
 | Events | `events.subscribe`, `events.wait` |
 | Integrations | `integration.install`, `integration.uninstall` |
 | Plugins | `plugin.link`, `plugin.list`, `plugin.unlink`, `plugin.enable`, `plugin.disable`, `plugin.action.list`, `plugin.action.invoke`, `plugin.log.list`, `plugin.pane.open`, `plugin.pane.focus`, `plugin.pane.close` |
@@ -149,7 +149,7 @@ On macOS, `pane.send_input` (used by `pane run`) and `agent.start` check the ter
 {"id":"req_resize","method":"pane.resize","params":{"pane_id":"w1:p1","direction":"right","amount":0.1}}
 {"id":"req_zoom","method":"pane.zoom","params":{"pane_id":"w1:p1","mode":"toggle"}}
 {"id":"req_input","method":"pane.input.set","params":{"pane_id":"w1:p1","right_click":"pane"}}
-{"id":"req_split","method":"pane.split","params":{"direction":"right","ratio":0.333,"right_click":"pane","env":{"HERDR_ROLE":"tests"}}}
+{"id":"req_split","method":"pane.split","params":{"direction":"right","ratio":0.333,"right_click":"pane","env":{"MOO_ROLE":"tests"}}}
 {"id":"req_process","method":"pane.process_info","params":{"pane_id":"w1:p1"}}
 ```
 
@@ -236,7 +236,7 @@ not preserve live PTYs, scrollback, or running processes.
         "label": "tests",
         "cwd": "/repo",
         "command": ["sh", "-c", "just test"],
-        "env": { "HERDR_ROLE": "tests" }
+        "env": { "MOO_ROLE": "tests" }
       }
     }
   }
@@ -251,8 +251,8 @@ is `type: "layout_split_ratio_set"` with the updated portable `layout`.
 ```
 
 Process-launching methods accept an `env` object. Herdr applies those key/value
-pairs to the newly launched process only. Herdr also injects `HERDR_SOCKET_PATH`,
-`HERDR_ENV=1`, `HERDR_WORKSPACE_ID`, `HERDR_TAB_ID`, and `HERDR_PANE_ID` into
+pairs to the newly launched process only. Herdr also injects `MOO_SOCKET_PATH`,
+`MOO_ENV=1`, `MOO_WORKSPACE_ID`, `MOO_TAB_ID`, and `MOO_PANE_ID` into
 managed pane processes. Herdr-managed variables are authoritative when they
 conflict with caller-provided env.
 
@@ -428,12 +428,12 @@ after present values. When `sort` is omitted, the existing
 `ui.agent_panel_sort` policy remains active. A custom sort temporarily replaces
 that policy without rewriting config.
 
-`source` identifies the owner. Plugins use `plugin:<HERDR_PLUGIN_ID>`; Herdr
+`source` identifies the owner. Plugins use `plugin:<MOO_PLUGIN_ID>`; Herdr
 rejects plugin-owned sets when that plugin is missing or disabled. Other callers
 may use their own non-`plugin:` source. A successful set atomically replaces the
 previous view. The view lasts until it is cleared, replaced, its owning plugin
 is disabled, unlinked, or uninstalled, or the server exits. Plugins that want
-durable behavior should save the query under `HERDR_PLUGIN_STATE_DIR` and
+durable behavior should save the query under `MOO_PLUGIN_STATE_DIR` and
 reapply it from a `[[startup]]` hook.
 
 Clear unconditionally, or only when the named source still owns the view:
@@ -560,13 +560,13 @@ log record. Missing context fields are filled from the active workspace, tab,
 focused pane, worktree provenance, and request id. Invoking an action from a
 disabled plugin returns a `plugin_disabled` error.
 
-Herdr injects `HERDR_SOCKET_PATH`, `HERDR_BIN_PATH`, `HERDR_ENV=1`,
-`HERDR_PLUGIN_ID`, `HERDR_PLUGIN_ROOT`, `HERDR_PLUGIN_CONFIG_DIR`,
-`HERDR_PLUGIN_STATE_DIR`, `HERDR_PLUGIN_CONTEXT_JSON`, and available
-`HERDR_WORKSPACE_ID`, `HERDR_TAB_ID`, and `HERDR_PANE_ID` values. Action
-commands also receive `HERDR_PLUGIN_ACTION_ID`; event hooks receive
-`HERDR_PLUGIN_EVENT` and `HERDR_PLUGIN_EVENT_JSON`; pane commands receive
-`HERDR_PLUGIN_ENTRYPOINT_ID`.
+Herdr injects `MOO_SOCKET_PATH`, `MOO_BIN_PATH`, `MOO_ENV=1`,
+`MOO_PLUGIN_ID`, `MOO_PLUGIN_ROOT`, `MOO_PLUGIN_CONFIG_DIR`,
+`MOO_PLUGIN_STATE_DIR`, `MOO_PLUGIN_CONTEXT_JSON`, and available
+`MOO_WORKSPACE_ID`, `MOO_TAB_ID`, and `MOO_PANE_ID` values. Action
+commands also receive `MOO_PLUGIN_ACTION_ID`; event hooks receive
+`MOO_PLUGIN_EVENT` and `MOO_PLUGIN_EVENT_JSON`; pane commands receive
+`MOO_PLUGIN_ENTRYPOINT_ID`.
 
 List recent action and event command logs:
 
@@ -577,14 +577,14 @@ List recent action and event command logs:
 Event hooks run for enabled installed plugins when Herdr emits a matching event
 name such as `worktree.created`.
 
-There is no Herdr-managed plugin storage API in v1. `HERDR_PLUGIN_CONFIG_DIR`
-and `HERDR_PLUGIN_STATE_DIR` are path discovery only; plugins own their files,
+There is no Herdr-managed plugin storage API in v1. `MOO_PLUGIN_CONFIG_DIR`
+and `MOO_PLUGIN_STATE_DIR` are path discovery only; plugins own their files,
 schemas, migrations, and cleanup.
 
 Open a managed terminal UI:
 
 ```json
-{"id":"req_plugin_pane","method":"plugin.pane.open","params":{"plugin_id":"example.board","entrypoint":"board","placement":"zoomed","target_pane_id":"w1:p1","env":{"HERDR_ROLE":"board"},"focus":true}}
+{"id":"req_plugin_pane","method":"plugin.pane.open","params":{"plugin_id":"example.board","entrypoint":"board","placement":"zoomed","target_pane_id":"w1:p1","env":{"MOO_ROLE":"board"},"focus":true}}
 ```
 
 `plugin.pane.open` requires an installed, enabled, platform-compatible plugin,
@@ -598,7 +598,7 @@ percentages such as `"80%"`. Omitted dimensions default to half the terminal
 size, with too-small values clamped to the popup minimum. A popup has no pane
 ID, remains outside all `pane.*` and agent APIs, emits no pane lifecycle events,
 leaves plugin focus context on the underlying tiled pane, and does not export
-`HERDR_PANE_ID` to its process. Popup launch returns `ok`; `popup.close` closes
+`MOO_PANE_ID` to its process. Popup launch returns `ok`; `popup.close` closes
 the active popup and returns
 `popup_not_open` when none exists. Split and zoomed panes target an existing
 pane; tab panes can target a workspace. Split, tab, zoomed, and overlay panes
@@ -636,20 +636,20 @@ The default socket lives under your Herdr config directory.
 Named sessions have separate sockets:
 
 ```text
-~/.config/herdr/herdr.sock
-~/.config/herdr/sessions/<name>/herdr.sock
+~/.config/moo/moo.sock
+~/.config/moo/sessions/<name>/moo.sock
 ```
 
 Resolution order:
 
 1. explicit CLI `--session <name>`
-2. `HERDR_SOCKET_PATH`
-3. `HERDR_SESSION=<name>`
+2. `MOO_SOCKET_PATH`
+3. `MOO_SESSION=<name>`
 4. default session socket
 
-Use `HERDR_SOCKET_PATH` only for low-level overrides.
+Use `MOO_SOCKET_PATH` only for low-level overrides.
 
-For plugins, prefer invoking `HERDR_BIN_PATH` and the CLI wrappers when you need
+For plugins, prefer invoking `MOO_BIN_PATH` and the CLI wrappers when you need
 portable Windows behavior. Raw socket clients are responsible for using the
 platform-native local socket form.
 

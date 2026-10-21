@@ -8,10 +8,10 @@ const originalPlatform = process.platform;
 const originalArgv = process.argv;
 const originalCreateConnection = net.createConnection;
 const originalEnvironment = {
-  HERDR_ENV: process.env.HERDR_ENV,
-  HERDR_OMP_IDLE_DEBOUNCE_MS: process.env.HERDR_OMP_IDLE_DEBOUNCE_MS,
-  HERDR_PANE_ID: process.env.HERDR_PANE_ID,
-  HERDR_SOCKET_PATH: process.env.HERDR_SOCKET_PATH,
+  MOO_ENV: process.env.MOO_ENV,
+  MOO_OMP_IDLE_DEBOUNCE_MS: process.env.MOO_OMP_IDLE_DEBOUNCE_MS,
+  MOO_PANE_ID: process.env.MOO_PANE_ID,
+  MOO_SOCKET_PATH: process.env.MOO_SOCKET_PATH,
   OMPCODE: process.env.OMPCODE,
 };
 
@@ -90,9 +90,9 @@ function createExtensionHarness() {
 function configureIntegrationEnvironment(recordingSocketPath: string) {
   // Tests may run inside an OMP shell; nested-session cases opt in explicitly.
   delete process.env.OMPCODE;
-  process.env.HERDR_ENV = "1";
-  process.env.HERDR_SOCKET_PATH = recordingSocketPath;
-  process.env.HERDR_PANE_ID = "test:p1";
+  process.env.MOO_ENV = "1";
+  process.env.MOO_SOCKET_PATH = recordingSocketPath;
+  process.env.MOO_PANE_ID = "test:p1";
 }
 
 function captureConnectionEndpoint() {
@@ -154,9 +154,9 @@ for (const socketPlugin of socketPlugins) {
 }
 
 test("OpenCode stays disabled without the Herdr socket environment", async () => {
-  process.env.HERDR_ENV = "1";
-  process.env.HERDR_PANE_ID = "test:p1";
-  delete process.env.HERDR_SOCKET_PATH;
+  process.env.MOO_ENV = "1";
+  process.env.MOO_PANE_ID = "test:p1";
+  delete process.env.MOO_SOCKET_PATH;
 
   const { HerdrAgentStatePlugin } = await importFresh("./opencode/herdr-agent-state.js");
 
@@ -525,7 +525,7 @@ async function startDroppedFirstResponseServer(name: string) {
 
 test("Oh My Pi retries working before a queued idle state", async () => {
   const { attemptedRequests } = await startDroppedFirstResponseServer("omp-retry");
-  process.env.HERDR_OMP_IDLE_DEBOUNCE_MS = "0";
+  process.env.MOO_OMP_IDLE_DEBOUNCE_MS = "0";
   const { handlers, pi } = createExtensionHarness();
 
   const { default: install } = await importFresh("./omp/herdr-agent-state.ts");
@@ -555,7 +555,7 @@ test("Oh My Pi retries working before a queued idle state", async () => {
 
 test("Oh My Pi keeps working when a turn ends with a scheduled continuation", async () => {
   const requests = await startRecordingServer("omp-will-continue");
-  process.env.HERDR_OMP_IDLE_DEBOUNCE_MS = "0";
+  process.env.MOO_OMP_IDLE_DEBOUNCE_MS = "0";
   const { handlers, pi } = createExtensionHarness();
 
   const { default: install } = await importFresh("./omp/herdr-agent-state.ts");

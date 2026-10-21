@@ -96,10 +96,10 @@ If you SSH into the server first and run `herdr` there, Herdr runs entirely on t
 
 For Linux and macOS hosts, Herdr can copy the current local binary when the platforms match. For Homebrew, mise, and Nix installs, when the platforms differ, or for Windows hosts, it downloads the matching release asset for the current client version from `https://herdr.dev/latest.json`.
 
-For local builds or custom packages, set `HERDR_REMOTE_BINARY` to a local file path before running remote attach. Use a bare Herdr executable for Linux or macOS targets and a complete `herdr-windows-x86_64.zip` package for Windows targets.
+For local builds or custom packages, set `MOO_REMOTE_BINARY` to a local file path before running remote attach. Use a bare Herdr executable for Linux or macOS targets and a complete `herdr-windows-x86_64.zip` package for Windows targets.
 
 ```bash
-HERDR_REMOTE_BINARY=target/release/herdr herdr --remote workbox
+MOO_REMOTE_BINARY=target/release/herdr herdr --remote workbox
 ```
 
 ## Remote named sessions

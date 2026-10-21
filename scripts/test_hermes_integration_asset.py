@@ -52,9 +52,9 @@ class HermesIntegrationAssetTests(unittest.TestCase):
     def test_send_session_uses_cli_with_the_active_pane(self):
         module = load_asset()
         environment = {
-            "HERDR_ENV": "1",
-            "HERDR_PANE_ID": "w1:p2",
-            "HERDR_BIN_PATH": "C:/bin/herdr.exe",
+            "MOO_ENV": "1",
+            "MOO_PANE_ID": "w1:p2",
+            "MOO_BIN_PATH": "C:/bin/herdr.exe",
         }
         with mock.patch.dict(module.os.environ, environment, clear=True):
             with mock.patch.object(module.subprocess, "run") as run:

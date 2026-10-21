@@ -28,7 +28,7 @@ The installed binary is the authority. CLI syntax may have changed since this sk
 Confirm the caller is inside Herdr and inspect the relevant help before doing anything:
 
 ```bash
-test "${HERDR_ENV:-}" = 1
+test "${MOO_ENV:-}" = 1
 herdr --version
 herdr --help
 herdr session
@@ -51,7 +51,7 @@ Use `/var/tmp` or a dedicated reproduction directory as the new pane's cwd. Save
 Choose a short unique name such as `repro-<topic>-<timestamp>`.
 
 Before launching, explicitly allow nesting in the configuration the disposable
-client will actually load. `HERDR_ENV=1` is inherited from the outer pane, so the
+client will actually load. `MOO_ENV=1` is inherited from the outer pane, so the
 launch is otherwise rejected unless `[experimental].allow_nested` is enabled.
 An isolated `XDG_CONFIG_HOME` does not inherit this setting from the user's global
 config, even when nesting is enabled there.
@@ -68,9 +68,9 @@ If reproducing with the user's configuration, copy that configuration into the
 test directory and enable `allow_nested` in its existing `[experimental]` table
 (or add the table if absent). Do not create duplicate tables or keys. Never edit
 the user's global configuration to permit a reproduction, and do not unset
-`HERDR_ENV` to bypass the nesting check.
+`MOO_ENV` to bypass the nesting check.
 
-Pass the absolute test config path as `HERDR_CONFIG_PATH` when launching below.
+Pass the absolute test config path as `MOO_CONFIG_PATH` when launching below.
 Use the same override for config validation and any commands that must load the
 test config. This override selects a config file; it does not isolate the saved
 machine catalog or other global state. Use test-only `XDG_CONFIG_HOME` and
@@ -81,13 +81,13 @@ Run the named session inside the new outer pane. Clear inherited session selecti
 
 ```bash
 env \
-  -u HERDR_SOCKET_PATH \
-  -u HERDR_CLIENT_SOCKET_PATH \
-  -u HERDR_SESSION \
-  -u HERDR_WORKSPACE_ID \
-  -u HERDR_TAB_ID \
-  -u HERDR_PANE_ID \
-  HERDR_CONFIG_PATH=<absolute-test-config-path> \
+  -u MOO_SOCKET_PATH \
+  -u MOO_CLIENT_SOCKET_PATH \
+  -u MOO_SESSION \
+  -u MOO_WORKSPACE_ID \
+  -u MOO_TAB_ID \
+  -u MOO_PANE_ID \
+  MOO_CONFIG_PATH=<absolute-test-config-path> \
   herdr --session <session-name>
 ```
 
@@ -106,12 +106,12 @@ Every control command issued from the parent must clear inherited socket overrid
 
 ```bash
 env \
-  -u HERDR_SOCKET_PATH \
-  -u HERDR_CLIENT_SOCKET_PATH \
-  -u HERDR_WORKSPACE_ID \
-  -u HERDR_TAB_ID \
-  -u HERDR_PANE_ID \
-  HERDR_SESSION=<session-name> \
+  -u MOO_SOCKET_PATH \
+  -u MOO_CLIENT_SOCKET_PATH \
+  -u MOO_WORKSPACE_ID \
+  -u MOO_TAB_ID \
+  -u MOO_PANE_ID \
+  MOO_SESSION=<session-name> \
   herdr pane list
 ```
 

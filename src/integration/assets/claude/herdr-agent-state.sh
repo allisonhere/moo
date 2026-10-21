@@ -2,8 +2,8 @@
 # installed by herdr
 # managed by herdr; reinstalling or updating the integration overwrites this file.
 # add custom hooks beside this file instead of editing it.
-# HERDR_INTEGRATION_ID=claude
-# HERDR_INTEGRATION_VERSION=11
+# MOO_INTEGRATION_ID=claude
+# MOO_INTEGRATION_VERSION=11
 
 set -eu
 
@@ -17,12 +17,12 @@ case "$action" in
   *) exit 0 ;;
 esac
 
-[ "${HERDR_ENV:-}" = "1" ] || exit 0
-[ -n "${HERDR_SOCKET_PATH:-}" ] || exit 0
-[ -n "${HERDR_PANE_ID:-}" ] || exit 0
+[ "${MOO_ENV:-}" = "1" ] || exit 0
+[ -n "${MOO_SOCKET_PATH:-}" ] || exit 0
+[ -n "${MOO_PANE_ID:-}" ] || exit 0
 command -v python3 >/dev/null 2>&1 || exit 0
 
-HERDR_ACTION="$action" HERDR_HOOK_INPUT_FILE="$hook_input_file" python3 - <<'PY'
+MOO_ACTION="$action" MOO_HOOK_INPUT_FILE="$hook_input_file" python3 - <<'PY'
 import json
 import os
 import random
@@ -30,10 +30,10 @@ import socket
 import time
 
 source = "herdr:claude"
-action = os.environ.get("HERDR_ACTION", "")
-pane_id = os.environ.get("HERDR_PANE_ID")
-socket_path = os.environ.get("HERDR_SOCKET_PATH")
-hook_input_file = os.environ.get("HERDR_HOOK_INPUT_FILE")
+action = os.environ.get("MOO_ACTION", "")
+pane_id = os.environ.get("MOO_PANE_ID")
+socket_path = os.environ.get("MOO_SOCKET_PATH")
+hook_input_file = os.environ.get("MOO_HOOK_INPUT_FILE")
 
 if not pane_id or not socket_path:
     raise SystemExit(0)

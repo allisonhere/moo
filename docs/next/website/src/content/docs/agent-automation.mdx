@@ -29,7 +29,7 @@ review_pane=$(printf '%s\n' "$split" | jq -r '.result.pane.pane_id')
 
 `workspace create` returns `.result.workspace`, `.result.tab`, and `.result.root_pane`. `tab create` returns `.result.tab` and `.result.root_pane`. `pane split` returns the new pane as `.result.pane`.
 
-Moving a pane to another workspace changes its workspace-qualified pane ID. After any `pane move`, continue with `.result.move_result.pane.pane_id`; the response keeps the old value at `.result.move_result.previous_pane_id`. A running process keeps its launch-time Herdr environment, but the old `HERDR_PANE_ID` remains an alias for that terminal, so `--current` stays safe. New commands can still resolve the agent by name after the move, but a wait already in progress ends with `agent_not_running`.
+Moving a pane to another workspace changes its workspace-qualified pane ID. After any `pane move`, continue with `.result.move_result.pane.pane_id`; the response keeps the old value at `.result.move_result.previous_pane_id`. A running process keeps its launch-time Herdr environment, but the old `MOO_PANE_ID` remains an alias for that terminal, so `--current` stays safe. New commands can still resolve the agent by name after the move, but a wait already in progress ends with `agent_not_running`.
 
 Use pane commands for shells, tests, servers, CI watchers, and other ordinary terminal processes. Use agent commands when Herdr needs to understand which agent is running or whether it is `working`, `blocked`, `done`, `idle`, or `unknown`.
 

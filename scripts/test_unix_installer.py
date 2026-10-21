@@ -134,7 +134,7 @@ exec {sha256sum} "$@"
             "FAKE_MANIFEST": str(manifest),
             "FAKE_PAYLOAD": str(self.payload),
             "FAKE_CURL_MARKER": str(self.root / "curl-called"),
-            "HERDR_INSTALL_DIR": str(self.install_dir),
+            "MOO_INSTALL_DIR": str(self.install_dir),
             **(extra_env or {}),
         }
         return subprocess.run(

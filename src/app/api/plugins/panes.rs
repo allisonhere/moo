@@ -263,20 +263,20 @@ impl App {
             crate::api::SOCKET_PATH_ENV_VAR.to_string(),
             crate::api::socket_path().display().to_string(),
         ));
-        env.push(("HERDR_ENV".to_string(), "1".to_string()));
+        env.push(("MOO_ENV".to_string(), "1".to_string()));
         env.push((
-            crate::HERDR_PRODUCT_ENV_VAR.to_string(),
+            crate::MOO_PRODUCT_ENV_VAR.to_string(),
             crate::product_identity::APP_DIR_NAME.to_string(),
         ));
-        env.push(("HERDR_PLUGIN_ID".to_string(), plugin.plugin_id.clone()));
+        env.push(("MOO_PLUGIN_ID".to_string(), plugin.plugin_id.clone()));
         env.push((
-            "HERDR_PLUGIN_ENTRYPOINT_ID".to_string(),
+            "MOO_PLUGIN_ENTRYPOINT_ID".to_string(),
             entrypoint.to_string(),
         ));
-        env.push(("HERDR_PLUGIN_CONTEXT_JSON".to_string(), context_json));
+        env.push(("MOO_PLUGIN_CONTEXT_JSON".to_string(), context_json));
         if let Ok(current_exe) = crate::platform::launch_executable() {
             env.push((
-                "HERDR_BIN_PATH".to_string(),
+                "MOO_BIN_PATH".to_string(),
                 current_exe.display().to_string(),
             ));
         }
@@ -361,14 +361,14 @@ fn plugin_pane_protected_env_key(key: &str) -> bool {
     matches!(
         key,
         crate::api::SOCKET_PATH_ENV_VAR
-            | "HERDR_ENV"
-            | crate::HERDR_PRODUCT_ENV_VAR
-            | "HERDR_PLUGIN_ID"
-            | "HERDR_PLUGIN_ROOT"
-            | "HERDR_PLUGIN_CONFIG_DIR"
-            | "HERDR_PLUGIN_STATE_DIR"
-            | "HERDR_PLUGIN_ENTRYPOINT_ID"
-            | "HERDR_PLUGIN_CONTEXT_JSON"
-            | "HERDR_BIN_PATH"
+            | "MOO_ENV"
+            | crate::MOO_PRODUCT_ENV_VAR
+            | "MOO_PLUGIN_ID"
+            | "MOO_PLUGIN_ROOT"
+            | "MOO_PLUGIN_CONFIG_DIR"
+            | "MOO_PLUGIN_STATE_DIR"
+            | "MOO_PLUGIN_ENTRYPOINT_ID"
+            | "MOO_PLUGIN_CONTEXT_JSON"
+            | "MOO_BIN_PATH"
     )
 }

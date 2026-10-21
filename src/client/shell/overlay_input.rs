@@ -568,6 +568,11 @@ impl ClientShellState {
             return;
         }
 
+        if matches!(self.overlay, Some(ClientShellOverlay::SessionReplay(_))) {
+            self.route_session_replay_key(key, outcome);
+            return;
+        }
+
         if matches!(self.overlay, Some(ClientShellOverlay::ReleaseNotes(_))) {
             match key.code {
                 KeyCode::Enter | KeyCode::Esc => self.dismiss_release_notes(outcome),

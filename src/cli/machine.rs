@@ -191,7 +191,7 @@ fn reconnect(args: &[String]) -> std::io::Result<i32> {
         }
     };
     if !std::io::stdin().is_terminal() {
-        eprintln!("reconnect requires an interactive terminal; use herdr machine status for noninteractive checks");
+        eprintln!("reconnect requires an interactive terminal; use moo machine status for noninteractive checks");
         return Ok(2);
     }
     let mut authentication = crate::remote::ssh_authentication_command(&profile.target)?;

@@ -24,10 +24,7 @@ impl std::fmt::Display for ClientError {
             ClientError::ConnectionFailed(err) => {
                 write!(f, "failed to connect to server: {err}")?;
                 let path = client_socket_path();
-                write!(
-                    f,
-                    "\nIs herdr server running? Start it with `herdr server`."
-                )?;
+                write!(f, "\nIs moo server running? Start it with `moo server`.")?;
                 write!(f, "\nSocket path: {}", path.display())
             }
             ClientError::HandshakeRejected { version, error } => {

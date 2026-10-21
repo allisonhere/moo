@@ -20,23 +20,23 @@ Every process in a Herdr pane inherits these environment variables:
 
 | Variable | Meaning |
 | --- | --- |
-| `HERDR_ENV` | `1` inside Herdr |
-| `HERDR_PANE_ID` | The pane your agent runs in |
-| `HERDR_BIN_PATH` | The Herdr binary that owns this pane |
-| `HERDR_SOCKET_PATH` | Herdr's API socket |
+| `MOO_ENV` | `1` inside Herdr |
+| `MOO_PANE_ID` | The pane your agent runs in |
+| `MOO_BIN_PATH` | The Herdr binary that owns this pane |
+| `MOO_SOCKET_PATH` | Herdr's API socket |
 
-Your agent makes three kinds of reports through `"$HERDR_BIN_PATH"`:
+Your agent makes three kinds of reports through `"$MOO_BIN_PATH"`:
 
 1. **State.** Report `idle`, `working`, or `blocked` whenever it changes.
 2. **Resume command.** Report the command that reopens the current session.
 3. **Release.** Release the pane when your agent exits.
 
-Only report when `HERDR_ENV=1` and the other variables are set. Outside Herdr, your integration should do nothing.
+Only report when `MOO_ENV=1` and the other variables are set. Outside Herdr, your integration should do nothing.
 
 ## Report state
 
 ```bash
-"$HERDR_BIN_PATH" pane report-agent "$HERDR_PANE_ID" \
+"$MOO_BIN_PATH" pane report-agent "$MOO_PANE_ID" \
   --source my-agent \
   --agent my-agent \
   --state working \
@@ -55,7 +55,7 @@ To change how your agent appears without changing its state, such as a title or 
 Put the command that resumes the current session after `--`. Include the options that session needs, such as the model or permission mode, so the resumed session behaves the same:
 
 ```bash
-"$HERDR_BIN_PATH" pane report-agent "$HERDR_PANE_ID" \
+"$MOO_BIN_PATH" pane report-agent "$MOO_PANE_ID" \
   --source my-agent \
   --agent my-agent \
   --state idle \
@@ -78,7 +78,7 @@ Herdr rejects a command that breaks the first three rules with `invalid_resume_a
 ## Release on exit
 
 ```bash
-"$HERDR_BIN_PATH" pane release-agent "$HERDR_PANE_ID" \
+"$MOO_BIN_PATH" pane release-agent "$MOO_PANE_ID" \
   --source my-agent \
   --agent my-agent \
   --seq 3
@@ -96,14 +96,14 @@ If your agent exits without releasing, Herdr notices once the pane is back at it
 
 ## Use the socket directly
 
-`HERDR_BIN_PATH` and the CLI are the portable choice, including on Windows. If your agent needs direct IPC, send the equivalent `pane.report_agent`, `pane.report_agent_session`, and `pane.release_agent` requests described in the [Socket API](/docs/socket-api/#agent-state-reporting). The resume command goes in the `resume_argv` array.
+`MOO_BIN_PATH` and the CLI are the portable choice, including on Windows. If your agent needs direct IPC, send the equivalent `pane.report_agent`, `pane.report_agent_session`, and `pane.release_agent` requests described in the [Socket API](/docs/socket-api/#agent-state-reporting). The resume command goes in the `resume_argv` array.
 
 ## Check your integration
 
 Start your agent in a Herdr pane, then check what Herdr sees:
 
 ```bash
-herdr pane get "$HERDR_PANE_ID"
+herdr pane get "$MOO_PANE_ID"
 herdr agent list
 ```
 

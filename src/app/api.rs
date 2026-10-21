@@ -801,8 +801,14 @@ impl App {
             .limit
             .unwrap_or(100)
             .clamp(1, crate::persist::agent_history::CAPACITY);
-        let skip = self.agent_history.len().saturating_sub(limit);
-        let entries = self.agent_history.iter().skip(skip).cloned().collect();
+        let matching = self.agent_history.iter().filter(|entry| {
+            params
+                .pane_id
+                .as_deref()
+                .is_none_or(|pane| entry.pane_id == pane)
+        });
+        let skip = matching.clone().count().saturating_sub(limit);
+        let entries = matching.skip(skip).cloned().collect();
         responses::encode_success(
             id,
             crate::api::schema::ResponseResult::AgentHistory { entries },
@@ -2625,7 +2631,10 @@ mod tests {
 
         let response = app.handle_api_request(crate::api::schema::Request {
             id: "history".into(),
-            method: Method::AgentHistory(AgentHistoryParams { limit: Some(3) }),
+            method: Method::AgentHistory(AgentHistoryParams {
+                limit: Some(3),
+                pane_id: None,
+            }),
         });
         let response: serde_json::Value = serde_json::from_str(&response).unwrap();
         assert_eq!(response["result"]["type"], "agent_history");
@@ -2645,6 +2654,47 @@ mod tests {
         );
         assert_eq!(app.agent_history[0].at_ms, 5);
     }
+    #[test]
+    fn agent_history_pane_filter_applies_before_the_limit() {
+        use crate::api::schema::{AgentHistoryEntry, AgentHistoryParams, AgentStatus, Method};
+
+        let (_api_tx, api_rx) = tokio::sync::mpsc::unbounded_channel();
+        let mut app = App::new(
+            &crate::config::Config::default(),
+            crate::app::AppPolicy::TEST,
+            None,
+            api_rx,
+            crate::api::EventHub::default(),
+        );
+        for (at_ms, pane_id) in [(1, "w1:p1"), (2, "w1:p2"), (3, "w1:p1"), (4, "w1:p2")] {
+            app.record_agent_transition(AgentHistoryEntry {
+                at_ms,
+                pane_id: pane_id.into(),
+                workspace_id: "w1".into(),
+                agent: None,
+                from: AgentStatus::Working,
+                to: AgentStatus::Done,
+                acked: false,
+            });
+        }
+
+        let response = app.handle_api_request(crate::api::schema::Request {
+            id: "history".into(),
+            method: Method::AgentHistory(AgentHistoryParams {
+                limit: Some(2),
+                pane_id: Some("w1:p1".into()),
+            }),
+        });
+        let response: serde_json::Value = serde_json::from_str(&response).unwrap();
+        let at: Vec<_> = response["result"]["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|entry| entry["at_ms"].as_u64().unwrap())
+            .collect();
+        assert_eq!(at, vec![1, 3]);
+    }
+
     #[test]
     fn attention_keeps_latest_unacked_blocked_or_done_per_pane() {
         use crate::api::schema::{

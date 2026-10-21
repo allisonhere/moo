@@ -1,7 +1,7 @@
 """Hermes plugin installed by Herdr to report resumable session identity."""
 
-# HERDR_INTEGRATION_ID=hermes
-# HERDR_INTEGRATION_VERSION=5
+# MOO_INTEGRATION_ID=hermes
+# MOO_INTEGRATION_VERSION=5
 
 from __future__ import annotations
 
@@ -15,9 +15,9 @@ _INTERACTIVE_PLATFORMS = {"cli", "tui", "desktop", "acp"}
 
 
 def _pane_id() -> str | None:
-    if os.environ.get("HERDR_ENV") != "1":
+    if os.environ.get("MOO_ENV") != "1":
         return None
-    return os.environ.get("HERDR_PANE_ID", "").strip() or None
+    return os.environ.get("MOO_PANE_ID", "").strip() or None
 
 
 def _send_session(session_id: str, start_source: str) -> None:
@@ -25,7 +25,7 @@ def _send_session(session_id: str, start_source: str) -> None:
     if pane_id is None:
         return
     command = [
-        os.environ.get("HERDR_BIN_PATH") or "herdr",
+        os.environ.get("MOO_BIN_PATH") or "herdr",
         "pane",
         "report-agent-session",
         pane_id,

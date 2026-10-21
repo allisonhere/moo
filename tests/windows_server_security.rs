@@ -111,8 +111,8 @@ fn server_integrity_requires_startup_consent_on_both_endpoints() {
         .join("sessions")
         .join("integrity-test");
     let endpoints = [
-        session_dir.join("herdr.sock"),
-        session_dir.join("herdr-client.sock"),
+        session_dir.join("moo.sock"),
+        session_dir.join("moo-client.sock"),
     ];
 
     // Reuse the named session after stopping, proving consent is process-local.
@@ -147,15 +147,15 @@ fn server_integrity_requires_startup_consent_on_both_endpoints() {
             .stdout(Stdio::null())
             .creation_flags(CREATE_NO_WINDOW);
         for name in [
-            "HERDR_SOCKET_PATH",
-            "HERDR_CLIENT_SOCKET_PATH",
-            "HERDR_CONFIG_PATH",
-            "HERDR_SESSION",
-            "HERDR_WORKSPACE",
-            "HERDR_TAB",
-            "HERDR_PANE",
-            "HERDR_TERMINAL",
-            "HERDR_STARTUP_CWD",
+            "MOO_SOCKET_PATH",
+            "MOO_CLIENT_SOCKET_PATH",
+            "MOO_CONFIG_PATH",
+            "MOO_SESSION",
+            "MOO_WORKSPACE",
+            "MOO_TAB",
+            "MOO_PANE",
+            "MOO_TERMINAL",
+            "MOO_STARTUP_CWD",
         ] {
             command.env_remove(name);
         }

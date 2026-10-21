@@ -8,6 +8,7 @@ pub(super) enum ClientGlobalMenuAction {
         action: crate::protocol::ClientShellCommandAction,
     },
     WhatsNew,
+    SessionReplay,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -61,6 +62,13 @@ pub(super) fn global_menu_items(
         action: ClientGlobalMenuAction::Binding(action),
     })
     .collect::<Vec<_>>();
+    if snapshot.focused_pane_id.is_some() {
+        items.push(ClientGlobalMenuItem {
+            label: "session replay".to_owned(),
+            shortcut: None,
+            action: ClientGlobalMenuAction::SessionReplay,
+        });
+    }
     items.extend(snapshot.commands.iter().filter_map(|command| {
         let label = command.description.as_deref()?.trim();
         (!label.is_empty()).then(|| ClientGlobalMenuItem {
@@ -257,6 +265,7 @@ impl ClientShellState {
                 self.invoke_endpoint_command(command_id, action, outcome)
             }
             ClientGlobalMenuAction::WhatsNew => self.open_release_notes(),
+            ClientGlobalMenuAction::SessionReplay => self.open_session_replay(outcome),
         }
         outcome.repaint = true;
     }

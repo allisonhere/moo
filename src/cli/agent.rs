@@ -1,8 +1,8 @@
 use std::time::{Duration, Instant};
 
 use crate::api::schema::{
-    AgentPromptParams, AgentReadParams, AgentRenameParams, AgentSendKeysParams, AgentStartParams,
-    AgentTarget, AgentWaitParams, EmptyParams, ErrorBody, ErrorResponse, Method,
+    AgentHistoryParams, AgentPromptParams, AgentReadParams, AgentRenameParams, AgentSendKeysParams,
+    AgentStartParams, AgentTarget, AgentWaitParams, EmptyParams, ErrorBody, ErrorResponse, Method,
     PaneProcessInfoParams, PaneTarget, Request,
 };
 
@@ -56,6 +56,7 @@ pub(super) fn run_agent_command(args: &[String]) -> std::io::Result<i32> {
         Operation::Read(params) => agent_read(params),
         Operation::SendKeys(params) => agent_send_keys(params),
         Operation::Rename(params) => agent_rename(params),
+        Operation::History(params) => agent_history(params),
         Operation::Wait(params) => agent_wait(params),
         Operation::Prompt(params) => agent_prompt(params),
         Operation::Start(params) => agent_start(params),
@@ -79,7 +80,7 @@ fn agent_explain(params: bindings::Explain) -> std::io::Result<i32> {
             return Ok(2);
         }
         let Some(agent_label) = agent else {
-            eprintln!("herdr agent explain --file requires --agent LABEL");
+            eprintln!("moo agent explain --file requires --agent LABEL");
             return Ok(2);
         };
         let content = match std::fs::read_to_string(&path) {
@@ -350,6 +351,13 @@ fn agent_list() -> std::io::Result<i32> {
     super::print_response(&super::send_request(&Request {
         id: "cli:agent:list".into(),
         method: Method::AgentList(EmptyParams::default()),
+    })?)
+}
+
+fn agent_history(params: AgentHistoryParams) -> std::io::Result<i32> {
+    super::print_response(&super::send_request(&Request {
+        id: "cli:agent:history".into(),
+        method: Method::AgentHistory(params),
     })?)
 }
 

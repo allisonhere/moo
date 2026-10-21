@@ -404,7 +404,7 @@ impl Leaf {
         match self.name {
             "input" => command.group(clap::ArgGroup::new("selector").args(["pane_id", "pane", "current"]).required(true)),
             "move" => command.group(clap::ArgGroup::new("destination").args(["tab", "new-tab", "new-workspace"]).required(true)),
-            "send-text" => command.after_help("next: herdr pane run <PANE_ID> <COMMAND> sends text and Enter in one call"),
+            "send-text" => command.after_help("next: moo pane run <PANE_ID> <COMMAND> sends text and Enter in one call"),
             "send-keys" => command.after_help("Use esc as the canonical Escape key name; escape is also accepted."),
             "wait-output" => command.after_help("The selected snapshot is searched immediately, including existing output, then polled. Without --timeout, this waits indefinitely."),
             _ => command,
@@ -610,7 +610,7 @@ pub(super) const LEAVES: &[Leaf] = &[
             if matches.get_flag("current") {
                 params.pane_id = crate::cli::target::caller_pane_id()
                     .map(|value| crate::cli::normalize_pane_id(&value))
-                    .ok_or_else(|| ParseError::Usage("--current requires HERDR_PANE_ID".into()))?;
+                    .ok_or_else(|| ParseError::Usage("--current requires MOO_PANE_ID".into()))?;
             }
             Ok(Method::PaneInputSet(params))
         },

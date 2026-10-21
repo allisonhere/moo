@@ -7,6 +7,7 @@ impl ClientShellState {
                 overlay,
                 ClientShellOverlay::ConfirmClose(_)
                     | ClientShellOverlay::Help(_)
+                    | ClientShellOverlay::SessionReplay(_)
                     | ClientShellOverlay::Navigator(_)
                     | ClientShellOverlay::WorktreeRemove(_)
                     | ClientShellOverlay::ContextMenu(_)

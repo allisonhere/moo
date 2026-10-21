@@ -7,7 +7,7 @@ use interprocess::local_socket::traits::Stream as _;
 
 use crate::ipc::LocalStream;
 
-pub const SESSION_ENV_VAR: &str = "HERDR_SESSION";
+pub const SESSION_ENV_VAR: &str = "MOO_SESSION";
 pub const DEFAULT_SESSION_NAME: &str = "default";
 
 const MAX_SESSION_NAME_LEN: usize = 64;
@@ -141,7 +141,7 @@ pub fn active_restart_after_update_guidance() -> String {
         if let Ok(socket_path) = std::env::var(crate::api::SOCKET_PATH_ENV_VAR) {
             return restart_after_update_guidance(
                 &format!(
-                    "{}={} herdr server stop",
+                    "{}={} moo server stop",
                     crate::api::SOCKET_PATH_ENV_VAR,
                     socket_path
                 ),
@@ -175,7 +175,7 @@ pub fn data_dir_for(name: Option<&str>) -> PathBuf {
 }
 
 pub fn api_socket_path_for(name: Option<&str>) -> PathBuf {
-    data_dir_for(name).join("herdr.sock")
+    data_dir_for(name).join("moo.sock")
 }
 
 pub fn active_api_socket_path() -> PathBuf {
@@ -189,7 +189,7 @@ pub fn active_api_socket_path() -> PathBuf {
 }
 
 pub fn client_socket_path_for(name: Option<&str>) -> PathBuf {
-    data_dir_for(name).join("herdr-client.sock")
+    data_dir_for(name).join("moo-client.sock")
 }
 
 pub fn list_sessions() -> std::io::Result<Vec<SessionInfo>> {
@@ -319,7 +319,7 @@ pub fn delete_session(name: &str) -> Result<SessionInfo, String> {
     let Some(dir) = exact_session_dir_for_delete(name)? else {
         return Ok(session_info(Some(name)));
     };
-    let socket_path = dir.join("herdr.sock");
+    let socket_path = dir.join("moo.sock");
     if is_running_at(&socket_path) {
         return Err(format!(
             "session {name} is running; stop it before deleting"
@@ -351,7 +351,7 @@ fn exact_session_dir_for_delete(name: &str) -> Result<Option<PathBuf>, String> {
     // filesystems. Never probe its socket or delete it without an exact entry.
     match std::fs::symlink_metadata(sessions_dir.join(name)) {
         Ok(_) => Err(format!(
-            "session {name} does not match an exact session name; use the spelling shown by `herdr session list`"
+            "session {name} does not match an exact session name; use the spelling shown by `moo session list`"
         )),
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(None),
         Err(err) => Err(err.to_string()),
@@ -880,7 +880,7 @@ mod tests {
             active_api_socket_path(),
             config_home
                 .join(crate::config::app_dir_name())
-                .join("herdr.sock")
+                .join("moo.sock")
         );
         std::env::remove_var("XDG_CONFIG_HOME");
         std::env::remove_var(SESSION_ENV_VAR);
@@ -931,7 +931,7 @@ mod tests {
             active_api_socket_path(),
             config_home
                 .join(crate::config::app_dir_name())
-                .join("herdr.sock")
+                .join("moo.sock")
         );
         std::env::remove_var("XDG_CONFIG_HOME");
         std::env::remove_var(SESSION_ENV_VAR);
@@ -981,10 +981,10 @@ mod tests {
     fn restart_after_update_guidance_names_stop_and_attach_commands() {
         assert_eq!(
             restart_after_update_guidance(
-                "herdr session stop work",
-                Some("herdr session attach work")
+                "moo session stop work",
+                Some("moo session attach work")
             ),
-            "Stop the old server to use the new version.\nStopping exits pane processes.\nRun `herdr session stop work`, then run `herdr session attach work` again."
+            "Stop the old server to use the new version.\nStopping exits pane processes.\nRun `moo session stop work`, then run `moo session attach work` again."
         );
     }
 
@@ -997,7 +997,7 @@ mod tests {
 
         assert_eq!(
             active_restart_after_update_guidance(),
-            "Stop the old server to use the new version.\nStopping exits pane processes.\nRun `HERDR_SOCKET_PATH=/tmp/custom-herdr.sock herdr server stop`, then restart Herdr with the same socket override."
+            "Stop the old server to use the new version.\nStopping exits pane processes.\nRun `MOO_SOCKET_PATH=/tmp/custom-herdr.sock moo server stop`, then restart Herdr with the same socket override."
         );
 
         std::env::remove_var(crate::api::SOCKET_PATH_ENV_VAR);
@@ -1021,7 +1021,7 @@ mod tests {
                 .join(crate::config::app_dir_name())
                 .join("sessions")
                 .join("work")
-                .join("herdr.sock")
+                .join("moo.sock")
         );
         std::env::remove_var("XDG_CONFIG_HOME");
         std::env::remove_var(SESSION_ENV_VAR);

@@ -251,7 +251,7 @@ mod tests {
     #[test]
     fn local_session_target_resolves_named_session_socket() {
         let client = ApiClient::for_target(ConnectionTarget::LocalSession(Some("work".into())));
-        assert!(client.socket_path().ends_with("sessions/work/herdr.sock"));
+        assert!(client.socket_path().ends_with("sessions/work/moo.sock"));
     }
 
     #[test]

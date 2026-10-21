@@ -1,12 +1,13 @@
 use clap::{ArgGroup, ArgMatches, Command};
 
 use crate::api::schema::agents::{
-    AgentPromptProjection, AgentPromptWaitProjection, AgentReadProjection, AgentRenameProjection,
-    AgentSendKeysProjection, AgentStartProjection, AgentWaitProjection,
+    AgentHistoryProjection, AgentPromptProjection, AgentPromptWaitProjection, AgentReadProjection,
+    AgentRenameProjection, AgentSendKeysProjection, AgentStartProjection, AgentWaitProjection,
 };
 use crate::api::schema::{
-    AgentPromptParams, AgentReadParams, AgentRenameParams, AgentSendKeysParams, AgentStartParams,
-    AgentStatus, AgentTarget, AgentWaitParams, ReadFormat, ReadSource, READ_FORMATS, READ_SOURCES,
+    AgentHistoryParams, AgentPromptParams, AgentReadParams, AgentRenameParams, AgentSendKeysParams,
+    AgentStartParams, AgentStatus, AgentTarget, AgentWaitParams, ReadFormat, ReadSource,
+    READ_FORMATS, READ_SOURCES,
 };
 pub(crate) use crate::cli::projection::optional_text;
 use crate::cli::projection::{
@@ -154,6 +155,22 @@ pub(crate) fn pane() -> Input<String> {
     .help("Existing pane at an interactive shell prompt")
 }
 
+pub(crate) fn history_pane() -> Input<Option<String>> {
+    Input::value("pane", "ID", |slot, value| {
+        *slot = Some(super::super::normalize_pane_id(value));
+        Ok(())
+    })
+    .help("Only this pane's transitions")
+}
+
+pub(crate) fn history_limit() -> Input<Option<usize>> {
+    Input::value("limit", "N", |slot, value| {
+        *slot = Some(super::super::parse_u32_flag("--limit", value)? as usize);
+        Ok(())
+    })
+    .help("Newest entries to show (default 100)")
+}
+
 pub(crate) fn rename_name() -> Input<Option<String>> {
     Input::positional("name", 1, |slot, value| {
         *slot = Some(value.to_owned());
@@ -231,6 +248,7 @@ pub(crate) enum Operation {
     Read(AgentReadParams),
     SendKeys(AgentSendKeysParams),
     Rename(AgentRenameParams),
+    History(AgentHistoryParams),
     Wait(AgentWaitParams),
     Prompt(AgentPromptParams),
     Start(AgentStartParams),
@@ -262,6 +280,7 @@ pub(crate) fn command() -> Command {
                 crate::product_identity::BINARY_NAME
             ))
             .group(ArgGroup::new("rename").args(["name", "clear"]).required(true)))
+        .subcommand(leaf("history", AgentHistoryProjection::arguments(), "Show recorded agent status changes"))
         .subcommand(leaf("wait", AgentWaitProjection::arguments(), "Wait until an agent reaches one of the requested states")
             .override_usage(format!(
                 "{} agent wait <TARGET> [OPTIONS]",
@@ -305,6 +324,7 @@ pub(crate) fn from_matches(matches: &ArgMatches) -> Result<Operation, ParseError
         }
         "send-keys" => Operation::SendKeys(AgentSendKeysProjection::from_matches(matches)?),
         "rename" => Operation::Rename(AgentRenameProjection::from_matches(matches)?),
+        "history" => Operation::History(AgentHistoryProjection::from_matches(matches)?),
         "wait" => Operation::Wait(AgentWaitProjection::from_matches(matches)?),
         "prompt" => {
             let mut params = AgentPromptProjection::from_matches(matches)?;

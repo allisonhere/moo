@@ -38,8 +38,8 @@ const CLIENT_MESSAGE_CLIENT_SHELL_FOCUS: u32 = 18;
 const CLIENT_MESSAGE_ENDPOINT_CONTROL: u32 = 20;
 
 pub fn isolate_herdr_test_process(command: &mut CommandBuilder) {
-    command.env_remove("HERDR_STARTUP_CWD");
-    command.env_remove("HERDR_SESSION");
+    command.env_remove("MOO_STARTUP_CWD");
+    command.env_remove("MOO_SESSION");
 }
 
 pub fn register_spawned_herdr_pid(pid: Option<u32>) {
@@ -763,7 +763,7 @@ fn process_runtime_dir(pid: u32) -> std::io::Result<Option<PathBuf>> {
             return Ok(Some(PathBuf::from(value)));
         }
 
-        if let Some(value) = kv.strip_prefix("HERDR_SOCKET_PATH=") {
+        if let Some(value) = kv.strip_prefix("MOO_SOCKET_PATH=") {
             socket_path = Some(PathBuf::from(value));
         }
     }

@@ -677,3 +677,62 @@ fn agent_rows_carry_a_bar_in_their_tabs_color() {
     assert_eq!((green.as_str(), red.as_str()), ("▎", "▎"));
     assert_ne!(green_fg, red_fg, "the bar follows the tab's color");
 }
+
+#[test]
+fn session_replay_requests_focused_pane_history_and_scrolls_back() {
+    use crate::api::schema::{AgentHistoryEntry, AgentStatus, Method, ResponseResult};
+
+    let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
+    state.set_snapshot(Box::new(snapshot()));
+    state.overlay = Some(ClientShellOverlay::GlobalMenu(ClientGlobalMenuOverlay {
+        query: TextEditor::from("session replay"),
+        highlighted: 0,
+    }));
+
+    let open = state.handle_input_bytes(b"\r");
+    let [ClientShellAction::Endpoint { request, .. }] = &open.actions[..] else {
+        panic!("session replay should request agent history");
+    };
+    let Method::AgentHistory(params) = &request.method else {
+        panic!("expected agent.history, got {:?}", request.method);
+    };
+    assert_eq!(params.pane_id.as_deref(), Some("pane_1"));
+    let request_id = request.id.clone();
+    assert!(matches!(
+        state.overlay,
+        Some(ClientShellOverlay::SessionReplay(
+            ClientSessionReplayOverlay { entries: None, .. }
+        ))
+    ));
+
+    let entries = (0..3)
+        .map(|at_ms| AgentHistoryEntry {
+            at_ms: at_ms * 1000,
+            pane_id: "pane_1".into(),
+            workspace_id: "ws_1".into(),
+            agent: None,
+            from: AgentStatus::Idle,
+            to: AgentStatus::Working,
+            acked: false,
+        })
+        .collect();
+    state.handle_endpoint_result(
+        "boot-1",
+        &request_id,
+        Ok(ResponseResult::AgentHistory { entries }),
+    );
+
+    state.handle_input_bytes(b"k");
+    assert!(matches!(
+        state.overlay,
+        Some(ClientShellOverlay::SessionReplay(
+            ClientSessionReplayOverlay {
+                back: 1,
+                entries: Some(_),
+                ..
+            }
+        ))
+    ));
+    state.handle_input_bytes(b"\x1b");
+    assert!(state.overlay.is_none());
+}

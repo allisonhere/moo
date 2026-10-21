@@ -125,7 +125,7 @@ async fn host_shutdown_saves_layout_before_releasing_delay_lock() {
     let mut service = login_service(&address, peer.clone()).await;
     let socket = base
         .join(support::app_dir_name())
-        .join("sessions/shutdown/herdr.sock");
+        .join("sessions/shutdown/moo.sock");
     let config = base.join("config.toml");
     std::fs::write(&config, "onboarding = false\n[experimental]\nallow_nested = true\n[terminal]\ndefault_shell = \"/bin/sh\"\n").unwrap();
     let mut server = ChildGuard(
@@ -134,15 +134,15 @@ async fn host_shutdown_saves_layout_before_releasing_delay_lock() {
             .env("XDG_CONFIG_HOME", &base)
             .env("XDG_STATE_HOME", &base)
             .env("XDG_RUNTIME_DIR", &base)
-            .env("HERDR_CONFIG_PATH", &config)
-            .env_remove("HERDR_SOCKET_PATH")
+            .env("MOO_CONFIG_PATH", &config)
+            .env_remove("MOO_SOCKET_PATH")
             .env("DBUS_SYSTEM_BUS_ADDRESS", address.trim())
-            .env_remove("HERDR_CLIENT_SOCKET_PATH")
-            .env_remove("HERDR_STARTUP_CWD")
-            .env_remove("HERDR_SESSION")
-            .env_remove("HERDR_WORKSPACE_ID")
-            .env_remove("HERDR_TAB_ID")
-            .env_remove("HERDR_PANE_ID")
+            .env_remove("MOO_CLIENT_SOCKET_PATH")
+            .env_remove("MOO_STARTUP_CWD")
+            .env_remove("MOO_SESSION")
+            .env_remove("MOO_WORKSPACE_ID")
+            .env_remove("MOO_TAB_ID")
+            .env_remove("MOO_PANE_ID")
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .spawn()

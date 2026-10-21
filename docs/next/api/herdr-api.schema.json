@@ -1273,6 +1273,13 @@
                 "integer",
                 "null"
               ]
+            },
+            "pane_id": {
+              "description": "Only this pane's transitions; every pane when omitted.",
+              "type": [
+                "string",
+                "null"
+              ]
             }
           },
           "type": "object"

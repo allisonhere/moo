@@ -27,7 +27,7 @@ const STATUS_REQUEST_TIMEOUT: Duration = Duration::from_secs(2);
 
 /// Private daemon-start hint used to seed a fresh headless server from the
 /// directory where the user ran `herdr`.
-pub(crate) const STARTUP_CWD_ENV_VAR: &str = "HERDR_STARTUP_CWD";
+pub(crate) const STARTUP_CWD_ENV_VAR: &str = "MOO_STARTUP_CWD";
 
 // ---------------------------------------------------------------------------
 // Server detection
@@ -155,7 +155,7 @@ fn client_protocol_accepts_hello(socket_path: &Path) -> io::Result<bool> {
 fn validate_running_server_compatibility(saved_federation: bool) -> io::Result<()> {
     let Some(status) = read_server_status()? else {
         return Err(io::Error::other(format!(
-            "a herdr server is listening, but its status API is unavailable.\n\n{}\nIf that fails, stop the old server process manually.",
+            "a moo server is listening, but its status API is unavailable.\n\n{}\nIf that fails, stop the old server process manually.",
             crate::session::active_restart_after_update_guidance()
         )));
     };
@@ -196,7 +196,7 @@ fn validate_running_server_compatibility(saved_federation: bool) -> io::Result<(
 /// The server process is fully detached:
 /// - Runs in its own session (setsid) so it survives the client exiting
 /// - Stdin/stdout/stderr are redirected to /dev/null
-/// - Inherits relevant environment variables (`XDG_CONFIG_HOME`, `HERDR_SESSION`,
+/// - Inherits relevant environment variables (`XDG_CONFIG_HOME`, `MOO_SESSION`,
 ///   socket overrides, etc.), except inherited socket overrides are cleared when
 ///   this CLI invocation explicitly selected a session.
 ///
@@ -215,7 +215,7 @@ pub fn spawn_server_daemon() -> io::Result<u32> {
 
     let pid =
         crate::platform::launch_server_daemon_command(&mut command).map_err(|err: io::Error| {
-            io::Error::new(err.kind(), format!("failed to spawn herdr server: {err}"))
+            io::Error::new(err.kind(), format!("failed to spawn moo server: {err}"))
         })?;
     info!(pid, "server daemon spawned");
 
@@ -244,7 +244,7 @@ fn build_server_daemon_command(exe: PathBuf) -> Command {
     if crate::session::explicit_session_requested() {
         command
             .env_remove(crate::api::SOCKET_PATH_ENV_VAR)
-            .env_remove("HERDR_CLIENT_SOCKET_PATH");
+            .env_remove("MOO_CLIENT_SOCKET_PATH");
     }
 
     command
@@ -283,7 +283,7 @@ pub fn wait_for_server_socket(socket_path: &Path, timeout: Duration) -> io::Resu
             "server did not become ready within {}s (socket: {}). The background server may still be starting; try `herdr` again, or check {}",
             timeout.as_secs(),
             socket_path.display(),
-            crate::session::data_dir().join("herdr-server.log").display()
+            crate::session::data_dir().join("moo-server.log").display()
         ),
     ))
 }
@@ -440,7 +440,7 @@ mod tests {
     fn server_daemon_command_clears_socket_overrides_for_explicit_session() {
         let _guard = env_lock().lock().unwrap();
         std::env::set_var(crate::api::SOCKET_PATH_ENV_VAR, "/tmp/inherited.sock");
-        std::env::set_var("HERDR_CLIENT_SOCKET_PATH", "/tmp/inherited-client.sock");
+        std::env::set_var("MOO_CLIENT_SOCKET_PATH", "/tmp/inherited-client.sock");
         std::env::remove_var(crate::session::SESSION_ENV_VAR);
         crate::session::clear_explicit_session_for_test();
         let args = vec![
@@ -457,10 +457,10 @@ mod tests {
             *key == OsStr::new(crate::api::SOCKET_PATH_ENV_VAR) && value.is_none()
         }));
         assert!(envs.iter().any(|(key, value)| {
-            *key == OsStr::new("HERDR_CLIENT_SOCKET_PATH") && value.is_none()
+            *key == OsStr::new("MOO_CLIENT_SOCKET_PATH") && value.is_none()
         }));
         std::env::remove_var(crate::api::SOCKET_PATH_ENV_VAR);
-        std::env::remove_var("HERDR_CLIENT_SOCKET_PATH");
+        std::env::remove_var("MOO_CLIENT_SOCKET_PATH");
         std::env::remove_var(crate::session::SESSION_ENV_VAR);
         crate::session::clear_explicit_session_for_test();
     }

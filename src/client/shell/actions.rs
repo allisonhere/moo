@@ -847,6 +847,9 @@ impl ClientShellState {
                 };
                 return (repaint, Vec::new());
             }
+            PendingEndpointKind::AgentHistory => {
+                return (self.handle_session_replay_result(result), Vec::new());
+            }
             kind @ (PendingEndpointKind::IntegrationList
             | PendingEndpointKind::IntegrationInstall) => {
                 return self.handle_settings_endpoint_result(kind, result);

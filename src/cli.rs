@@ -238,7 +238,7 @@ fn channel_set(args: &[String]) -> std::io::Result<i32> {
     crate::platform::end_cli_output();
     if let Err(err) = crate::update::self_update(crate::update::SelfUpdateOptions::default()) {
         eprintln!("update failed: {err}");
-        eprintln!("Run `herdr update` to retry.");
+        eprintln!("Run `moo update` to retry.");
         return Ok(1);
     }
 
@@ -282,8 +282,8 @@ fn channel_set_install_action(
 
 fn print_channel_help() {
     eprintln!("{} channel commands:", crate::product_identity::BINARY_NAME);
-    eprintln!("  herdr channel show                  print the configured update channel");
-    eprintln!("  herdr channel set <stable|preview>  choose the update channel");
+    eprintln!("  moo channel show                  print the configured update channel");
+    eprintln!("  moo channel set <stable|preview>  choose the update channel");
 }
 
 fn run_config_command(args: &[String]) -> std::io::Result<i32> {
@@ -400,7 +400,7 @@ fn config_reset_keys(args: &[String]) -> std::io::Result<i32> {
         path.display()
     );
     println!("Built-in v2 keybindings will apply after Herdr restarts or reloads config.");
-    println!("If a Herdr server is running, run `herdr server reload-config` to apply this now.");
+    println!("If a Herdr server is running, run `moo server reload-config` to apply this now.");
     println!(
         "To restore: cp {} {}",
         backup_path.display(),
@@ -989,20 +989,20 @@ fn print_terminal_help() {
         "{} terminal commands:",
         crate::product_identity::BINARY_NAME
     );
-    eprintln!("  herdr terminal attach <terminal_id> [--takeover]");
-    eprintln!("  herdr terminal session control <target> [--takeover] [--cols N] [--rows N]");
-    eprintln!("  herdr terminal session observe <target> [--cols N] [--rows N]");
-    eprintln!("  herdr terminal title set <title>");
-    eprintln!("  herdr terminal title clear");
+    eprintln!("  moo terminal attach <terminal_id> [--takeover]");
+    eprintln!("  moo terminal session control <target> [--takeover] [--cols N] [--rows N]");
+    eprintln!("  moo terminal session observe <target> [--cols N] [--rows N]");
+    eprintln!("  moo terminal title set <title>");
+    eprintln!("  moo terminal title clear");
     eprintln!("  detach from direct attach with ctrl+b q; send literal ctrl+b with ctrl+b ctrl+b");
 }
 
 fn print_session_help() {
     eprintln!("{} session commands:", crate::product_identity::BINARY_NAME);
-    eprintln!("  herdr session list [--json]");
-    eprintln!("  herdr session attach <name>");
-    eprintln!("  herdr session stop <name> [--json]");
-    eprintln!("  herdr session delete <name> [--json]");
+    eprintln!("  moo session list [--json]");
+    eprintln!("  moo session attach <name>");
+    eprintln!("  moo session stop <name> [--json]");
+    eprintln!("  moo session delete <name> [--json]");
     eprintln!("  use 'default' as <name> to target the default session for stop");
 }
 
@@ -1067,15 +1067,15 @@ mod tests {
     #[test]
     fn parse_env_assignment_accepts_empty_values() {
         assert_eq!(
-            super::parse_env_assignment("HERDR_ROLE=").unwrap(),
-            ("HERDR_ROLE".to_string(), String::new())
+            super::parse_env_assignment("MOO_ROLE=").unwrap(),
+            ("MOO_ROLE".to_string(), String::new())
         );
     }
 
     #[test]
     fn parse_env_assignment_requires_key_value_separator() {
         assert_eq!(
-            super::parse_env_assignment("HERDR_ROLE").unwrap_err(),
+            super::parse_env_assignment("MOO_ROLE").unwrap_err(),
             "env must use KEY=VALUE"
         );
     }

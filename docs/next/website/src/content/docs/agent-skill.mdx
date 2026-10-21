@@ -11,7 +11,7 @@ Herdr also serves a separate guide at [`herdr.dev/agent-guide.md`](https://herdr
 
 ## What the skill does
 
-The skill tells an agent to use the `herdr` CLI when `HERDR_ENV=1` is set. That means the agent is running inside a Herdr-managed pane and can safely talk to the local Herdr socket.
+The skill tells an agent to use the `herdr` CLI when `MOO_ENV=1` is set. That means the agent is running inside a Herdr-managed pane and can safely talk to the local Herdr socket.
 
 With the skill installed, an agent can:
 
@@ -50,11 +50,11 @@ herdr
 claude
 ```
 
-Or use any other coding agent in a Herdr pane so `HERDR_ENV=1` is available to the agent process.
+Or use any other coding agent in a Herdr pane so `MOO_ENV=1` is available to the agent process.
 
 ## Safety rule
 
-The skill starts with one guardrail: if `HERDR_ENV=1` is not set, the agent should stop and say it is not running inside a Herdr-managed pane.
+The skill starts with one guardrail: if `MOO_ENV=1` is not set, the agent should stop and say it is not running inside a Herdr-managed pane.
 
 This prevents an agent outside Herdr from trying to control a session it does not own.
 

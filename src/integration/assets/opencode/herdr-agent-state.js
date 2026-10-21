@@ -1,8 +1,8 @@
 // installed by herdr
 // managed by herdr; reinstalling or updating the integration overwrites this file.
 // add custom hooks/plugins beside this file instead of editing it.
-// HERDR_INTEGRATION_ID=opencode
-// HERDR_INTEGRATION_VERSION=13
+// MOO_INTEGRATION_ID=opencode
+// MOO_INTEGRATION_VERSION=13
 
 import net from "node:net";
 
@@ -59,8 +59,8 @@ function request(method, params) {
 }
 
 function requestOnce(method, params) {
-  const paneId = process.env.HERDR_PANE_ID;
-  const socketPath = process.env.HERDR_SOCKET_PATH;
+  const paneId = process.env.MOO_PANE_ID;
+  const socketPath = process.env.MOO_SOCKET_PATH;
 
   if (!paneId || !socketPath) {
     return Promise.resolve();
@@ -135,9 +135,9 @@ function ownsLocalLifecycle() {
 export const HerdrAgentStatePlugin = async () => {
   if (
     !ownsLocalLifecycle() ||
-    process.env.HERDR_ENV !== "1" ||
-    !process.env.HERDR_SOCKET_PATH ||
-    !process.env.HERDR_PANE_ID
+    process.env.MOO_ENV !== "1" ||
+    !process.env.MOO_SOCKET_PATH ||
+    !process.env.MOO_PANE_ID
   ) {
     return {};
   }

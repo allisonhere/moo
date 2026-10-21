@@ -2,8 +2,8 @@
 # installed by herdr
 # managed by herdr; reinstalling or updating the integration overwrites this file.
 # add custom hooks beside this file instead of editing it.
-# HERDR_INTEGRATION_ID=devin
-# HERDR_INTEGRATION_VERSION=3
+# MOO_INTEGRATION_ID=devin
+# MOO_INTEGRATION_VERSION=3
 
 set -eu
 
@@ -17,12 +17,12 @@ case "$action" in
   *) exit 0 ;;
 esac
 
-[ "${HERDR_ENV:-}" = "1" ] || exit 0
-[ -n "${HERDR_SOCKET_PATH:-}" ] || exit 0
-[ -n "${HERDR_PANE_ID:-}" ] || exit 0
+[ "${MOO_ENV:-}" = "1" ] || exit 0
+[ -n "${MOO_SOCKET_PATH:-}" ] || exit 0
+[ -n "${MOO_PANE_ID:-}" ] || exit 0
 command -v python3 >/dev/null 2>&1 || exit 0
 
-HERDR_HOOK_INPUT_FILE="$hook_input_file" python3 - <<'PY'
+MOO_HOOK_INPUT_FILE="$hook_input_file" python3 - <<'PY'
 from __future__ import annotations
 
 import json
@@ -51,7 +51,7 @@ def load_hook_input(path: str | None) -> dict:
 
 
 def load_session_list(project_dir: str | None):
-    injected = os.environ.get("HERDR_DEVIN_LIST_JSON")
+    injected = os.environ.get("MOO_DEVIN_LIST_JSON")
     if injected is not None:
         try:
             parsed = json.loads(injected)
@@ -134,10 +134,10 @@ def resolve_session_id(project_dir: str, hook_input: dict) -> str | None:
     return None
 
 
-pane_id = os.environ.get("HERDR_PANE_ID")
-socket_path = os.environ.get("HERDR_SOCKET_PATH")
+pane_id = os.environ.get("MOO_PANE_ID")
+socket_path = os.environ.get("MOO_SOCKET_PATH")
 project_dir = os.environ.get("DEVIN_PROJECT_DIR") or os.getcwd()
-hook_input = load_hook_input(os.environ.get("HERDR_HOOK_INPUT_FILE"))
+hook_input = load_hook_input(os.environ.get("MOO_HOOK_INPUT_FILE"))
 
 if not pane_id or not socket_path:
     raise SystemExit(0)

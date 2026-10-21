@@ -20,7 +20,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 const LAUNCHCTL: &str = "/bin/launchctl";
 const LABEL_PREFIX: &str = "dev.herdr.server.";
 /// Tells the job process to fork the server and exit; never inherited by panes.
-const DETACH_ENV: &str = "HERDR_LAUNCHD_DETACH";
+const DETACH_ENV: &str = "MOO_LAUNCHD_DETACH";
 /// Finished jobs stay loaded until logout; older ones are removed on the next launch.
 const STALE_JOB_AGE: Duration = Duration::from_secs(60);
 
@@ -323,7 +323,7 @@ mod tests {
         let mut command = Command::new("/opt/her<dr>");
         command
             .arg("a&b")
-            .env("HERDR_TEST_VALUE", "\"q\"\tx")
+            .env("MOO_TEST_VALUE", "\"q\"\tx")
             .env_remove("HOME");
         let plist = job_plist(
             "dev.herdr.server.1.2",
@@ -335,7 +335,7 @@ mod tests {
 
         assert!(plist.contains("<string>/opt/her&lt;dr&gt;</string>"));
         assert!(plist.contains("<string>a&amp;b</string>"));
-        assert!(plist.contains("<key>HERDR_TEST_VALUE</key>\n<string>&quot;q&quot;\tx</string>"));
+        assert!(plist.contains("<key>MOO_TEST_VALUE</key>\n<string>&quot;q&quot;\tx</string>"));
         assert!(!plist.contains("<key>HOME</key>"));
         assert!(plist.contains(&format!("<key>{DETACH_ENV}</key>")));
         assert!(plist.contains("<key>KeepAlive</key>\n<false/>"));
@@ -351,7 +351,7 @@ mod tests {
             std::ffi::OsString::from_vec(vec![0x66, 0xff]),
         ] {
             let mut command = Command::new("/bin/true");
-            command.env("HERDR_TEST_VALUE", &value);
+            command.env("MOO_TEST_VALUE", &value);
             assert!(
                 job_plist("dev.herdr.server.1.2", &command, None, 0o022).is_err(),
                 "{value:?}"
@@ -421,7 +421,7 @@ mod tests {
         assert_eq!(coalition, resource_coalition(std::process::id()));
     }
 
-    const DETACH_HELPER_OUT: &str = "HERDR_LAUNCHD_DETACH_HELPER_OUT";
+    const DETACH_HELPER_OUT: &str = "MOO_LAUNCHD_DETACH_HELPER_OUT";
 
     /// Body of the launchd job in `detached_server_outlives_its_launcher_job`.
     #[test]
@@ -533,8 +533,8 @@ mod tests {
         let mut command = Command::new("/bin/sh");
         command
             .arg("-c")
-            .arg("printf '%s %s %s' $$ \"$HERDR_LAUNCHD_TEST\" \"${HERDR_LAUNCHD_DETACH-unset}\" > out; exec sleep 30")
-            .env("HERDR_LAUNCHD_TEST", "yes")
+            .arg("printf '%s %s %s' $$ \"$MOO_LAUNCHD_TEST\" \"${MOO_LAUNCHD_DETACH-unset}\" > out; exec sleep 30")
+            .env("MOO_LAUNCHD_TEST", "yes")
             .current_dir(dir.path());
 
         let label = spawn_launchd_job(&command).expect("launchd job");

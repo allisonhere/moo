@@ -17,7 +17,7 @@ pub(crate) use actions::{
 #[cfg(test)]
 pub(crate) use env::integration_env_lock;
 pub(crate) use env::{
-    apply_pane_base_env, HERDR_PANE_ID_ENV_VAR, HERDR_TAB_ID_ENV_VAR, HERDR_WORKSPACE_ID_ENV_VAR,
+    apply_pane_base_env, MOO_PANE_ID_ENV_VAR, MOO_TAB_ID_ENV_VAR, MOO_WORKSPACE_ID_ENV_VAR,
 };
 pub(crate) use registry::{
     experimental_letta_integration_status, installed_integration_statuses,
@@ -280,7 +280,7 @@ const ANTIGRAVITY_CLI_HOOK_TIMEOUT_SEC: u64 = 10;
 /// events accept a `matcher`/`hooks` wrapper, and sending one here would
 /// invalidate the whole file.
 const ANTIGRAVITY_CLI_HOOK_EVENTS: [(&str, &str); 1] = [("PreInvocation", "session")];
-const INTEGRATION_VERSION_MARKER: &str = "HERDR_INTEGRATION_VERSION=";
+const INTEGRATION_VERSION_MARKER: &str = "MOO_INTEGRATION_VERSION=";
 const MASTRACODE_HOOK_INSTALL_NAME: &str = if cfg!(windows) {
     "herdr-agent-state.ps1"
 } else {

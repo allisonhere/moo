@@ -5,7 +5,7 @@ fn workspace_and_pane_management_commands_work() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
+    let socket_path = runtime_dir.join("moo.sock");
 
     let herdr = spawn_herdr(&config_home, &runtime_dir, &socket_path);
     wait_for_socket(&socket_path, Duration::from_secs(5));
@@ -95,7 +95,7 @@ fn worktree_management_commands_work() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
+    let socket_path = runtime_dir.join("moo.sock");
     let repo = base.join("repo");
     let checkout = base.join("checkout");
     create_committed_repo(&repo);
@@ -221,7 +221,7 @@ fn workspace_close_requires_explicit_worktree_group_intent() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
+    let socket_path = runtime_dir.join("moo.sock");
     let repo = base.join("repo");
     let checkout = base.join("checkout");
     create_committed_repo(&repo);
@@ -298,7 +298,7 @@ fn forced_worktree_remove_terminates_processes_inside_checkout() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
+    let socket_path = runtime_dir.join("moo.sock");
     let repo = base.join("repo");
     let checkout = base.join("checkout-with-process");
     create_committed_repo(&repo);
@@ -367,7 +367,7 @@ fn worktree_open_existing_checkout_by_path_and_branch() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
+    let socket_path = runtime_dir.join("moo.sock");
     let repo = base.join("repo");
     let checkout = base.join("external-checkout");
     create_committed_repo(&repo);
@@ -703,7 +703,7 @@ fn tab_management_commands_work() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
+    let socket_path = runtime_dir.join("moo.sock");
 
     let herdr = spawn_herdr(&config_home, &runtime_dir, &socket_path);
     wait_for_socket(&socket_path, Duration::from_secs(5));

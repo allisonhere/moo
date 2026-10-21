@@ -113,7 +113,7 @@ pub(crate) fn remove_legacy_pi_extension_from_omp_dir(dir: &Path) -> io::Result<
     }
 
     let content = fs::read_to_string(&legacy_path)?;
-    if content.contains("HERDR_INTEGRATION_ID=pi") {
+    if content.contains("MOO_INTEGRATION_ID=pi") {
         fs::remove_file(legacy_path)?;
         return Ok(true);
     }

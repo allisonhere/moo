@@ -1,14 +1,14 @@
 #!/bin/sh
 # managed by herdr; reinstalling the integration replaces this file.
-# HERDR_INTEGRATION_ID=qwen
-# HERDR_INTEGRATION_VERSION=2
+# MOO_INTEGRATION_ID=qwen
+# MOO_INTEGRATION_VERSION=2
 
 [ "${1:-}" = "session" ] || exit 0
-[ "${HERDR_ENV:-}" = "1" ] || exit 0
-[ -n "${HERDR_PANE_ID:-}" ] || exit 0
-[ -n "${HERDR_SOCKET_PATH:-}" ] || exit 0
-if [ -n "${HERDR_BIN_PATH:-}" ]; then
-    [ -x "$HERDR_BIN_PATH" ] || exit 0
+[ "${MOO_ENV:-}" = "1" ] || exit 0
+[ -n "${MOO_PANE_ID:-}" ] || exit 0
+[ -n "${MOO_SOCKET_PATH:-}" ] || exit 0
+if [ -n "${MOO_BIN_PATH:-}" ]; then
+    [ -x "$MOO_BIN_PATH" ] || exit 0
 else
     command -v herdr >/dev/null 2>&1 || exit 0
 fi
@@ -27,9 +27,9 @@ try:
     source = payload.get("source")
     if not isinstance(session_id, str) or not session_id:
         raise ValueError
-    command = os.environ.get("HERDR_BIN_PATH") or "herdr"
+    command = os.environ.get("MOO_BIN_PATH") or "herdr"
     args = [
-        command, "pane", "report-agent-session", os.environ["HERDR_PANE_ID"],
+        command, "pane", "report-agent-session", os.environ["MOO_PANE_ID"],
         "--source", "herdr:qwen", "--agent", "qwen",
         "--agent-session-id", session_id, "--seq", str(time.time_ns()),
     ]

@@ -120,7 +120,7 @@ exec "$TEST_REMOTE_HERDR" "$@"
             "version": 1,
             "ssh": [{"id": PROFILE_ID, "label": "mac", "target": "fake-mac", "session": "fleet", "enabled": true}]
         })).unwrap()).unwrap();
-        let remote = UnixListener::bind(session.join("herdr.sock")).unwrap();
+        let remote = UnixListener::bind(session.join("moo.sock")).unwrap();
         remote.set_nonblocking(true).unwrap();
         let local = UnixListener::bind(root.join("local.sock")).unwrap();
         local.set_nonblocking(true).unwrap();
@@ -152,15 +152,15 @@ exec "$TEST_REMOTE_HERDR" "$@"
             .env("XDG_RUNTIME_DIR", &self.root)
             .env("TEST_ROOT", &self.root)
             .env("TEST_REMOTE_HERDR", self.root.join("remote herdr"))
-            .env("HERDR_SOCKET_PATH", self.root.join("local.sock"))
+            .env("MOO_SOCKET_PATH", self.root.join("local.sock"))
             .env(
-                "HERDR_CLIENT_SOCKET_PATH",
+                "MOO_CLIENT_SOCKET_PATH",
                 self.root.join("never-client.sock"),
             )
-            .env("HERDR_SESSION", "wrong-inherited-session")
-            .env("HERDR_PANE_ID", "wrong-local-pane")
-            .env_remove("HERDR_CONFIG_PATH")
-            .env_remove("HERDR_REMOTE_BINARY");
+            .env("MOO_SESSION", "wrong-inherited-session")
+            .env("MOO_PANE_ID", "wrong-local-pane")
+            .env_remove("MOO_CONFIG_PATH")
+            .env_remove("MOO_REMOTE_BINARY");
         command
     }
 
@@ -746,7 +746,7 @@ fn machine_api_server_stop_is_sent_only_to_the_selected_machine() {
     let server = harness.serve(json!({"result":{"type":"ok"}}), harness.protocol);
     let output = harness
         .command(&["--machine", "mac", "server", "stop"])
-        .env("HERDR_SOCKET_PATH", harness.root.join("missing-local.sock"))
+        .env("MOO_SOCKET_PATH", harness.root.join("missing-local.sock"))
         .output()
         .unwrap();
     assert!(
@@ -776,6 +776,6 @@ fn machine_api_protocol_mismatch_never_sends_the_mutation() {
     let error = String::from_utf8_lossy(&output.stderr);
     assert!(error.contains("protocol_mismatch"), "{error}");
     assert!(error.contains("machine 'mac'"), "{error}");
-    assert!(!error.contains("HERDR_SOCKET_PATH="), "{error}");
+    assert!(!error.contains("MOO_SOCKET_PATH="), "{error}");
     harness.assert_local_untouched();
 }

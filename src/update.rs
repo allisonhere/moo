@@ -25,13 +25,13 @@ use serde::{Deserialize, Deserializer};
 const STABLE_UPDATE_MANIFEST_URL: &str = "https://herdr.dev/latest.json";
 const PREVIEW_UPDATE_MANIFEST_URL: &str = "https://herdr.dev/preview.json";
 const HOMEBREW_FORMULA_API_URL: &str = "https://formulae.brew.sh/api/formula/herdr.json";
-const HERDR_UPDATE_COMMAND: &str = "moo update";
+const MOO_UPDATE_COMMAND: &str = "moo update";
 const HOMEBREW_UPDATE_COMMAND: &str = "brew update && brew upgrade herdr";
 const MISE_UPDATE_COMMAND: &str = "mise upgrade herdr";
 const NIX_UPDATE_COMMAND: &str = "update through Nix";
 const MISE_INSTALLS_DIR_ENV: &str = "MISE_INSTALLS_DIR";
-const FAKE_UPDATE_VERSION_ENV: &str = "HERDR_FAKE_UPDATE_VERSION";
-const FAKE_UPDATE_NOTES_VERSION_ENV: &str = "HERDR_FAKE_UPDATE_NOTES_VERSION";
+const FAKE_UPDATE_VERSION_ENV: &str = "MOO_FAKE_UPDATE_VERSION";
+const FAKE_UPDATE_NOTES_VERSION_ENV: &str = "MOO_FAKE_UPDATE_NOTES_VERSION";
 const DEFAULT_FAKE_UPDATE_NOTES_VERSION: &str = "0.3.0";
 #[cfg(not(windows))]
 const SERVER_STOP_RESPONSE_TIMEOUT: Duration = Duration::from_secs(5);
@@ -786,7 +786,7 @@ fn install_windows_update_with_installer(
 
 #[cfg(windows)]
 fn windows_installed_herdr_exe_path() -> Result<PathBuf, String> {
-    if let Some(install_dir) = env::var_os("HERDR_INSTALL_DIR").filter(|value| !value.is_empty()) {
+    if let Some(install_dir) = env::var_os("MOO_INSTALL_DIR").filter(|value| !value.is_empty()) {
         return Ok(PathBuf::from(install_dir).join("herdr.exe"));
     }
 
@@ -804,11 +804,11 @@ fn windows_installed_herdr_exe_path() -> Result<PathBuf, String> {
 // ---------------------------------------------------------------------------
 
 fn running_inside_herdr_env(herdr_env: Option<&str>) -> bool {
-    herdr_env == Some(crate::HERDR_ENV_VALUE)
+    herdr_env == Some(crate::MOO_ENV_VALUE)
 }
 
 fn running_inside_herdr() -> bool {
-    running_inside_herdr_env(env::var(crate::HERDR_ENV_VAR).ok().as_deref())
+    running_inside_herdr_env(env::var(crate::MOO_ENV_VAR).ok().as_deref())
 }
 
 #[cfg(not(windows))]
@@ -996,7 +996,7 @@ fn plan_running_server_updates(
 
     if plans.is_empty() && target_client_protocol_server_is_running()? {
         return Err(format!(
-            "a herdr server is listening, but its status API is unavailable; try `{}`, or stop the old server process manually, then run `herdr update` again",
+            "a moo server is listening, but its status API is unavailable; try `{}`, or stop the old server process manually, then run `moo update` again",
             crate::session::local_stop_command()
         ));
     }
@@ -1037,7 +1037,7 @@ fn running_update_targets() -> Result<Vec<RunningUpdateTarget>, String> {
             name: None,
             label: socket_path.display().to_string(),
             stop_command: format!(
-                "{}={} herdr server stop",
+                "{}={} moo server stop",
                 crate::api::SOCKET_PATH_ENV_VAR,
                 socket_path.display()
             ),
@@ -1133,7 +1133,7 @@ fn prompt_to_stop_old_servers_before_update(
 ) -> Result<bool, String> {
     if !io::stdin().is_terminal() {
         return Err(
-            "one or more Herdr sessions must stop for this update. Stop running Herdr sessions when ready, then run `herdr update` again from an interactive terminal."
+            "one or more Herdr sessions must stop for this update. Stop running Herdr sessions when ready, then run `moo update` again from an interactive terminal."
                 .to_string(),
         );
     }
@@ -1476,13 +1476,13 @@ fn recover_failed_live_handoff_for_update(
         FailedHandoffServerState::NoServerResponding => {
             if let Some(command) = plan.attach_command() {
                 eprintln!(
-                    "no herdr server is responding for session {}. the binary was updated; run `{command}` to start {}.",
+                    "no moo server is responding for session {}. the binary was updated; run `{command}` to start {}.",
                     plan.label(),
                     release.label()
                 );
             } else {
                 eprintln!(
-                    "no herdr server is responding at {}. the binary was updated; restart with the same socket override to use {}.",
+                    "no moo server is responding at {}. the binary was updated; restart with the same socket override to use {}.",
                     plan.socket_path().display(),
                     release.label()
                 );
@@ -1894,13 +1894,13 @@ pub(crate) fn update_install_command() -> &'static str {
     } else if is_nix_managed_install() {
         NIX_UPDATE_COMMAND
     } else {
-        HERDR_UPDATE_COMMAND
+        MOO_UPDATE_COMMAND
     }
 }
 
 pub(crate) fn update_install_instruction(install_command: &str) -> String {
     match install_command {
-        HERDR_UPDATE_COMMAND => {
+        MOO_UPDATE_COMMAND => {
             "detach, run `moo update`, then run Herdr again to reconnect".to_string()
         }
         HOMEBREW_UPDATE_COMMAND => {
@@ -2160,7 +2160,7 @@ pub fn self_update(options: SelfUpdateOptions) -> Result<Version, String> {
     }
 
     if running_inside_herdr() {
-        return Err("run `herdr update` outside herdr after detaching from the session".into());
+        return Err("run `moo update` outside herdr after detaching from the session".into());
     }
 
     eprintln!("checking {} channel for updates...", channel.as_str());
@@ -2221,7 +2221,7 @@ pub fn self_update(options: SelfUpdateOptions) -> Result<Version, String> {
             && !prompt_to_complete_plain_update(&server_update_decisions, &release)?
         {
             eprintln!("Herdr was not updated.");
-            eprintln!("Stop running Herdr sessions when ready, then run `herdr update` again.");
+            eprintln!("Stop running Herdr sessions when ready, then run `moo update` again.");
             return Ok(current);
         }
         install_downloaded_update(downloaded_update)?;
@@ -2277,9 +2277,7 @@ fn saved_machine_update_notice_lines(
         "your SSH machines run their own herdr and may be older:".to_string(),
     ];
     lines.extend(labels.into_iter().map(|label| format!("  {label}")));
-    lines.push(
-        "run `herdr update` on each one. it will tell you what to restart there.".to_string(),
-    );
+    lines.push("run `moo update` on each one. it will tell you what to restart there.".to_string());
     lines
 }
 
@@ -2558,7 +2556,7 @@ mod tests {
                 "your SSH machines run their own herdr and may be older:",
                 "  rohan",
                 "  workbox",
-                "run `herdr update` on each one. it will tell you what to restart there.",
+                "run `moo update` on each one. it will tell you what to restart there.",
             ]
         );
     }
@@ -2576,7 +2574,7 @@ mod tests {
         let default = KeptServer {
             label: "default",
             version: "0.9.1",
-            stop_command: "herdr server stop",
+            stop_command: "moo server stop",
             attach_command: Some("herdr"),
         };
         assert_eq!(
@@ -2585,7 +2583,7 @@ mod tests {
                 "",
                 "your running server is still v0.9.1. run `herdr` to reconnect; everything keeps working.",
                 "server fixes in v0.10.0 apply only after it restarts.",
-                "when your agents are idle, run `herdr server stop`, then `herdr`.",
+                "when your agents are idle, run `moo server stop`, then `herdr`.",
                 "this closes running panes and their agents.",
             ]
         );
@@ -2593,13 +2591,13 @@ mod tests {
         let work = KeptServer {
             label: "work",
             version: "0.9.0",
-            stop_command: "herdr session stop work",
-            attach_command: Some("herdr session attach work"),
+            stop_command: "moo session stop work",
+            attach_command: Some("moo session attach work"),
         };
         let default = KeptServer {
             label: "default",
             version: "0.9.1",
-            stop_command: "herdr server stop",
+            stop_command: "moo server stop",
             attach_command: Some("herdr"),
         };
         assert_eq!(
@@ -2608,8 +2606,8 @@ mod tests {
                 "",
                 "your running servers are still older. reconnect as usual; everything keeps working.",
                 "server fixes in v0.10.0 apply only after each one restarts:",
-                "  default  v0.9.1  `herdr server stop`, then `herdr`",
-                "  work     v0.9.0  `herdr session stop work`, then `herdr session attach work`",
+                "  default  v0.9.1  `moo server stop`, then `herdr`",
+                "  work     v0.9.0  `moo session stop work`, then `moo session attach work`",
                 "restart one when its agents are idle. this closes its panes and their agents.",
             ]
         );
@@ -2618,13 +2616,13 @@ mod tests {
         let socket_override = KeptServer {
             label: "/tmp/herdr.sock",
             version: "0.9.1",
-            stop_command: "herdr server stop",
+            stop_command: "moo server stop",
             attach_command: None,
         };
         let lines = kept_server_notice_lines(&[socket_override], "0.10.0");
         assert_eq!(
             lines[3],
-            "when your agents are idle, run `herdr server stop`, then moo with the same socket override."
+            "when your agents are idle, run `moo server stop`, then moo with the same socket override."
         );
     }
 
@@ -2975,7 +2973,7 @@ mod tests {
     #[test]
     fn update_install_instruction_distinguishes_install_from_restart() {
         assert_eq!(
-            update_install_instruction(HERDR_UPDATE_COMMAND),
+            update_install_instruction(MOO_UPDATE_COMMAND),
             "detach, run `moo update`, then run Herdr again to reconnect"
         );
         assert_eq!(
@@ -3013,7 +3011,7 @@ mod tests {
 
     #[test]
     fn running_inside_herdr_env_requires_marker() {
-        assert!(running_inside_herdr_env(Some(crate::HERDR_ENV_VALUE)));
+        assert!(running_inside_herdr_env(Some(crate::MOO_ENV_VALUE)));
         assert!(!running_inside_herdr_env(None));
         assert!(!running_inside_herdr_env(Some("0")));
     }
@@ -3131,8 +3129,8 @@ mod tests {
             target: RunningUpdateTarget {
                 name: Some("work".to_string()),
                 label: "work".to_string(),
-                stop_command: "herdr session stop work".to_string(),
-                attach_command: Some("herdr session attach work".to_string()),
+                stop_command: "moo session stop work".to_string(),
+                attach_command: Some("moo session attach work".to_string()),
                 socket_path: crate::session::api_socket_path_for(Some("work")),
                 client_socket_path: crate::session::client_socket_path_for(Some("work")),
                 must_be_running: true,
@@ -3354,8 +3352,8 @@ mod tests {
             target: RunningUpdateTarget {
                 name: Some("work".to_string()),
                 label: "work".to_string(),
-                stop_command: "herdr session stop work".to_string(),
-                attach_command: Some("herdr session attach work".to_string()),
+                stop_command: "moo session stop work".to_string(),
+                attach_command: Some("moo session attach work".to_string()),
                 socket_path: crate::session::api_socket_path_for(Some("work")),
                 client_socket_path: crate::session::client_socket_path_for(Some("work")),
                 must_be_running: true,
@@ -3390,8 +3388,8 @@ mod tests {
             target: RunningUpdateTarget {
                 name: Some("work".to_string()),
                 label: "work".to_string(),
-                stop_command: "herdr session stop work".to_string(),
-                attach_command: Some("herdr session attach work".to_string()),
+                stop_command: "moo session stop work".to_string(),
+                attach_command: Some("moo session attach work".to_string()),
                 socket_path: crate::session::api_socket_path_for(Some("work")),
                 client_socket_path: crate::session::client_socket_path_for(Some("work")),
                 must_be_running: true,

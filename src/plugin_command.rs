@@ -158,10 +158,8 @@ mod tests {
     #[cfg(windows)]
     #[test]
     fn windows_batch_command_captures_output() {
-        let root = std::env::temp_dir().join(format!(
-            "herdr plugin command output {}",
-            std::process::id()
-        ));
+        let root =
+            std::env::temp_dir().join(format!("moo plugin command output {}", std::process::id()));
         std::fs::create_dir_all(&root).expect("create batch fixture directory");
         let path = root.join("capture.cmd");
         std::fs::write(&path, "@echo off\r\necho plugin-%1\r\n").expect("write batch fixture");

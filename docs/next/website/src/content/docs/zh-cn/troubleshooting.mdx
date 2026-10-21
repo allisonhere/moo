@@ -93,7 +93,7 @@ herdr
 
 旧服务器可能在注销后继续运行，但无法查询用户信息或解析 DNS。症状包括 `No user exists for uid 501`、`Could not get manager name.` 和 `curl: (6) Could not resolve host`。重新登录不能修复该服务器。请停止受影响的会话，然后从新登录会话的 GUI 终端启动 Herdr。这会结束正在运行的窗格进程，但会恢复保存的会话布局。实时移交会保留源服务器的服务上下文和现有窗格进程。因此，旧服务器需要完全重启会话才能应用此修复；移交无法修复继承的上下文。
 
-如果新启动的服务器仍出现此问题，请在 `herdr-server.log` 中查找 `could not select persistent user service context`。所需的 macOS API 不可用时，Herdr 会保留继承的上下文。详情见 [Herdr issue #4100](https://github.com/herdrdev/herdr/issues/4100)。
+如果新启动的服务器仍出现此问题，请在 `moo-server.log` 中查找 `could not select persistent user service context`。所需的 macOS API 不可用时，Herdr 会保留继承的上下文。详情见 [Herdr issue #4100](https://github.com/herdrdev/herdr/issues/4100)。
 
 ## 找不到 `herdr` 命令
 
@@ -113,8 +113,8 @@ Herdr 日志默认位于 `~/.config/herdr/`:
 
 ```text
 herdr.log
-herdr-client.log
-herdr-server.log
+moo-client.log
+moo-server.log
 ```
 
 设置 `HERDR_LOG=moo=debug` 可获得更多细节。报告问题时请附上当前日志和轮转后的日志。见[配置](/zh-cn/docs/configuration/#logs)。

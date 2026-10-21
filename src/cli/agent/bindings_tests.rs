@@ -17,6 +17,7 @@ fn params(args: &[&str]) -> serde_json::Value {
         Operation::Read(params) => Method::AgentRead(params),
         Operation::SendKeys(params) => Method::AgentSendKeys(params),
         Operation::Rename(params) => Method::AgentRename(params),
+        Operation::History(params) => Method::AgentHistory(params),
         Operation::Wait(params) => Method::AgentWait(params),
         Operation::Prompt(params) => Method::AgentPrompt(params),
         Operation::Start(params) => Method::AgentStart(params),
@@ -28,6 +29,15 @@ fn params(args: &[&str]) -> serde_json::Value {
     })
     .unwrap()["params"]
         .clone()
+}
+
+#[test]
+fn agent_history_projection_maps_optional_filters() {
+    assert_eq!(params(&["history"]), serde_json::json!({}));
+    assert_eq!(
+        params(&["history", "--pane", "w1:p2", "--limit", "5"]),
+        serde_json::json!({"limit":5, "pane_id":"w1:p2"})
+    );
 }
 
 #[test]

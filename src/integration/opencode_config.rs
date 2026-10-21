@@ -279,7 +279,7 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn failed_cli_registration_preserves_existing_config() {
-        const CHILD_CONFIG: &str = "HERDR_TEST_3970_CONFIG_DIR";
+        const CHILD_CONFIG: &str = "MOO_TEST_3970_CONFIG_DIR";
         if let Some(dir) = std::env::var_os(CHILD_CONFIG) {
             let dir = PathBuf::from(dir);
             let result = add_cli_plugin(&dir, &dir.join("state"), "./herdr-opencode");

@@ -1807,7 +1807,7 @@ command = ["cmd.exe", "/d", "/c", "slot.cmd", "default"]
     #[cfg(target_os = "linux")]
     #[tokio::test]
     async fn plugin_launch_survives_executable_replacement() {
-        const CHILD_ROOT: &str = "HERDR_TEST_PLUGIN_REPLACEMENT_ROOT";
+        const CHILD_ROOT: &str = "MOO_TEST_PLUGIN_REPLACEMENT_ROOT";
         if let Some(root) = std::env::var_os(CHILD_ROOT) {
             let root = std::path::PathBuf::from(root);
             let executable = std::env::current_exe().unwrap();
@@ -1835,12 +1835,12 @@ platforms = ["linux"]
 [[actions]]
 id = "probe"
 title = "Probe executable"
-command = ["sh", "-c", '"$HERDR_BIN_PATH" --list >/dev/null; printf "%s\n" "$?" > action-status']
+command = ["sh", "-c", '"$MOO_BIN_PATH" --list >/dev/null; printf "%s\n" "$?" > action-status']
 
 [[panes]]
 id = "probe"
 title = "Probe executable"
-command = ["sh", "-c", '"$HERDR_BIN_PATH" --list >/dev/null; printf "%s\n" "$?" > pane-status']
+command = ["sh", "-c", '"$MOO_BIN_PATH" --list >/dev/null; printf "%s\n" "$?" > pane-status']
 "#,
             );
             link_manifest(&mut app, &plugin_root);
@@ -1946,7 +1946,7 @@ platforms = ["linux", "macos"]
 [[panes]]
 id = "board"
 title = "Plugin Board"
-command = ["sh", "-c", "printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n' \"$PWD\" \"$HERDR_PLUGIN_ID\" \"$HERDR_PLUGIN_ENTRYPOINT_ID\" \"$HERDR_WORKSPACE_ID\" \"$HERDR_PANE_ID\" \"$HERDR_BIN_PATH\" \"$HERDR_PLUGIN_CONTEXT_JSON\" \"${{HERDR_CELL_WIDTH_PX-unset}}\" \"${{HERDR_CELL_HEIGHT_PX-unset}}\" > {}"]
+command = ["sh", "-c", "printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n' \"$PWD\" \"$MOO_PLUGIN_ID\" \"$MOO_PLUGIN_ENTRYPOINT_ID\" \"$MOO_WORKSPACE_ID\" \"$MOO_PANE_ID\" \"$MOO_BIN_PATH\" \"$MOO_PLUGIN_CONTEXT_JSON\" \"${{MOO_CELL_WIDTH_PX-unset}}\" \"${{MOO_CELL_HEIGHT_PX-unset}}\" > {}"]
 "#,
                 capture.display()
             ),
@@ -1967,19 +1967,16 @@ command = ["sh", "-c", "printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n' \"$PWD\" \
                 cwd: None,
                 focus: true,
                 env: std::collections::HashMap::from([
-                    ("HERDR_PLUGIN_ID".to_string(), "spoofed-plugin".to_string()),
+                    ("MOO_PLUGIN_ID".to_string(), "spoofed-plugin".to_string()),
                     (
-                        "HERDR_PLUGIN_ENTRYPOINT_ID".to_string(),
+                        "MOO_PLUGIN_ENTRYPOINT_ID".to_string(),
                         "spoofed-entrypoint".to_string(),
                     ),
                     (
-                        "HERDR_PLUGIN_CONTEXT_JSON".to_string(),
+                        "MOO_PLUGIN_CONTEXT_JSON".to_string(),
                         "{\"spoofed\":true}".to_string(),
                     ),
-                    (
-                        "HERDR_BIN_PATH".to_string(),
-                        "/tmp/spoofed-herdr".to_string(),
-                    ),
+                    ("MOO_BIN_PATH".to_string(), "/tmp/spoofed-herdr".to_string()),
                 ]),
             }),
         });
@@ -2053,7 +2050,7 @@ platforms = ["linux", "macos"]
 [[panes]]
 id = "board"
 title = "Plugin Board"
-command = ["sh", "-c", "printf '%s\n%s\n%s\n' \"$HERDR_PLUGIN_ROOT\" \"$HERDR_PLUGIN_CONFIG_DIR\" \"$HERDR_PLUGIN_STATE_DIR\" > {}"]
+command = ["sh", "-c", "printf '%s\n%s\n%s\n' \"$MOO_PLUGIN_ROOT\" \"$MOO_PLUGIN_CONFIG_DIR\" \"$MOO_PLUGIN_STATE_DIR\" > {}"]
 "#,
                 capture.display()
             ),
@@ -2075,15 +2072,15 @@ command = ["sh", "-c", "printf '%s\n%s\n%s\n' \"$HERDR_PLUGIN_ROOT\" \"$HERDR_PL
                 focus: true,
                 env: std::collections::HashMap::from([
                     (
-                        "HERDR_PLUGIN_ROOT".to_string(),
+                        "MOO_PLUGIN_ROOT".to_string(),
                         "/tmp/spoofed-root".to_string(),
                     ),
                     (
-                        "HERDR_PLUGIN_CONFIG_DIR".to_string(),
+                        "MOO_PLUGIN_CONFIG_DIR".to_string(),
                         "/tmp/spoofed-config".to_string(),
                     ),
                     (
-                        "HERDR_PLUGIN_STATE_DIR".to_string(),
+                        "MOO_PLUGIN_STATE_DIR".to_string(),
                         "/tmp/spoofed-state".to_string(),
                     ),
                 ]),
@@ -2403,7 +2400,7 @@ title = "Plugin Popup"
 placement = "popup"
 width = "80%"
 height = "40%"
-command = ["sh", "-c", "printf %s ${{HERDR_PANE_ID-unset}} > '{}'; sleep 1"]
+command = ["sh", "-c", "printf %s ${{MOO_PANE_ID-unset}} > '{}'; sleep 1"]
 "#,
             env_capture.display()
         );
@@ -2818,7 +2815,7 @@ platforms = ["linux", "macos"]
 [[actions]]
 id = "run"
 title = "Run"
-command = ["sh", "-c", "printf '%s' \"$HERDR_PLUGIN_ACTION_ID\""]
+command = ["sh", "-c", "printf '%s' \"$MOO_PLUGIN_ACTION_ID\""]
 "#,
         );
         link_manifest(&mut app, &root);
@@ -2885,7 +2882,7 @@ platforms = ["linux", "macos"]
 [[actions]]
 id = "run"
 title = "Run"
-command = ["sh", "-c", "printf '%s\n%s\n%s' \"$HERDR_PLUGIN_ROOT\" \"$HERDR_PLUGIN_CONFIG_DIR\" \"$HERDR_PLUGIN_STATE_DIR\""]
+command = ["sh", "-c", "printf '%s\n%s\n%s' \"$MOO_PLUGIN_ROOT\" \"$MOO_PLUGIN_CONFIG_DIR\" \"$MOO_PLUGIN_STATE_DIR\""]
 "#,
         );
         link_manifest(&mut app, &root);
@@ -2994,7 +2991,7 @@ min_herdr_version = "0.6.10"
 platforms = ["linux", "macos"]
 
 [[startup]]
-command = ["sh", "-c", "printf '%s:%s' \"$HERDR_PLUGIN_ID\" \"$HERDR_PLUGIN_EVENT\" > {}"]
+command = ["sh", "-c", "printf '%s:%s' \"$MOO_PLUGIN_ID\" \"$MOO_PLUGIN_EVENT\" > {}"]
 "#,
                 capture.display()
             ),
@@ -3042,7 +3039,7 @@ platforms = ["linux", "macos"]
 
 [[events]]
 on = "worktree.created"
-command = ["sh", "-c", "printf '%s' \"$HERDR_PLUGIN_CONTEXT_JSON\" > {}"]
+command = ["sh", "-c", "printf '%s' \"$MOO_PLUGIN_CONTEXT_JSON\" > {}"]
 "#,
                 capture.display()
             ),
@@ -3261,7 +3258,7 @@ platforms = ["linux", "macos"]
 [[actions]]
 id = "open"
 title = "Open link"
-command = ["sh", "-c", "printf '%s|%s' \"$HERDR_PLUGIN_LINK_HANDLER_ID\" \"$HERDR_PLUGIN_CLICKED_URL\""]
+command = ["sh", "-c", "printf '%s|%s' \"$MOO_PLUGIN_LINK_HANDLER_ID\" \"$MOO_PLUGIN_CLICKED_URL\""]
 
 [[link_handlers]]
 id = "github-issue"

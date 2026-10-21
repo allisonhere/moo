@@ -271,7 +271,7 @@ jobs:
       - *require-release-admins
       - name: Trigger stable Nix package update
         env:
-          GH_TOKEN: ${{ secrets.HERDR_NIX_DISPATCH_TOKEN }}
+          GH_TOKEN: ${{ secrets.MOO_NIX_DISPATCH_TOKEN }}
           GH_HOST: github.com
         run: |
           if ! gh workflow run update-check.yml --repo herdrdev/herdr-nix --ref main; then

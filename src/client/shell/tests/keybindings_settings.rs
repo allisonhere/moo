@@ -159,7 +159,7 @@ fn remote_client_preferences_keep_the_same_identity_across_bridge_processes() {
 
 #[test]
 fn remote_client_preferences_process_child() {
-    if std::env::var("HERDR_TEST_PREFERENCES_CHILD").as_deref() != Ok("1") {
+    if std::env::var("MOO_TEST_PREFERENCES_CHILD").as_deref() != Ok("1") {
         return;
     }
     let expected_path = super::super::preferences::path_for_remote_endpoint("dev", "agents");

@@ -239,9 +239,7 @@ fn server_live_handoff(args: &[String]) -> std::io::Result<i32> {
 
     eprintln!(
         "live handoff complete; server log: {}",
-        crate::session::data_dir()
-            .join("herdr-server.log")
-            .display()
+        crate::session::data_dir().join("moo-server.log").display()
     );
     Ok(0)
 }
@@ -259,15 +257,17 @@ fn parse_live_handoff_params(args: &[String]) -> Result<ServerLiveHandoffParams,
 
 fn print_server_help() {
     eprintln!("{} server commands:", crate::product_identity::BINARY_NAME);
-    eprintln!("  herdr server                run as headless server");
+    eprintln!("  moo server                run as headless server");
     #[cfg(windows)]
-    eprintln!("  herdr server --allow-unelevated-clients  allow ordinary same-account clients to control an elevated server");
-    eprintln!("  herdr server stop           stop the running server via the API socket");
-    eprintln!("  herdr server live-handoff   hand off live panes to a new local server");
-    eprintln!("  herdr server reload-config  reload config.toml in the running server");
-    eprintln!("  herdr server agent-manifests [--json]  show agent detection manifest status");
-    eprintln!("  herdr server update-agent-manifests [--json]  fetch and reload agent detection manifests");
-    eprintln!("  herdr server reload-agent-manifests  reload agent detection manifests in the running server");
+    eprintln!("  moo server --allow-unelevated-clients  allow ordinary same-account clients to control an elevated server");
+    eprintln!("  moo server stop           stop the running server via the API socket");
+    eprintln!("  moo server live-handoff   hand off live panes to a new local server");
+    eprintln!("  moo server reload-config  reload config.toml in the running server");
+    eprintln!("  moo server agent-manifests [--json]  show agent detection manifest status");
+    eprintln!(
+        "  moo server update-agent-manifests [--json]  fetch and reload agent detection manifests"
+    );
+    eprintln!("  moo server reload-agent-manifests  reload agent detection manifests in the running server");
 }
 
 #[cfg(test)]

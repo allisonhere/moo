@@ -1198,7 +1198,7 @@ mod tests {
         let _guard = env_lock().lock().unwrap();
         let dir = unique_test_path("api-accept-spawn-failure");
         fs::create_dir_all(&dir).unwrap();
-        let path = dir.join("herdr.sock");
+        let path = dir.join("moo.sock");
         std::env::set_var(crate::api::SOCKET_PATH_ENV_VAR, &path);
         let (api_tx, _api_rx) = mpsc::unbounded_channel();
 
@@ -1235,7 +1235,7 @@ mod tests {
 
         let expected = config_home
             .join(crate::config::app_dir_name())
-            .join("herdr.sock");
+            .join("moo.sock");
         assert_eq!(socket_path(), expected);
 
         std::env::remove_var("XDG_CONFIG_HOME");
@@ -1255,7 +1255,7 @@ mod tests {
             .join(crate::config::app_dir_name())
             .join("sessions")
             .join("work")
-            .join("herdr.sock");
+            .join("moo.sock");
         assert_eq!(socket_path(), expected);
 
         std::env::remove_var(crate::session::SESSION_ENV_VAR);

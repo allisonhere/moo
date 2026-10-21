@@ -852,7 +852,7 @@ fn outdated_integrations_detect_previous_pi_version() {
     let extension_path = ext_dir.join(PI_EXTENSION_INSTALL_NAME);
     fs::write(
         &extension_path,
-        "// HERDR_INTEGRATION_ID=pi\n// HERDR_INTEGRATION_VERSION=4\n",
+        "// MOO_INTEGRATION_ID=pi\n// MOO_INTEGRATION_VERSION=4\n",
     )
     .unwrap();
     std::env::set_var("HOME", &home);
@@ -882,7 +882,7 @@ fn outdated_integrations_detect_previous_omp_version() {
     let extension_path = ext_dir.join(OMP_EXTENSION_INSTALL_NAME);
     fs::write(
         &extension_path,
-        "// HERDR_INTEGRATION_ID=omp\n// HERDR_INTEGRATION_VERSION=4\n",
+        "// MOO_INTEGRATION_ID=omp\n// MOO_INTEGRATION_VERSION=4\n",
     )
     .unwrap();
     std::env::set_var("HOME", &home);
@@ -1119,7 +1119,7 @@ fn claude_v9_integration_status_is_outdated_until_reinstalled() {
     let hook_path = claude_hooks_dir.join(CLAUDE_HOOK_INSTALL_NAME);
     fs::write(
         &hook_path,
-        "#!/bin/sh\n# HERDR_INTEGRATION_ID=claude\n# HERDR_INTEGRATION_VERSION=9\n",
+        "#!/bin/sh\n# MOO_INTEGRATION_ID=claude\n# MOO_INTEGRATION_VERSION=9\n",
     )
     .unwrap();
     std::env::set_var("HOME", &home);
@@ -1158,7 +1158,7 @@ fn claude_v2_integration_status_is_outdated() {
     let hook_path = claude_hooks_dir.join(CLAUDE_HOOK_INSTALL_NAME);
     fs::write(
         &hook_path,
-        "#!/bin/sh\n# HERDR_INTEGRATION_ID=claude\n# HERDR_INTEGRATION_VERSION=2\n",
+        "#!/bin/sh\n# MOO_INTEGRATION_ID=claude\n# MOO_INTEGRATION_VERSION=2\n",
     )
     .unwrap();
     std::env::set_var("HOME", &home);
@@ -1251,7 +1251,7 @@ fn claude_windows_hook_reports_utf8_session_path() {
     let fake_herdr = base.join("herdr-capture.ps1");
     fs::write(
         &fake_herdr,
-        "$capture = $env:HERDR_TEST_CAPTURE\n[System.IO.File]::WriteAllText($capture, ($args -join \"`n\"), [System.Text.UTF8Encoding]::new($false))\n",
+        "$capture = $env:MOO_TEST_CAPTURE\n[System.IO.File]::WriteAllText($capture, ($args -join \"`n\"), [System.Text.UTF8Encoding]::new($false))\n",
     )
     .unwrap();
 
@@ -1267,10 +1267,10 @@ fn claude_windows_hook_reports_utf8_session_path() {
         .args(["-NoProfile", "-ExecutionPolicy", "Bypass", "-File"])
         .arg(&installed.hook_path)
         .arg("session")
-        .env("HERDR_ENV", "1")
-        .env("HERDR_PANE_ID", "w1:p2")
-        .env("HERDR_BIN_PATH", &fake_herdr)
-        .env("HERDR_TEST_CAPTURE", &capture)
+        .env("MOO_ENV", "1")
+        .env("MOO_PANE_ID", "w1:p2")
+        .env("MOO_BIN_PATH", &fake_herdr)
+        .env("MOO_TEST_CAPTURE", &capture)
         .env_remove("CURSOR_VERSION")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -1417,7 +1417,7 @@ fn codex_v2_integration_status_is_outdated() {
     let hook_path = codex_dir.join(CODEX_HOOK_INSTALL_NAME);
     fs::write(
         &hook_path,
-        "#!/bin/sh\n# HERDR_INTEGRATION_ID=codex\n# HERDR_INTEGRATION_VERSION=2\n",
+        "#!/bin/sh\n# MOO_INTEGRATION_ID=codex\n# MOO_INTEGRATION_VERSION=2\n",
     )
     .unwrap();
     std::env::set_var("HOME", &home);
@@ -1879,7 +1879,7 @@ fn install_copilot_writes_hook_and_updates_settings() {
         if let Some(entries) = settings["hooks"].get(event) {
             assert!(
                 !entries.to_string().contains(COPILOT_HOOK_INSTALL_NAME),
-                "expected herdr hooks.{event} entries to be removed"
+                "expected moo hooks.{event} entries to be removed"
             );
         }
     }
@@ -1899,7 +1899,7 @@ fn copilot_v1_integration_status_is_outdated() {
     let hook_path = copilot_hooks_dir.join(COPILOT_HOOK_INSTALL_NAME);
     fs::write(
         &hook_path,
-        "#!/bin/sh\n# HERDR_INTEGRATION_ID=copilot\n# HERDR_INTEGRATION_VERSION=1\n",
+        "#!/bin/sh\n# MOO_INTEGRATION_ID=copilot\n# MOO_INTEGRATION_VERSION=1\n",
     )
     .unwrap();
     std::env::set_var("HOME", &home);
@@ -2358,7 +2358,7 @@ fn droid_v1_integration_status_is_outdated() {
     let hook_path = droid_hooks_dir.join(DROID_HOOK_INSTALL_NAME);
     fs::write(
         &hook_path,
-        "#!/bin/sh\n# HERDR_INTEGRATION_ID=droid\n# HERDR_INTEGRATION_VERSION=1\n",
+        "#!/bin/sh\n# MOO_INTEGRATION_ID=droid\n# MOO_INTEGRATION_VERSION=1\n",
     )
     .unwrap();
     std::env::set_var("HOME", &home);
@@ -3998,8 +3998,8 @@ fn install_qwen_writes_session_hook_and_preserves_settings() {
     assert!(command.ends_with("session"));
     assert!(settings.get("permissions").is_some());
     let hook_asset = fs::read_to_string(&installed.hook_path).unwrap();
-    assert!(hook_asset.contains("HERDR_INTEGRATION_ID=qwen"));
-    assert!(hook_asset.contains("HERDR_INTEGRATION_VERSION=2"));
+    assert!(hook_asset.contains("MOO_INTEGRATION_ID=qwen"));
+    assert!(hook_asset.contains("MOO_INTEGRATION_VERSION=2"));
     assert!(hook_asset.contains("herdr:qwen"));
 
     install_qwen().unwrap();
@@ -4156,10 +4156,10 @@ fn letta_session_hook_is_silent_and_encodes_default_conversation() {
     let mut child = Command::new("sh")
         .arg(&installed.hook_path)
         .arg("session")
-        .env("HERDR_ENV", "1")
-        .env("HERDR_PANE_ID", "w1:p2")
-        .env("HERDR_SOCKET_PATH", "/tmp/herdr.sock")
-        .env("HERDR_BIN_PATH", &fake_herdr)
+        .env("MOO_ENV", "1")
+        .env("MOO_PANE_ID", "w1:p2")
+        .env("MOO_SOCKET_PATH", "/tmp/herdr.sock")
+        .env("MOO_BIN_PATH", &fake_herdr)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -4385,7 +4385,7 @@ fn cursor_v1_integration_status_is_outdated() {
     let hook_path = cursor_dir.join(CURSOR_HOOK_INSTALL_NAME);
     fs::write(
         &hook_path,
-        "#!/bin/sh\n# HERDR_INTEGRATION_ID=cursor\n# HERDR_INTEGRATION_VERSION=1\n",
+        "#!/bin/sh\n# MOO_INTEGRATION_ID=cursor\n# MOO_INTEGRATION_VERSION=1\n",
     )
     .unwrap();
     std::env::set_var(CURSOR_CONFIG_DIR_ENV_VAR, &cursor_dir);
@@ -4898,7 +4898,7 @@ fn antigravity_cli_v3_install_is_outdated_until_reinstalled() {
     fs::write(
         hook_dir.join(ANTIGRAVITY_CLI_HOOK_INSTALL_NAME),
         ANTIGRAVITY_CLI_HOOK_ASSET
-            .replace("HERDR_INTEGRATION_VERSION=4", "HERDR_INTEGRATION_VERSION=3"),
+            .replace("MOO_INTEGRATION_VERSION=4", "MOO_INTEGRATION_VERSION=3"),
     )
     .unwrap();
     std::env::set_var(ANTIGRAVITY_CLI_CONFIG_DIR_ENV_VAR, &agy_dir);
@@ -4993,7 +4993,7 @@ fn grok_v1_integration_status_is_outdated() {
     let hook_path = hooks_dir.join(GROK_HOOK_INSTALL_NAME);
     fs::write(
         &hook_path,
-        "#!/bin/sh\n# HERDR_INTEGRATION_ID=grok\n# HERDR_INTEGRATION_VERSION=1\n",
+        "#!/bin/sh\n# MOO_INTEGRATION_ID=grok\n# MOO_INTEGRATION_VERSION=1\n",
     )
     .unwrap();
     fs::write(

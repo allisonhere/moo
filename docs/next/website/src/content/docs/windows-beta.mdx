@@ -23,7 +23,7 @@ Windows builds are available through both stable and preview update channels. Ne
 
 The installer stores releases under `%USERPROFILE%\.herdr\packages\standalone\releases`, puts the active versioned release directory on PATH, keeps `%LOCALAPPDATA%\Programs\Herdr\bin` as a stable compatibility alias, and retains a small number of older releases so running processes do not block updates.
 
-For internal testing, `HERDR_MANIFEST_URL` can point the installer at a custom manifest instead of Herdr's stable or preview manifest. Set `HERDR_CHANNEL=preview` with a custom preview manifest.
+For internal testing, `MOO_MANIFEST_URL` can point the installer at a custom manifest instead of Herdr's stable or preview manifest. Set `MOO_CHANNEL=preview` with a custom preview manifest.
 
 ## Supported on Windows
 
@@ -118,7 +118,7 @@ Native mode restores the IME anchor, but it can reintroduce occasional cursor fl
 
 Windows terminals do not all report modified keys in the same shape. Herdr preserves mouse reporting and `ctrl+j` in Windows Terminal and Alacritty on Windows. The native Windows input path also preserves physical key presses, repeats, releases, standalone Escape, and `shift+enter` through default ConPTY panes. Modified keys still depend on the outer terminal reporting a distinct key event; if it reports `shift+enter` as plain Enter, Herdr can only forward plain Enter.
 
-Windows packages include Microsoft's current app-local ConPTY runtime because the system ConPTY on older Windows 10 builds drops Kitty keyboard protocol sequences used by agents such as Kimi and Pi. Set `HERDR_WINDOWS_CONPTY=system` before starting Herdr only when diagnosing a compatibility problem with the bundled runtime.
+Windows packages include Microsoft's current app-local ConPTY runtime because the system ConPTY on older Windows 10 builds drops Kitty keyboard protocol sequences used by agents such as Kimi and Pi. Set `MOO_WINDOWS_CONPTY=system` before starting Herdr only when diagnosing a compatibility problem with the bundled runtime.
 
 ## Copy and paste
 
@@ -157,6 +157,6 @@ Include:
 - Windows version.
 - Terminal app.
 - Shell, such as PowerShell or cmd.
-- Whether you used a named `HERDR_SESSION`.
+- Whether you used a named `MOO_SESSION`.
 - Relevant Herdr logs.
 - Exact steps to reproduce.

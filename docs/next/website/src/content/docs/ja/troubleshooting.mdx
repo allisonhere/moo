@@ -93,7 +93,7 @@ herdr
 
 古いサーバーはログアウト後も動作し続ける一方、ユーザー情報の検索や DNS が使えなくなることがあります。症状には `No user exists for uid 501`、`Could not get manager name.`、`curl: (6) Could not resolve host` などがあります。再ログインだけでは修復されません。対象セッションを停止し、新しいログインの GUI ターミナルから Herdr を起動してください。実行中のペインプロセスは終了しますが、保存されたセッション配置は復元されます。ライブハンドオフは元のサーバーのサービスコンテキストと既存のペインプロセスを維持します。そのため、古いサーバーにこの修正を適用するにはセッションの完全な再起動が必要です。ハンドオフでは継承したコンテキストを修復できません。
 
-新しく起動したサーバーでも問題が起きる場合は、`herdr-server.log` の `could not select persistent user service context` を確認してください。必要な macOS API が利用できない場合、Herdr は継承したコンテキストを維持します。[Herdr issue #4100](https://github.com/herdrdev/herdr/issues/4100) を参照してください。
+新しく起動したサーバーでも問題が起きる場合は、`moo-server.log` の `could not select persistent user service context` を確認してください。必要な macOS API が利用できない場合、Herdr は継承したコンテキストを維持します。[Herdr issue #4100](https://github.com/herdrdev/herdr/issues/4100) を参照してください。
 
 ## `herdr` コマンドが見つからない
 
@@ -113,8 +113,8 @@ Herdr のログはデフォルトで `~/.config/herdr/` にあります:
 
 ```text
 herdr.log
-herdr-client.log
-herdr-server.log
+moo-client.log
+moo-server.log
 ```
 
 詳細なログには `HERDR_LOG=moo=debug` を設定します。問題を報告するときは現在のログとローテーション済みログを含めてください。[設定](/ja/docs/configuration/#logs)を参照してください。

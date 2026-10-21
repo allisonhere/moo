@@ -1,14 +1,14 @@
 # installed by herdr
 # managed by herdr; reinstalling or updating the integration overwrites this file.
 # add custom hooks beside this file instead of editing it.
-# HERDR_INTEGRATION_ID=grok
-# HERDR_INTEGRATION_VERSION=3
+# MOO_INTEGRATION_ID=grok
+# MOO_INTEGRATION_VERSION=3
 
 param([string]$Action = "")
 
 if ($Action -ne "session") { exit 0 }
-if ($env:HERDR_ENV -ne "1") { exit 0 }
-if ([string]::IsNullOrWhiteSpace($env:HERDR_PANE_ID)) { exit 0 }
+if ($env:MOO_ENV -ne "1") { exit 0 }
+if ([string]::IsNullOrWhiteSpace($env:MOO_PANE_ID)) { exit 0 }
 
 # Read hook input as raw bytes so UTF-8 payloads decode correctly even when the
 # console input code page is not UTF-8 (for example CP949 on Korean Windows).
@@ -43,9 +43,9 @@ if ([string]::IsNullOrWhiteSpace($sessionId) -and $null -ne $payload) {
 if ([string]::IsNullOrWhiteSpace($sessionId)) { exit 0 }
 
 $seq = [DateTime]::UtcNow.Ticks
-$herdr = if ([string]::IsNullOrWhiteSpace($env:HERDR_BIN_PATH)) { "herdr" } else { $env:HERDR_BIN_PATH }
+$herdr = if ([string]::IsNullOrWhiteSpace($env:MOO_BIN_PATH)) { "herdr" } else { $env:MOO_BIN_PATH }
 $herdrArgs = @(
-    "pane", "report-agent-session", $env:HERDR_PANE_ID,
+    "pane", "report-agent-session", $env:MOO_PANE_ID,
     "--source", "herdr:grok",
     "--agent", "grok",
     "--seq", "$seq",

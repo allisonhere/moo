@@ -53,7 +53,7 @@ pub(crate) use self::{
 
 pub(crate) use self::{keybinds::CommandKeybindType, model::KeysConfig};
 
-pub const CONFIG_PATH_ENV_VAR: &str = "HERDR_CONFIG_PATH";
+pub const CONFIG_PATH_ENV_VAR: &str = "MOO_CONFIG_PATH";
 
 pub(crate) fn is_keybinding_config_diagnostic(diagnostic: &str) -> bool {
     if diagnostic.starts_with("config parse error:") || diagnostic.starts_with("config read error:")

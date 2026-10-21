@@ -65,6 +65,7 @@ pub(crate) fn render_client_overlay(
         ClientShellOverlay::Rename(v) => render_rename_overlay(b, v, p),
         ClientShellOverlay::ConfirmClose(v) => render_confirm_close_overlay(b, v, p),
         ClientShellOverlay::Help(v) => render_help_overlay(b, v, k, p),
+        ClientShellOverlay::SessionReplay(v) => render_session_replay_overlay(b, v, p),
         ClientShellOverlay::Navigator(v) => {
             render_navigator_overlay(b, v, endpoints, active_endpoint_id, p)
         }
@@ -1472,6 +1473,122 @@ fn render_confirm_close_overlay(
         worktree_search: Rect::default(),
         worktree_rows: Vec::new(),
         cursor: None,
+        ..OverlayRender::default()
+    })
+}
+
+fn replay_status_label(status: crate::api::schema::AgentStatus) -> &'static str {
+    use crate::api::schema::AgentStatus;
+    match status {
+        AgentStatus::Idle => "idle",
+        AgentStatus::Working => "working",
+        AgentStatus::Blocked => "blocked",
+        AgentStatus::Done => "done",
+        AgentStatus::Unknown => "unknown",
+    }
+}
+
+fn replay_status_color(
+    status: crate::api::schema::AgentStatus,
+    p: &Palette,
+) -> ratatui::style::Color {
+    use crate::api::schema::AgentStatus;
+    match status {
+        AgentStatus::Idle => p.overlay1,
+        AgentStatus::Working => p.yellow,
+        AgentStatus::Blocked => p.red,
+        AgentStatus::Done => p.green,
+        AgentStatus::Unknown => p.overlay0,
+    }
+}
+
+/// `1h 02m`, `3m 20s` or `12s`.
+fn replay_duration(ms: u64) -> String {
+    let secs = ms / 1000;
+    match (secs / 3600, secs / 60 % 60, secs % 60) {
+        (0, 0, s) => format!("{s}s"),
+        (0, m, s) => format!("{m}m {s:02}s"),
+        (h, m, _) => format!("{h}h {m:02}m"),
+    }
+}
+
+fn render_session_replay_overlay(
+    b: &mut Buffer,
+    replay: &ClientSessionReplayOverlay,
+    p: &Palette,
+) -> Option<OverlayRender> {
+    let q = popup(b.area, 72, 20)?;
+    let i = panel(b, q, p.accent, p.panel_bg)?;
+    let bg = p.panel_bg;
+    put_text(
+        b,
+        i.x,
+        i.y,
+        i.width,
+        &format!(" session replay · {}", replay.pane_id),
+        Style::default()
+            .fg(p.accent)
+            .bg(bg)
+            .add_modifier(Modifier::BOLD),
+    );
+    let list = Rect::new(i.x, i.y + 2, i.width, i.height.saturating_sub(3));
+    let hint = " ↑↓ scroll · esc close";
+    put_text(
+        b,
+        i.x,
+        i.bottom().saturating_sub(1),
+        i.width,
+        hint,
+        Style::default().fg(p.overlay0).bg(bg),
+    );
+    match replay.entries.as_deref() {
+        None => put_text(
+            b,
+            list.x,
+            list.y,
+            list.width,
+            " loading…",
+            Style::default().fg(p.overlay0).bg(bg),
+        ),
+        Some([]) => put_text(
+            b,
+            list.x,
+            list.y,
+            list.width,
+            " no status changes recorded for this pane yet",
+            Style::default().fg(p.overlay0).bg(bg),
+        ),
+        Some(entries) => {
+            let visible = usize::from(list.height).max(1);
+            let end = entries.len().saturating_sub(replay.back);
+            let start = end.saturating_sub(visible);
+            let origin = entries[0].at_ms;
+            for (offset, index) in (start..end).enumerate() {
+                let entry = &entries[index];
+                let y = list.y + offset as u16;
+                let span = entries.get(index + 1).map_or_else(
+                    || "now".to_owned(),
+                    |next| replay_duration(next.at_ms.saturating_sub(entry.at_ms)),
+                );
+                let at = replay_duration(entry.at_ms.saturating_sub(origin));
+                let line = format!(
+                    " +{at:<8} {} → {}   for {span}",
+                    replay_status_label(entry.from),
+                    replay_status_label(entry.to),
+                );
+                put_text(
+                    b,
+                    list.x,
+                    y,
+                    list.width,
+                    &line,
+                    Style::default().fg(replay_status_color(entry.to, p)).bg(bg),
+                );
+            }
+        }
+    }
+    Some(OverlayRender {
+        area: q,
         ..OverlayRender::default()
     })
 }

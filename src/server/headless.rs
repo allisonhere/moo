@@ -2,8 +2,8 @@
 //!
 //! The server:
 //! - Does not enter raw mode or read stdin
-//! - Creates and listens on both `herdr.sock` (existing JSON API) and
-//!   `herdr-client.sock` (new binary protocol)
+//! - Creates and listens on both `moo.sock` (existing JSON API) and
+//!   `moo-client.sock` (new binary protocol)
 //! - Initializes AppState and all PTYs from session restore or fresh state
 //! - Runs the main event loop (drain events, drain API requests, scheduled tasks)
 //! - Renders to a virtual ratatui Buffer in memory

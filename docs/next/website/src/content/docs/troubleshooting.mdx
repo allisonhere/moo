@@ -93,7 +93,7 @@ Automatically started macOS servers use a per-user service context so logging ou
 
 An older server can survive logout while losing user lookup and DNS. Symptoms include `No user exists for uid 501`, `Could not get manager name.`, and `curl: (6) Could not resolve host`. Logging back in does not repair that server. Stop the affected session and start Herdr from a GUI terminal in the new login. This ends live pane processes but restores the saved session layout. Live handoff preserves the source server's service context and existing pane processes. Older servers therefore need a full session restart to adopt this fix; handoff cannot repair their inherited context.
 
-If a newly started server still has this problem, check `herdr-server.log` for `could not select persistent user service context`. Herdr keeps the inherited context if the required macOS APIs are unavailable. See [Herdr issue #4100](https://github.com/herdrdev/herdr/issues/4100).
+If a newly started server still has this problem, check `moo-server.log` for `could not select persistent user service context`. Herdr keeps the inherited context if the required macOS APIs are unavailable. See [Herdr issue #4100](https://github.com/herdrdev/herdr/issues/4100).
 
 ## The `herdr` command is not found
 
@@ -112,9 +112,9 @@ First confirm that normal OpenSSH works with `ssh <host>`. For a passphrase-prot
 Herdr logs live in `~/.config/herdr/` by default:
 
 ```text
-herdr.log
-herdr-client.log
-herdr-server.log
+moo.log
+moo-client.log
+moo-server.log
 ```
 
-Set `HERDR_LOG=moo=debug` for more detail. Include the current log and rotated siblings when reporting a problem. See [Configuration](/docs/configuration/#logs).
+Set `MOO_LOG=herdr=debug` for more detail. Include the current log and rotated siblings when reporting a problem. See [Configuration](/docs/configuration/#logs).

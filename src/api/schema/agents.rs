@@ -281,9 +281,14 @@ pub struct AgentAttentionAckParams {
     pub pane_id: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema, Default)]
-pub struct AgentHistoryParams {
-    /// Newest entries to return; defaults to 100, capped at the retained history.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub limit: Option<usize>,
+cli_params! {
+    #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema, Default)]
+    pub struct AgentHistoryParams => AgentHistoryProjection {
+        /// Newest entries to return; defaults to 100, capped at the retained history.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub limit: Option<usize> => Field::new(None).input(bindings::history_limit()),
+        /// Only this pane's transitions; every pane when omitted.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub pane_id: Option<String> => Field::new(None).input(bindings::history_pane()),
+    }
 }

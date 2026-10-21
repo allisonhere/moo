@@ -3,10 +3,10 @@ use std::path::{Path, PathBuf};
 
 /// Legacy environment variable for overriding the client socket path.
 ///
-/// Contractual override behavior for auto-detect uses `HERDR_SOCKET_PATH`.
+/// Contractual override behavior for auto-detect uses `MOO_SOCKET_PATH`.
 /// This variable is kept as a fallback for callers that explicitly need a
-/// client-only override when `HERDR_SOCKET_PATH` is not set.
-pub const CLIENT_SOCKET_PATH_ENV_VAR: &str = "HERDR_CLIENT_SOCKET_PATH";
+/// client-only override when `MOO_SOCKET_PATH` is not set.
+pub const CLIENT_SOCKET_PATH_ENV_VAR: &str = "MOO_CLIENT_SOCKET_PATH";
 
 /// Socket permission mode (owner read/write only).
 const SOCKET_PERMISSION_MODE: u32 = 0o600;
@@ -15,10 +15,10 @@ const SOCKET_PERMISSION_MODE: u32 = 0o600;
 ///
 /// Contract-aligned override behavior:
 /// 1. If CLI `--session <name>` is active, use that session's client socket.
-/// 2. If `HERDR_SOCKET_PATH` is set, derive the client socket path from it by
-///    inserting `-client` before `.sock` (e.g. `herdr.sock` -> `herdr-client.sock`).
+/// 2. If `MOO_SOCKET_PATH` is set, derive the client socket path from it by
+///    inserting `-client` before `.sock` (e.g. `moo.sock` -> `moo-client.sock`).
 ///    This keeps JSON API and client socket overrides consistent.
-/// 3. Otherwise, honor `HERDR_CLIENT_SOCKET_PATH` (legacy/testing fallback).
+/// 3. Otherwise, honor `MOO_CLIENT_SOCKET_PATH` (legacy/testing fallback).
 /// 4. Otherwise, use the active session data directory.
 pub fn client_socket_path() -> PathBuf {
     if crate::session::explicit_session_requested() {
@@ -63,7 +63,7 @@ pub(crate) fn derive_client_socket_from_api_socket(api_socket_path: &Path) -> Pa
 pub(crate) fn prepare_socket_path(path: &Path) -> io::Result<()> {
     crate::ipc::prepare_socket_path(path, |path| {
         format!(
-            "herdr server is already running (socket busy at {})",
+            "moo server is already running (socket busy at {})",
             path.display()
         )
     })
@@ -107,7 +107,7 @@ mod tests {
         std::env::remove_var(crate::session::SESSION_ENV_VAR);
         crate::session::clear_explicit_session_for_test();
         let path = client_socket_path_from_overrides(None, None);
-        assert_eq!(path, crate::config::config_dir().join("herdr-client.sock"));
+        assert_eq!(path, crate::config::config_dir().join("moo-client.sock"));
     }
 
     #[test]

@@ -132,7 +132,7 @@ fn named_sessions_use_separate_servers_and_workspace_state() {
     assert!(alpha_session["socket_path"]
         .as_str()
         .unwrap()
-        .ends_with("/sessions/alpha/herdr.sock"));
+        .ends_with("/sessions/alpha/moo.sock"));
     assert!(beta_session["session_dir"]
         .as_str()
         .unwrap()
@@ -210,7 +210,7 @@ fn dead_server_cli_reports_one_session_aware_json_line() {
         assert_eq!(
             response["error"]["message"],
             format!(
-                "no herdr server is running at {}; run `{attach_command}` to start or attach it",
+                "no moo server is running at {}; run `{attach_command}` to start or attach it",
                 socket_path.display()
             )
         );
@@ -236,10 +236,10 @@ fn dead_server_cli_reports_one_session_aware_json_line() {
         .args(["workspace", "create"])
         .env("XDG_CONFIG_HOME", &config_home)
         .env("XDG_RUNTIME_DIR", &runtime_dir)
-        .env("HERDR_SOCKET_PATH", &stale_socket)
-        .env("HERDR_SESSION", "unrelated")
-        .env_remove("HERDR_CLIENT_SOCKET_PATH")
-        .env_remove("HERDR_ENV")
+        .env("MOO_SOCKET_PATH", &stale_socket)
+        .env("MOO_SESSION", "unrelated")
+        .env_remove("MOO_CLIENT_SOCKET_PATH")
+        .env_remove("MOO_ENV")
         .output()
         .unwrap();
     assert_server_not_running(stale, &stale_socket, "moo");
@@ -267,7 +267,7 @@ fn integration_commands_run_locally_when_server_is_missing() {
 
     let workspace_list = Command::new(env!("CARGO_BIN_EXE_moo"))
         .args(["workspace", "list"])
-        .env("HERDR_SOCKET_PATH", &missing_socket)
+        .env("MOO_SOCKET_PATH", &missing_socket)
         .env("HOME", &home_dir)
         .output()
         .unwrap();
@@ -275,7 +275,7 @@ fn integration_commands_run_locally_when_server_is_missing() {
 
     let integration_install = Command::new(env!("CARGO_BIN_EXE_moo"))
         .args(["integration", "install", "pi"])
-        .env("HERDR_SOCKET_PATH", &missing_socket)
+        .env("MOO_SOCKET_PATH", &missing_socket)
         .env("HOME", &home_dir)
         .output()
         .unwrap();
@@ -287,7 +287,7 @@ fn integration_commands_run_locally_when_server_is_missing() {
 
     let integration_status = Command::new(env!("CARGO_BIN_EXE_moo"))
         .args(["integration", "status"])
-        .env("HERDR_SOCKET_PATH", &missing_socket)
+        .env("MOO_SOCKET_PATH", &missing_socket)
         .env("HOME", &home_dir)
         .output()
         .unwrap();
@@ -298,7 +298,7 @@ fn integration_commands_run_locally_when_server_is_missing() {
 
     let integration_uninstall = Command::new(env!("CARGO_BIN_EXE_moo"))
         .args(["integration", "uninstall", "pi"])
-        .env("HERDR_SOCKET_PATH", &missing_socket)
+        .env("MOO_SOCKET_PATH", &missing_socket)
         .env("HOME", &home_dir)
         .output()
         .unwrap();
@@ -319,7 +319,7 @@ fn integration_status_outdated_only_prints_action_for_legacy_install() {
     fs::create_dir_all(&extensions_dir).unwrap();
     fs::write(
         extensions_dir.join("herdr-agent-state.ts"),
-        "// legacy herdr integration\n",
+        "// legacy moo integration\n",
     )
     .unwrap();
 
@@ -330,7 +330,7 @@ fn integration_status_outdated_only_prints_action_for_legacy_install() {
 
     let output = Command::new(env!("CARGO_BIN_EXE_moo"))
         .args(["integration", "status", "--outdated-only"])
-        .env("HERDR_SOCKET_PATH", &missing_socket)
+        .env("MOO_SOCKET_PATH", &missing_socket)
         .env("HOME", &home_dir)
         .output()
         .unwrap();
@@ -339,7 +339,7 @@ fn integration_status_outdated_only_prints_action_for_legacy_install() {
     assert!(output.stdout.is_empty());
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("installed herdr integrations need updating"));
-    assert!(stderr.contains("herdr integration install pi"));
+    assert!(stderr.contains("moo integration install pi"));
 
     cleanup_test_base(&base);
 }
@@ -356,7 +356,7 @@ fn integration_status_rejects_unknown_flags() {
 
     let output = Command::new(env!("CARGO_BIN_EXE_moo"))
         .args(["integration", "status", "--wat"])
-        .env("HERDR_SOCKET_PATH", &missing_socket)
+        .env("MOO_SOCKET_PATH", &missing_socket)
         .env("HOME", &home_dir)
         .output()
         .unwrap();
@@ -371,7 +371,7 @@ fn status_commands_report_client_and_server_versions() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
+    let socket_path = runtime_dir.join("moo.sock");
 
     let herdr = spawn_herdr(&config_home, &runtime_dir, &socket_path);
     wait_for_socket(&socket_path, Duration::from_secs(5));
@@ -533,8 +533,8 @@ fn server_stop_command_shuts_down_running_server() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let socket_path = runtime_dir.join("moo.sock");
+    let client_socket = runtime_dir.join("moo-client.sock");
 
     let mut herdr = spawn_herdr(&config_home, &runtime_dir, &socket_path);
     wait_for_socket(&socket_path, Duration::from_secs(5));
@@ -573,8 +573,8 @@ fn server_stop_then_restart_restores_pane_history() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let socket_path = runtime_dir.join("moo.sock");
+    let client_socket = runtime_dir.join("moo-client.sock");
     let marker = "PERSISTED_HISTORY_AFTER_STOP";
 
     let mut herdr = spawn_herdr_with_pane_history(&config_home, &runtime_dir, &socket_path);
@@ -665,7 +665,7 @@ fn unloaded_session_survives_autosave_and_shutdown_when_recovery_is_blocked() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
+    let socket_path = runtime_dir.join("moo.sock");
     let data_dir = config_home.join(app_dir_name());
     fs::create_dir_all(&data_dir).unwrap();
     let session_path = data_dir.join("session.json");
@@ -683,7 +683,7 @@ fn unloaded_session_survives_autosave_and_shutdown_when_recovery_is_blocked() {
         Duration::from_secs(10),
         Duration::from_millis(25),
         || {
-            fs::read_to_string(data_dir.join("herdr-server.log"))
+            fs::read_to_string(data_dir.join("moo-server.log"))
                 .is_ok_and(|log| log.contains("event=\"persist.save\""))
         }
     ));
@@ -702,7 +702,7 @@ fn session_appearing_after_startup_is_preserved_before_autosave() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
+    let socket_path = runtime_dir.join("moo.sock");
     let data_dir = config_home.join(app_dir_name());
     let herdr = spawn_herdr(&config_home, &runtime_dir, &socket_path);
     wait_for_socket(&socket_path, Duration::from_secs(5));
@@ -720,7 +720,7 @@ fn session_appearing_after_startup_is_preserved_before_autosave() {
         Duration::from_secs(10),
         Duration::from_millis(25),
         || {
-            fs::read_to_string(data_dir.join("herdr-server.log"))
+            fs::read_to_string(data_dir.join("moo-server.log"))
                 .is_ok_and(|log| log.contains("event=\"persist.save\""))
         }
     ));
@@ -737,8 +737,8 @@ fn server_start_restores_legacy_session_through_api_identity() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let socket_path = runtime_dir.join("moo.sock");
+    let client_socket = runtime_dir.join("moo-client.sock");
     let data_dir = config_home.join(app_dir_name());
     let pion_cwd = base.join("legacy-pion");
     let herdr_cwd = base.join("legacy-herdr");

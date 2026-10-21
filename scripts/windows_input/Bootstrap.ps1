@@ -4,12 +4,12 @@ param([Parameter(Mandatory)][string] $PlanPath)
 $plan = Read-GauntletJson $PlanPath
 # Terminal activation can inherit another process's environment. Normalize here too.
 foreach ($item in @(Get-ChildItem Env:)) {
-    if ($item.Name -like 'HERDR_*' -or $item.Name -in @('SSH_CONNECTION', 'SSH_TTY')) { Remove-Item "Env:$($item.Name)" }
+    if ($item.Name -like 'MOO_*' -or $item.Name -in @('SSH_CONNECTION', 'SSH_TTY')) { Remove-Item "Env:$($item.Name)" }
 }
-$env:HERDR_CONFIG_PATH = $plan.config
+$env:MOO_CONFIG_PATH = $plan.config
 $env:XDG_CONFIG_HOME = $plan.config_home
-$env:HERDR_SESSION = $plan.session
-if ($plan.profile -ne 'default') { $env:HERDR_WINDOWS_INPUT_PROBE = $plan.profile }
+$env:MOO_SESSION = $plan.session
+if ($plan.profile -ne 'default') { $env:MOO_WINDOWS_INPUT_PROBE = $plan.profile }
 Add-Type -Path "$PSScriptRoot/Native.cs"
 $before = [HerdrInputGauntlet.ConsoleProbe]::Geometry()
 $child = $null

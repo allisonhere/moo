@@ -17,8 +17,12 @@ fn indicator_index(style: crate::config::StatusIndicatorStyle) -> usize {
     usize::from(style == crate::config::StatusIndicatorStyle::Symbols)
 }
 
-fn toast_index(delivery: crate::config::ToastDelivery) -> usize {
+/// Toasts off with sound on is its own choice ("audio only"), so plain "off" means silent.
+const TOAST_AUDIO_ONLY: usize = 4;
+
+fn toast_index(delivery: crate::config::ToastDelivery, sound_enabled: bool) -> usize {
     match delivery {
+        crate::config::ToastDelivery::Off if sound_enabled => TOAST_AUDIO_ONLY,
         crate::config::ToastDelivery::Off => 0,
         crate::config::ToastDelivery::Herdr => 1,
         crate::config::ToastDelivery::Terminal => 2,
@@ -51,7 +55,9 @@ impl ClientShellState {
             ClientSettingsSection::Indicators => indicator_index(self.config.status_indicators),
             ClientSettingsSection::TabPill => usize::from(!self.config.tab_agent_pill),
             ClientSettingsSection::Sound => usize::from(!self.config.sound_enabled),
-            ClientSettingsSection::Toast => toast_index(self.config.toast_delivery),
+            ClientSettingsSection::Toast => {
+                toast_index(self.config.toast_delivery, self.config.sound_enabled)
+            }
             ClientSettingsSection::Integrations => 0,
         }
     }
@@ -101,7 +107,7 @@ impl ClientShellState {
                 ClientSettingsSection::Indicators
                 | ClientSettingsSection::TabPill
                 | ClientSettingsSection::Sound => 2,
-                ClientSettingsSection::Toast => 4,
+                ClientSettingsSection::Toast => 5,
                 ClientSettingsSection::Integrations => settings.integrations.len(),
             },
             _ => 0,
@@ -219,9 +225,14 @@ impl ClientShellState {
             ClientSettingsSection::Sound => {
                 self.save_settings_edit(crate::config::ConfigEdit::Sound(selected == 0), outcome);
             }
+            ClientSettingsSection::Toast if selected == 0 => {
+                self.save_settings_edit(crate::config::ConfigEdit::Silent, outcome);
+            }
+            ClientSettingsSection::Toast if selected == TOAST_AUDIO_ONLY => {
+                self.save_settings_edit(crate::config::ConfigEdit::AudioOnly, outcome);
+            }
             ClientSettingsSection::Toast => {
                 let delivery = match selected {
-                    0 => crate::config::ToastDelivery::Off,
                     1 => crate::config::ToastDelivery::Herdr,
                     2 => crate::config::ToastDelivery::Terminal,
                     _ => crate::config::ToastDelivery::System,

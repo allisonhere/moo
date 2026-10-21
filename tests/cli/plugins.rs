@@ -567,9 +567,9 @@ fn plugin_update_does_not_resurrect_a_plugin_unlinked_during_build() {
         .env("XDG_CONFIG_HOME", &config_home)
         .env("XDG_RUNTIME_DIR", &runtime_dir)
         .env("GIT_CONFIG_GLOBAL", &git_config)
-        .env_remove("HERDR_SOCKET_PATH")
-        .env_remove("HERDR_CLIENT_SOCKET_PATH")
-        .env_remove("HERDR_ENV")
+        .env_remove("MOO_SOCKET_PATH")
+        .env_remove("MOO_CLIENT_SOCKET_PATH")
+        .env_remove("MOO_ENV")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     let child = update.spawn().unwrap();
@@ -641,10 +641,10 @@ command = ["sh", "./read.sh", "pane"]
     fs::write(source_repo.join("version"), "old").unwrap();
     fs::write(source_repo.join("read.sh"), r#"
 kind="$1"
-touch "$HERDR_PLUGIN_ROOT/ready-$kind"
-while [ ! -e "$HERDR_PLUGIN_ROOT/release" ]; do sleep 0.05; done
-printf '%s:%s' "$(cat version)" "$(cat "$HERDR_PLUGIN_ROOT/version")" > "$HERDR_PLUGIN_ROOT/result-$kind.tmp"
-mv "$HERDR_PLUGIN_ROOT/result-$kind.tmp" "$HERDR_PLUGIN_ROOT/result-$kind"
+touch "$MOO_PLUGIN_ROOT/ready-$kind"
+while [ ! -e "$MOO_PLUGIN_ROOT/release" ]; do sleep 0.05; done
+printf '%s:%s' "$(cat version)" "$(cat "$MOO_PLUGIN_ROOT/version")" > "$MOO_PLUGIN_ROOT/result-$kind.tmp"
+mv "$MOO_PLUGIN_ROOT/result-$kind.tmp" "$MOO_PLUGIN_ROOT/result-$kind"
 "#).unwrap();
     run_git(&source_repo, &["add", "."]);
     run_git(&source_repo, &["commit", "--quiet", "-m", "old plugin"]);
@@ -841,7 +841,7 @@ fn plugin_link_list_unlink_cli_smoke_test() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
+    let socket_path = runtime_dir.join("moo.sock");
     let plugin_dir = base.join("plugins").join("layout");
     fs::create_dir_all(&plugin_dir).unwrap();
     fs::write(
@@ -947,7 +947,7 @@ command = ["sh", "-c", "sleep 5"]
             "--entrypoint",
             "board",
             "--env",
-            "HERDR_ROLE=board",
+            "MOO_ROLE=board",
             "--no-focus",
         ],
     );
@@ -1028,7 +1028,7 @@ min_herdr_version = "0.6.10"
 platforms = ["linux", "macos", "windows"]
 
 [[build]]
-command = ["sh", "-c", "echo built > built.txt; if [ -n \"$HERDR_SESSION\" ]; then echo \"$HERDR_SESSION\" > leaked-session.txt; fi"]
+command = ["sh", "-c", "echo built > built.txt; if [ -n \"$MOO_SESSION\" ]; then echo \"$MOO_SESSION\" > leaked-session.txt; fi"]
 
 [[actions]]
 id = "bootstrap"
@@ -1072,7 +1072,7 @@ command = ["sh", "-c", "echo bootstrap"]
         &[
             ("GIT_CONFIG_GLOBAL", &git_config),
             ("XDG_STATE_HOME", &base.join("state")),
-            ("HERDR_SESSION", Path::new("leaked-session")),
+            ("MOO_SESSION", Path::new("leaked-session")),
         ],
     );
     assert!(
@@ -1110,7 +1110,7 @@ command = ["sh", "-c", "echo bootstrap"]
             .join("worktree-bootstrap")
             .join("leaked-session.txt")
             .exists(),
-        "build command should not inherit HERDR_SESSION"
+        "build command should not inherit MOO_SESSION"
     );
 
     let uninstall = run_named_cli(

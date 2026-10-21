@@ -81,9 +81,9 @@ Moo keeps upstream's environment variable names, session file format, and socket
 | State and logs | `~/.local/state/herdr` | `~/.local/state/moo` | `~/.local/state/moo-dev` |
 | Default sockets | under the config directory | under the config directory | under the config directory |
 
-The socket file names remain `herdr.sock` and `herdr-client.sock` inside the fork's own config directory. The `HERDR_*` environment names are unchanged so agents, plugins, and integrations continue to work.
+The socket file names remain `moo.sock` and `moo-client.sock` inside the fork's own config directory. The `MOO_*` environment names are unchanged so agents, plugins, and integrations continue to work.
 
-Moo tags panes it launches with `HERDR_PRODUCT_ID=moo`. If it inherits a socket from a managed pane belonging to another product, it refuses to reuse that socket instead of attaching to an incompatible server.
+Moo tags panes it launches with `MOO_PRODUCT_ID=moo`. If it inherits a socket from a managed pane belonging to another product, it refuses to reuse that socket instead of attaching to an incompatible server.
 
 ## What's different
 
@@ -115,7 +115,7 @@ A user-assigned name takes precedence over integration-provided display labels, 
 Remote attach and saved SSH machines discover the fork's own `moo` binary on the remote host; they never discover or download upstream `herdr`.
 
 - For a same-platform POSIX remote, Moo installs the local fork binary when the remote copy is missing or older.
-- Set `HERDR_REMOTE_BINARY` to an explicit fork binary or package to override the install source.
+- Set `MOO_REMOTE_BINARY` to an explicit fork binary or package to override the install source.
 - Windows remote installation requires an explicit package until fork-owned Windows packages exist. Moo will not fall back to an upstream Herdr asset.
 - SSH authentication, host-key handling, and connection setup are inherited from upstream.
 
@@ -196,8 +196,8 @@ ZIG=/path/to/zig cargo build --release --locked --bin moo
 You launched Moo inside a managed pane belonging to another product, such as upstream Herdr. Start it from a normal terminal instead. If you intentionally want to bypass the inherited socket, clear the relevant variables:
 
 ```sh
-env -u HERDR_ENV -u HERDR_PRODUCT_ID \
-    -u HERDR_SOCKET_PATH -u HERDR_CLIENT_SOCKET_PATH \
+env -u MOO_ENV -u MOO_PRODUCT_ID \
+    -u MOO_SOCKET_PATH -u MOO_CLIENT_SOCKET_PATH \
     moo
 ```
 
@@ -216,11 +216,11 @@ Add the install directory to your `PATH`, for example `~/.local/bin`.
 
 ### Remote setup or Windows attach fails
 
-Set `HERDR_REMOTE_BINARY` to a compatible fork binary or package for the target machine. Windows remote installs are not available without an explicit package.
+Set `MOO_REMOTE_BINARY` to a compatible fork binary or package for the target machine. Windows remote installs are not available without an explicit package.
 
 ### Logs
 
-Find the server log in the fork's config directory, for example `~/.config/moo/herdr-server.log`.
+Find the server log in the fork's config directory, for example `~/.config/moo/moo-server.log`.
 
 ## Development
 
@@ -240,7 +240,7 @@ The fork adds no telemetry, cloud account, or network dependency of its own. It 
 
 - The name **Moo** is temporary while product branding is undecided.
 - There are no fork-owned release downloads, update channel, or remote packages yet. POSIX remotes seed the local fork binary; Windows remotes need an explicit package.
-- The larger agent workspace features are still in progress: a unified agent dashboard, attention queue, activity history, and multi-agent orchestration are not part of this build.
+- The larger agent workspace features are still in progress: a unified agent dashboard and multi-agent orchestration are not part of this build. Agent status history is available through `moo agent history` and the **session replay** palette entry.
 
 ## Licensing
 

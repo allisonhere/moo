@@ -15,9 +15,9 @@ use std::time::{Duration, Instant};
 
 use tracing::warn;
 
-const DISABLE_SOUND_ENV: &str = "HERDR_DISABLE_SOUND";
+const DISABLE_SOUND_ENV: &str = "MOO_DISABLE_SOUND";
 #[cfg(any(windows, test))]
-const WINDOWS_SOUND_PATH_ENV: &str = "HERDR_SOUND_PATH";
+const WINDOWS_SOUND_PATH_ENV: &str = "MOO_SOUND_PATH";
 #[cfg(not(any(windows, target_os = "macos")))]
 const AUDIO_PLAYER_TIMEOUT: Duration = Duration::from_secs(15);
 #[cfg(not(any(windows, target_os = "macos")))]
@@ -132,8 +132,8 @@ fn run_player(path: &Path) -> Result<Output, String> {
 fn windows_media_player_script() -> &'static str {
     r#"
 $ErrorActionPreference = 'Stop'
-$Path = [Environment]::GetEnvironmentVariable('HERDR_SOUND_PATH', 'Process')
-if ([string]::IsNullOrWhiteSpace($Path)) { throw 'HERDR_SOUND_PATH is not set' }
+$Path = [Environment]::GetEnvironmentVariable('MOO_SOUND_PATH', 'Process')
+if ([string]::IsNullOrWhiteSpace($Path)) { throw 'MOO_SOUND_PATH is not set' }
 Add-Type -AssemblyName PresentationCore
 Add-Type -AssemblyName WindowsBase
 $resolved = (Resolve-Path -LiteralPath $Path).ProviderPath
@@ -447,7 +447,7 @@ mod tests {
                 .flatten()
         });
 
-        assert!(script.contains("GetEnvironmentVariable('HERDR_SOUND_PATH', 'Process')"));
+        assert!(script.contains("GetEnvironmentVariable('MOO_SOUND_PATH', 'Process')"));
         assert!(!script.contains("param([string]$Path)"));
         assert!(script.contains("Resolve-Path -LiteralPath $Path"));
         assert!(script.contains("Dispatcher]::PushFrame"));

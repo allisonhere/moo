@@ -30,6 +30,7 @@ mod overlay_input;
 mod preferences;
 mod render;
 mod scroll;
+mod session_replay;
 mod settings;
 mod state;
 mod surface_patch;
