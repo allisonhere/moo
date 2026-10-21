@@ -1,5 +1,7 @@
 #![cfg(all(unix, not(target_os = "macos")))]
 
+pub mod support;
+
 use std::fs;
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::fs::PermissionsExt;
@@ -87,11 +89,7 @@ impl Harness {
             std::process::id(),
             NEXT.fetch_add(1, Ordering::Relaxed)
         ));
-        let app = if cfg!(debug_assertions) {
-            "herdr-dev"
-        } else {
-            "herdr"
-        };
+        let app = support::app_dir_name();
         let state = root.join("state").join(app).join("client");
         let session = root.join("config").join(app).join("sessions/fleet");
         fs::create_dir_all(&state).unwrap();
@@ -99,9 +97,10 @@ impl Harness {
         fs::create_dir_all(root.join("bin")).unwrap();
         fs::write(root.join("bin/ssh"), SSH).unwrap();
         fs::set_permissions(root.join("bin/ssh"), fs::Permissions::from_mode(0o700)).unwrap();
-        std::os::unix::fs::symlink(env!("CARGO_BIN_EXE_herdr"), root.join("remote herdr")).unwrap();
+        std::os::unix::fs::symlink(env!("CARGO_BIN_EXE_herdr-forge"), root.join("remote herdr"))
+            .unwrap();
         fs::create_dir_all(root.join("remote bin")).unwrap();
-        let remote_wrapper = root.join("remote bin/herdr");
+        let remote_wrapper = root.join("remote bin/herdr-forge");
         fs::write(
             &remote_wrapper,
             r#"#!/bin/sh
@@ -126,7 +125,7 @@ exec "$TEST_REMOTE_HERDR" "$@"
         remote.set_nonblocking(true).unwrap();
         let local = UnixListener::bind(root.join("local.sock")).unwrap();
         local.set_nonblocking(true).unwrap();
-        let status = Command::new(env!("CARGO_BIN_EXE_herdr"))
+        let status = Command::new(env!("CARGO_BIN_EXE_herdr-forge"))
             .args(["status", "client", "--json"])
             .output()
             .unwrap();
@@ -141,7 +140,7 @@ exec "$TEST_REMOTE_HERDR" "$@"
     }
 
     fn command(&self, args: &[&str]) -> Command {
-        let mut command = Command::new(env!("CARGO_BIN_EXE_herdr"));
+        let mut command = Command::new(env!("CARGO_BIN_EXE_herdr-forge"));
         command
             .args(args)
             .env(
@@ -339,8 +338,8 @@ fn machine_api_bootstrap_falls_back_from_an_old_path_binary() {
     let harness = Harness::new();
     fs::create_dir_all(harness.root.join(".local/bin")).unwrap();
     std::os::unix::fs::symlink(
-        env!("CARGO_BIN_EXE_herdr"),
-        harness.root.join(".local/bin/herdr"),
+        env!("CARGO_BIN_EXE_herdr-forge"),
+        harness.root.join(".local/bin/herdr-forge"),
     )
     .unwrap();
     let server = harness.serve(
@@ -408,11 +407,11 @@ fn machine_api_reuses_discovery_across_commands_without_rewriting_profiles() {
 fn machine_api_recovers_a_stale_path_before_sending_a_mutation() {
     let harness = Harness::new();
     harness.warm_metadata();
-    fs::remove_file(harness.root.join("remote bin/herdr")).unwrap();
+    fs::remove_file(harness.root.join("remote bin/herdr-forge")).unwrap();
     fs::create_dir_all(harness.root.join(".local/bin")).unwrap();
     std::os::unix::fs::symlink(
-        env!("CARGO_BIN_EXE_herdr"),
-        harness.root.join(".local/bin/herdr"),
+        env!("CARGO_BIN_EXE_herdr-forge"),
+        harness.root.join(".local/bin/herdr-forge"),
     )
     .unwrap();
     let before = harness.ssh_calls();

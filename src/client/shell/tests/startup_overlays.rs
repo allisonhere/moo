@@ -1,6 +1,106 @@
 use super::*;
 
 #[test]
+fn command_palette_filters_navigates_executes_and_closes() {
+    let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
+    state.set_snapshot(Box::new(snapshot()));
+    state.set_pane_surface(surface());
+
+    state.record_binding(
+        crate::input::KeybindMatch::Action(crate::input::KeybindAction::OpenCommandPalette),
+        &mut ClientShellInput::default(),
+    );
+    assert!(matches!(
+        state.overlay,
+        Some(ClientShellOverlay::GlobalMenu(ClientGlobalMenuOverlay {
+            highlighted: 0,
+            ..
+        }))
+    ));
+
+    state.handle_input_bytes(b"work");
+    let Some(ClientShellOverlay::GlobalMenu(menu)) = state.overlay.as_ref() else {
+        panic!("command palette should remain open while filtering");
+    };
+    assert_eq!(menu.query.as_str(), "work");
+    assert_eq!(menu.highlighted, 0);
+    assert_eq!(
+        super::super::global_menu::filtered_global_menu_items(
+            state.snapshot.as_deref().unwrap(),
+            &state.config.keybinds.keybinds,
+            menu.query.as_str()
+        )
+        .iter()
+        .map(|item| item.label.clone())
+        .collect::<Vec<_>>(),
+        ["new workspace", "new worktree", "open worktree"]
+    );
+
+    state.handle_input_bytes(b"\x1b[B");
+    assert!(matches!(
+        state.overlay,
+        Some(ClientShellOverlay::GlobalMenu(ClientGlobalMenuOverlay {
+            highlighted: 1,
+            ..
+        }))
+    ));
+    let outcome = state.handle_input_bytes(b"\r");
+    assert!(outcome.actions.iter().any(|action| matches!(
+        action,
+        ClientShellAction::Endpoint { request, .. }
+            if matches!(
+                &request.method,
+                crate::api::schema::Method::WorktreeList(_)
+            )
+    )));
+
+    state.open_command_palette();
+    state.handle_input_bytes(b"\x1b");
+    assert!(state.overlay.is_none());
+}
+
+#[test]
+fn command_palette_renders_empty_and_tiny_states_with_bounded_hits() {
+    let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
+    state.set_snapshot(Box::new(snapshot()));
+    state.set_pane_surface(surface());
+    state.overlay = Some(ClientShellOverlay::GlobalMenu(ClientGlobalMenuOverlay {
+        query: TextEditor::from("no command matches this"),
+        highlighted: 0,
+    }));
+
+    let frame = state.compose(20, 6).expect("tiny command palette");
+    assert_eq!((frame.width, frame.height), (20, 6));
+    assert!(state.hits.global_menu_rows.is_empty());
+    assert!(frame.cursor.is_some());
+}
+
+#[test]
+fn command_palette_accepts_j_and_k_queries_and_keeps_selection_visible() {
+    let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
+    state.set_snapshot(Box::new(snapshot()));
+    state.set_pane_surface(surface());
+    state.open_command_palette();
+
+    state.handle_input_bytes(b"key");
+    assert!(matches!(
+        state.overlay,
+        Some(ClientShellOverlay::GlobalMenu(ref menu)) if menu.query.as_str() == "key"
+    ));
+
+    if let Some(ClientShellOverlay::GlobalMenu(menu)) = state.overlay.as_mut() {
+        menu.query = TextEditor::default();
+        menu.highlighted = 9;
+    }
+    state.compose(20, 6).expect("short command palette");
+    assert!(state
+        .hits
+        .global_menu_rows
+        .iter()
+        .any(|(_, index)| *index == 9));
+}
+
+#[test]
 fn endpoint_product_announcement_is_client_rendered_modal_and_dismissed_by_identity() {
     let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
     let mut endpoint_snapshot = snapshot();
@@ -718,6 +818,9 @@ fn update_ready_menu_opens_client_owned_release_notes_and_dismisses_by_version()
     state.mode = ClientShellMode::Navigate;
 
     state.toggle_global_menu();
+    if let Some(ClientShellOverlay::GlobalMenu(menu)) = state.overlay.as_mut() {
+        menu.query = TextEditor::from("update");
+    }
     let menu = state.compose(106, 30).expect("update menu");
     let text = menu
         .cells
@@ -730,18 +833,26 @@ fn update_ready_menu_opens_client_owned_release_notes_and_dismisses_by_version()
         .collect::<Vec<_>>()
         .join("\n");
     assert!(text.contains("● update ready"));
-    let update_row = state.hits.global_menu_rows[3].0;
-    assert_eq!(update_row.width, 16);
+    let update_row = state.hits.global_menu_rows[0].0;
     let menu_buffer = menu.to_ratatui_buffer().expect("menu buffer");
-    assert_eq!(
-        menu_buffer[(update_row.x + 1, update_row.y)].fg,
-        state.config.palette.accent
-    );
+    // Query "update" leaves a single result, which is the highlighted row.
+    let row_fg = menu_buffer[(update_row.x + 1, update_row.y)].fg;
     assert_eq!(
         menu_buffer[(update_row.x + 3, update_row.y)].fg,
-        state.config.palette.text
+        row_fg,
+        "badge and label should share the highlighted row's contrast foreground"
     );
-    state.activate_global_menu_item(3, &mut ClientShellInput::default());
+    assert_eq!(
+        menu_buffer[(update_row.x + 1, update_row.y)].bg,
+        state.config.palette.accent,
+        "highlighted row should use the accent background"
+    );
+    state.handle_raw_events(vec![RawInputEvent::Mouse(crossterm::event::MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: update_row.x,
+        row: update_row.y,
+        modifiers: KeyModifiers::NONE,
+    })]);
     let notes = state.compose(106, 30).expect("release notes");
     let bottom_row_start = usize::from(notes.width) * usize::from(notes.height - 1);
     let bottom_row = notes.cells[bottom_row_start..]
@@ -761,7 +872,7 @@ fn update_ready_menu_opens_client_owned_release_notes_and_dismisses_by_version()
         .join("\n");
     assert!(text.contains("v0.8.3"));
     assert!(text.contains("update ready"));
-    assert!(text.contains("detach, run herdr update"));
+    assert!(text.contains("detach, run herdr-forge update"));
     assert!(!state.hits.release_notes_scrollbar.is_empty());
     let outer = crate::ui::centered_popup_rect(
         Rect::new(0, 0, 106, 30),
@@ -921,7 +1032,8 @@ fn coalesced_release_notes_open_and_scroll_uses_current_geometry() {
     state.set_pane_surface(surface());
     state.compose(106, 30).expect("initial shell");
     state.overlay = Some(ClientShellOverlay::GlobalMenu(ClientGlobalMenuOverlay {
-        highlighted: 3,
+        query: TextEditor::from("update"),
+        highlighted: 0,
     }));
 
     state.handle_raw_events(vec![
@@ -978,7 +1090,7 @@ fn coalesced_release_notes_open_and_mouse_uses_current_geometry() {
     };
     let metrics = crate::ui::release_notes_scroll_metrics(
         &notes,
-        "herdr update",
+        "herdr-forge update",
         stack.content,
         &state.config.palette,
     );
@@ -992,7 +1104,8 @@ fn coalesced_release_notes_open_and_mouse_uses_current_geometry() {
     ));
 
     state.overlay = Some(ClientShellOverlay::GlobalMenu(ClientGlobalMenuOverlay {
-        highlighted: 3,
+        query: TextEditor::from("update"),
+        highlighted: 0,
     }));
     state.handle_raw_events(vec![
         RawInputEvent::Key(crate::input::TerminalKey::new(
@@ -1014,7 +1127,8 @@ fn coalesced_release_notes_open_and_mouse_uses_current_geometry() {
     ));
 
     state.overlay = Some(ClientShellOverlay::GlobalMenu(ClientGlobalMenuOverlay {
-        highlighted: 3,
+        query: TextEditor::from("update"),
+        highlighted: 0,
     }));
     let closed = state.handle_raw_events(vec![
         RawInputEvent::Key(crate::input::TerminalKey::new(
@@ -1157,6 +1271,7 @@ fn client_settings_preview_restore_and_endpoint_integrations_are_owned_by_overla
     state.set_snapshot(Box::new(snapshot()));
     state.set_pane_surface(surface());
     state.overlay = Some(ClientShellOverlay::GlobalMenu(ClientGlobalMenuOverlay {
+        query: TextEditor::default(),
         highlighted: 0,
     }));
     let open = state.handle_input_bytes(b"\r");

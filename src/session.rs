@@ -44,10 +44,10 @@ pub fn configure_from_args(args: &[String]) -> Result<Vec<String>, String> {
             return Ok(args.to_vec());
         }
         let Some(name) = args.get(3) else {
-            return Err("usage: herdr session attach <name>".to_string());
+            return Err("usage: herdr-forge session attach <name>".to_string());
         };
         if args.len() != 4 {
-            return Err("usage: herdr session attach <name>".to_string());
+            return Err("usage: herdr-forge session attach <name>".to_string());
         }
         apply_explicit_name(name)?;
         return Ok(cleaned);
@@ -104,8 +104,11 @@ pub fn active_name() -> Option<String> {
 
 pub fn local_attach_command() -> String {
     match active_name() {
-        Some(name) => format!("herdr session attach {name}"),
-        None => "herdr".to_string(),
+        Some(name) => format!(
+            "{} session attach {name}",
+            crate::product_identity::BINARY_NAME
+        ),
+        None => crate::product_identity::BINARY_NAME.to_string(),
     }
 }
 
@@ -115,8 +118,11 @@ pub fn local_stop_command() -> String {
 
 pub fn stop_command_for(name: Option<&str>) -> String {
     match name {
-        Some(name) => format!("herdr session stop {name}"),
-        None => "herdr server stop".to_string(),
+        Some(name) => format!(
+            "{} session stop {name}",
+            crate::product_identity::BINARY_NAME
+        ),
+        None => format!("{} server stop", crate::product_identity::BINARY_NAME),
     }
 }
 
@@ -938,7 +944,7 @@ mod tests {
         let _guard = env_lock().lock().unwrap();
         std::env::remove_var(SESSION_ENV_VAR);
 
-        assert_eq!(local_attach_command(), "herdr");
+        assert_eq!(local_attach_command(), "herdr-forge");
     }
 
     #[test]
@@ -946,7 +952,7 @@ mod tests {
         let _guard = env_lock().lock().unwrap();
         std::env::set_var(SESSION_ENV_VAR, "work");
 
-        assert_eq!(local_attach_command(), "herdr session attach work");
+        assert_eq!(local_attach_command(), "herdr-forge session attach work");
 
         std::env::remove_var(SESSION_ENV_VAR);
     }
@@ -956,7 +962,7 @@ mod tests {
         let _guard = env_lock().lock().unwrap();
         std::env::remove_var(SESSION_ENV_VAR);
 
-        assert_eq!(local_stop_command(), "herdr server stop");
+        assert_eq!(local_stop_command(), "herdr-forge server stop");
 
         std::env::remove_var(SESSION_ENV_VAR);
     }
@@ -966,7 +972,7 @@ mod tests {
         let _guard = env_lock().lock().unwrap();
         std::env::set_var(SESSION_ENV_VAR, "work");
 
-        assert_eq!(local_stop_command(), "herdr session stop work");
+        assert_eq!(local_stop_command(), "herdr-forge session stop work");
 
         std::env::remove_var(SESSION_ENV_VAR);
     }

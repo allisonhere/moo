@@ -25,7 +25,7 @@ use serde::{Deserialize, Deserializer};
 const STABLE_UPDATE_MANIFEST_URL: &str = "https://herdr.dev/latest.json";
 const PREVIEW_UPDATE_MANIFEST_URL: &str = "https://herdr.dev/preview.json";
 const HOMEBREW_FORMULA_API_URL: &str = "https://formulae.brew.sh/api/formula/herdr.json";
-const HERDR_UPDATE_COMMAND: &str = "herdr update";
+const HERDR_UPDATE_COMMAND: &str = "herdr-forge update";
 const HOMEBREW_UPDATE_COMMAND: &str = "brew update && brew upgrade herdr";
 const MISE_UPDATE_COMMAND: &str = "mise upgrade herdr";
 const NIX_UPDATE_COMMAND: &str = "update through Nix";
@@ -961,7 +961,7 @@ fn plan_running_server_updates(
         )
         .map_err(|err| {
             format!(
-                "failed to read status for herdr target {} at {}: {err}. stop it with `{}` and run `herdr update` again",
+                "failed to read status for herdr target {} at {}: {err}. stop it with `{}` and run `herdr-forge update` again",
                 target.label,
                 target.socket_path.display(),
                 target.stop_command
@@ -970,7 +970,7 @@ fn plan_running_server_updates(
             Some(server) => server,
             None if target.must_be_running => {
                 return Err(format!(
-                        "herdr target {} looked running, but its status API did not respond at {}. stop it with `{}` and run `herdr update` again",
+                        "herdr target {} looked running, but its status API did not respond at {}. stop it with `{}` and run `herdr-forge update` again",
                     target.label,
                     target.socket_path.display(),
                     target.stop_command
@@ -978,7 +978,7 @@ fn plan_running_server_updates(
             }
             None if client_protocol_server_is_running_at(&target.client_socket_path) => {
                 return Err(format!(
-                    "herdr target {} has a client socket, but its status API did not respond at {}. stop it with `{}` and run `herdr update` again",
+                    "herdr target {} has a client socket, but its status API did not respond at {}. stop it with `{}` and run `herdr-forge update` again",
                     target.label,
                     target.socket_path.display(),
                     target.stop_command
@@ -1067,9 +1067,13 @@ fn running_update_targets() -> Result<Vec<RunningUpdateTarget>, String> {
                 Some(&session.name)
             }),
             attach_command: Some(if session.default {
-                "herdr".to_string()
+                crate::product_identity::BINARY_NAME.to_string()
             } else {
-                format!("herdr session attach {}", session.name)
+                format!(
+                    "{} session attach {}",
+                    crate::product_identity::BINARY_NAME,
+                    session.name
+                )
             }),
             label: session.name.clone(),
             client_socket_path: crate::session::client_socket_path_for(if session.default {
@@ -1114,7 +1118,7 @@ pub(crate) fn parse_self_update_args(args: &[String]) -> Result<SelfUpdateOption
         match arg.as_str() {
             "--handoff" => options.live_handoff = true,
             "--help" | "-h" => {
-                return Err("usage: herdr update [--handoff]".to_string());
+                return Err("usage: herdr-forge update [--handoff]".to_string());
             }
             _ => return Err(format!("unknown update option: {arg}")),
         }
@@ -1487,7 +1491,8 @@ fn recover_failed_live_handoff_for_update(
         }
         FailedHandoffServerState::Unknown(status_error) => {
             eprintln!(
-                "herdr could not determine server state for {} {} after the failed handoff: {status_error}",
+                "{} could not determine server state for {} {} after the failed handoff: {status_error}",
+                crate::product_identity::BINARY_NAME,
                 plan.target_noun(),
                 plan.label()
             );
@@ -1777,7 +1782,7 @@ fn print_running_session_update_outcomes(
     release: &ReleaseInfo,
 ) {
     if outcomes.is_empty() {
-        eprintln!("run herdr again.");
+        eprintln!("run {} again.", crate::product_identity::BINARY_NAME);
         return;
     }
 
@@ -1896,7 +1901,7 @@ pub(crate) fn update_install_command() -> &'static str {
 pub(crate) fn update_install_instruction(install_command: &str) -> String {
     match install_command {
         HERDR_UPDATE_COMMAND => {
-            "detach, run `herdr update`, then run Herdr again to reconnect".to_string()
+            "detach, run `herdr-forge update`, then run Herdr again to reconnect".to_string()
         }
         HOMEBREW_UPDATE_COMMAND => {
             "detach, run `brew update && brew upgrade herdr`, then run Herdr again to reconnect"
@@ -1974,6 +1979,9 @@ fn preview_channel_rejection_for_exe_path(path: &Path) -> Option<&'static str> {
 }
 
 #[cfg(unix)]
+// Retained for install-source policy tests; remote installs now always seed the
+// local fork binary instead of downloading a package-managed asset.
+#[allow(dead_code)]
 pub(crate) fn is_package_manager_managed_exe_path(path: &Path) -> bool {
     is_homebrew_managed_exe_path_following_links(path)
         || is_mise_managed_exe_path_following_links(path)
@@ -1981,6 +1989,7 @@ pub(crate) fn is_package_manager_managed_exe_path(path: &Path) -> bool {
 }
 
 #[cfg(not(unix))]
+#[allow(dead_code)]
 pub(crate) fn is_package_manager_managed_exe_path(_path: &Path) -> bool {
     false
 }
@@ -2107,6 +2116,14 @@ fn homebrew_cellar_keg_root(path: &Path) -> Option<PathBuf> {
 
 /// Manual self-update command (`herdr update`).
 pub fn self_update(options: SelfUpdateOptions) -> Result<Version, String> {
+    if !crate::product_identity::supports_upstream_self_update() {
+        return Err(format!(
+            "self-update is disabled for {} ({}); install a newer fork build explicitly",
+            crate::product_identity::NAME,
+            crate::product_identity::BINARY_NAME
+        ));
+    }
+
     let channel = UpdateChannel::configured();
 
     if is_homebrew_managed_install() {
@@ -2279,7 +2296,10 @@ impl KeptServer<'_> {
     fn reconnect(&self) -> String {
         match self.attach_command {
             Some(attach) => format!("`{attach}`"),
-            None => "herdr with the same socket override".to_string(),
+            None => format!(
+                "{} with the same socket override",
+                crate::product_identity::BINARY_NAME
+            ),
         }
     }
 }
@@ -2604,7 +2624,7 @@ mod tests {
         let lines = kept_server_notice_lines(&[socket_override], "0.10.0");
         assert_eq!(
             lines[3],
-            "when your agents are idle, run `herdr server stop`, then herdr with the same socket override."
+            "when your agents are idle, run `herdr server stop`, then herdr-forge with the same socket override."
         );
     }
 
@@ -2956,7 +2976,7 @@ mod tests {
     fn update_install_instruction_distinguishes_install_from_restart() {
         assert_eq!(
             update_install_instruction(HERDR_UPDATE_COMMAND),
-            "detach, run `herdr update`, then run Herdr again to reconnect"
+            "detach, run `herdr-forge update`, then run Herdr again to reconnect"
         );
         assert_eq!(
             update_install_instruction(HOMEBREW_UPDATE_COMMAND),
@@ -3255,7 +3275,7 @@ mod tests {
             "unexpected error: {err}"
         );
         assert!(
-            err.contains("herdr session stop work"),
+            err.contains("herdr-forge session stop work"),
             "unexpected error: {err}"
         );
     }

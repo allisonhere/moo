@@ -272,10 +272,12 @@ pub(super) fn agent_row(
     let tab_label = tab
         .filter(|tab| tab_count > 1 || tab.custom_label)
         .map(|tab| tab.label.as_str());
+    // A user rename outranks metadata supplied by hooks/integrations, so
+    // `agent rename` always wins over a stale or generic display label.
     let agent_label = agent
-        .display_agent
+        .name
         .as_deref()
-        .or(agent.name.as_deref())
+        .or(agent.display_agent.as_deref())
         .or(agent.agent.as_deref())
         .or(agent.title.as_deref());
     let labels = agent

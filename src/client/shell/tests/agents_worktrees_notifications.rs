@@ -1682,3 +1682,106 @@ fn semantic_notifications_use_client_policy_and_stable_navigation_targets() {
     assert!(state.visible_notification.is_none());
     assert_eq!(state.pending_notifications.len(), 1);
 }
+
+#[test]
+fn agent_rename_outranks_metadata_and_is_available_from_the_sidebar() {
+    let mut projected = snapshot();
+    projected.agents = vec![ClientShellAgent {
+        pane_id: "pane_1".into(),
+        workspace_id: "ws_1".into(),
+        tab_id: "tab_1".into(),
+        name: Some("reviewer".into()),
+        display_agent: Some("codex".into()),
+        agent: Some("pi".into()),
+        title: None,
+        terminal_title: None,
+        terminal_title_stripped: None,
+        agent_status: AgentStatus::Idle,
+        state_change_seq: 1,
+        state_labels: Vec::new(),
+        tokens: Vec::new(),
+        focused: true,
+    }];
+    let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
+    state.set_snapshot(Box::new(projected));
+    state.set_pane_surface(surface());
+
+    // The user rename wins over the integration-provided display label.
+    let frame = state.compose(106, 30).expect("agent sidebar");
+    let text = frame
+        .cells
+        .chunks(frame.width as usize)
+        .map(|row| {
+            row.iter()
+                .map(|cell| cell.symbol.as_str())
+                .collect::<String>()
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(text.contains("reviewer"), "{text}");
+    assert!(!text.contains("codex"), "{text}");
+
+    // Right-clicking the row offers rename and clear.
+    let row = state.hits.agents.first().expect("agent row").0;
+    state.open_agent_context_menu("pane_1".into(), row.x, row.y);
+    let Some(ClientShellOverlay::ContextMenu(menu)) = state.overlay.as_ref() else {
+        panic!("agent context menu");
+    };
+    assert_eq!(
+        menu.items()
+            .iter()
+            .map(|item| item.label)
+            .collect::<Vec<_>>(),
+        ["Rename agent", "Clear agent name"]
+    );
+
+    // Rename through the shared overlay and submit the existing API method.
+    let mut open = ClientShellInput::default();
+    state.activate_context_menu_item(0, &mut open);
+    assert!(matches!(
+        state.overlay.as_ref(),
+        Some(ClientShellOverlay::Rename(ClientRenameOverlay {
+            target: ClientRenameTarget::Agent { pane_id },
+            ..
+        })) if pane_id == "pane_1"
+    ));
+    state.handle_input_bytes(&[0x15]);
+    state.handle_input_bytes(b"worker");
+    let save = state.handle_input_bytes(b"\r");
+    let [ClientShellAction::Endpoint { request, .. }] = &save.actions[..] else {
+        panic!("agent rename should use endpoint API");
+    };
+    assert!(matches!(
+        &request.method,
+        crate::api::schema::Method::AgentRename(params)
+            if params.target == "pane_1" && params.name.as_deref() == Some("worker")
+    ));
+
+    // The keyboard path opens the same overlay for the focused agent.
+    let mut keyed = ClientShellInput::default();
+    state.record_binding(
+        crate::input::KeybindMatch::Action(crate::input::KeybindAction::RenameAgent),
+        &mut keyed,
+    );
+    assert!(matches!(
+        state.overlay.as_ref(),
+        Some(ClientShellOverlay::Rename(ClientRenameOverlay {
+            target: ClientRenameTarget::Agent { pane_id },
+            ..
+        })) if pane_id == "pane_1"
+    ));
+    let _ = state.handle_input_bytes(b"\x1b");
+
+    // Clearing sends an explicit clear request.
+    state.open_agent_context_menu("pane_1".into(), row.x, row.y);
+    let mut cleared = ClientShellInput::default();
+    state.activate_context_menu_item(1, &mut cleared);
+    let [ClientShellAction::Endpoint { request, .. }] = &cleared.actions[..] else {
+        panic!("agent clear should use endpoint API");
+    };
+    assert!(matches!(
+        &request.method,
+        crate::api::schema::Method::AgentRename(params)
+            if params.target == "pane_1" && params.name.is_none()
+    ));
+}

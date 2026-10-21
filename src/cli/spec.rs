@@ -6,7 +6,7 @@ mod completion;
 mod machine;
 
 pub(super) fn command() -> Command {
-    let command = Command::new("herdr")
+    let command = Command::new(crate::product_identity::BINARY_NAME)
         .about("terminal workspace manager for AI coding agents")
         .disable_help_flag(true)
         .disable_version_flag(true)
@@ -89,10 +89,9 @@ fn write_requested_help(
         return Ok(false);
     }
 
-    let mut root = command();
-    root.build();
+    let mut root = command().bin_name(crate::product_identity::BINARY_NAME);
     let mut selected = &mut root;
-    let mut path = vec!["herdr".to_string()];
+    let mut path = vec![crate::product_identity::BINARY_NAME.to_string()];
     for segment in &args[1..help_index] {
         if selected.find_subcommand(segment).is_none() {
             break;
@@ -436,7 +435,7 @@ mod tests {
 
         for path in paths {
             for flag in ["-h", "--help"] {
-                let mut args = vec!["herdr".to_string()];
+                let mut args = vec![crate::product_identity::BINARY_NAME.to_string()];
                 args.extend(path.iter().cloned());
                 args.push(flag.to_string());
                 let mut output = Vec::new();
@@ -447,7 +446,7 @@ mod tests {
                 );
                 let output = String::from_utf8(output).unwrap();
                 assert!(
-                    output.contains(&format!("Usage: herdr {}", path.join(" "))),
+                    output.contains(&format!("Usage: herdr-forge {}", path.join(" "))),
                     "unexpected help for herdr {}: {output}",
                     path.join(" ")
                 );
@@ -529,7 +528,13 @@ mod tests {
     fn agent_prompt_until_requires_wait() {
         let error = super::command()
             .try_get_matches_from([
-                "herdr", "agent", "prompt", "reviewer", "hello", "--until", "idle",
+                crate::product_identity::BINARY_NAME,
+                "agent",
+                "prompt",
+                "reviewer",
+                "hello",
+                "--until",
+                "idle",
             ])
             .unwrap_err();
         assert_eq!(
@@ -541,14 +546,38 @@ mod tests {
     #[test]
     fn agent_rename_requires_exactly_one_name_or_clear() {
         for valid in [
-            &["herdr", "agent", "rename", "reviewer", "worker"][..],
-            &["herdr", "agent", "rename", "reviewer", "--clear"][..],
+            &[
+                crate::product_identity::BINARY_NAME,
+                "agent",
+                "rename",
+                "reviewer",
+                "worker",
+            ][..],
+            &[
+                crate::product_identity::BINARY_NAME,
+                "agent",
+                "rename",
+                "reviewer",
+                "--clear",
+            ][..],
         ] {
             assert!(super::command().try_get_matches_from(valid).is_ok());
         }
         for invalid in [
-            &["herdr", "agent", "rename", "reviewer"][..],
-            &["herdr", "agent", "rename", "reviewer", "worker", "--clear"][..],
+            &[
+                crate::product_identity::BINARY_NAME,
+                "agent",
+                "rename",
+                "reviewer",
+            ][..],
+            &[
+                crate::product_identity::BINARY_NAME,
+                "agent",
+                "rename",
+                "reviewer",
+                "worker",
+                "--clear",
+            ][..],
         ] {
             assert!(super::command().try_get_matches_from(invalid).is_err());
         }
@@ -556,7 +585,7 @@ mod tests {
         let mut help = Vec::new();
         super::write_requested_help(
             &[
-                "herdr".to_string(),
+                crate::product_identity::BINARY_NAME.to_string(),
                 "agent".to_string(),
                 "rename".to_string(),
                 "--help".to_string(),
@@ -567,7 +596,7 @@ mod tests {
         .unwrap();
         assert!(String::from_utf8(help)
             .unwrap()
-            .contains("Usage: herdr agent rename <TARGET> <NAME>|--clear"));
+            .contains("Usage: herdr-forge agent rename <TARGET> <NAME>|--clear"));
     }
 
     #[test]
@@ -670,7 +699,7 @@ mod tests {
     }
 
     fn long_help(path: &[&str]) -> String {
-        let mut args = vec!["herdr".to_string()];
+        let mut args = vec![crate::product_identity::BINARY_NAME.to_string()];
         args.extend(path.iter().map(|segment| segment.to_string()));
         args.push("--help".to_string());
         let mut output = Vec::new();
@@ -707,7 +736,7 @@ mod tests {
             "agent start dropped its existing after_help: {agent_start}"
         );
         assert!(
-            agent_start.contains("next: herdr agent prompt <TARGET> <TEXT> --wait"),
+            agent_start.contains("next: herdr-forge agent prompt <TARGET> <TEXT> --wait"),
             "agent start is missing its next-step hint: {agent_start}"
         );
 
@@ -731,7 +760,12 @@ mod tests {
         ] {
             let mut cmd = super::command();
             let mut output = Vec::new();
-            clap_complete::generate(shell, &mut cmd, "herdr", &mut output);
+            clap_complete::generate(
+                shell,
+                &mut cmd,
+                crate::product_identity::BINARY_NAME,
+                &mut output,
+            );
             assert!(!output.is_empty(), "empty {shell:?} completion output");
         }
     }

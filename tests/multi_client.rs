@@ -76,10 +76,14 @@ fn wait_for_socket(path: &Path, timeout: Duration) {
 }
 
 fn spawn_server(config: &Path, runtime: &Path, api: &Path) -> SpawnedHerdr {
-    fs::create_dir_all(config.join("herdr")).unwrap();
+    fs::create_dir_all(config.join(support::app_dir_name())).unwrap();
     fs::create_dir_all(runtime).unwrap();
     register_runtime_dir(runtime);
-    fs::write(config.join("herdr/config.toml"), "onboarding = false\n").unwrap();
+    fs::write(
+        config.join(support::app_dir_name()).join("config.toml"),
+        "onboarding = false\n",
+    )
+    .unwrap();
     let pair = native_pty_system()
         .openpty(PtySize {
             rows: 24,
@@ -88,7 +92,7 @@ fn spawn_server(config: &Path, runtime: &Path, api: &Path) -> SpawnedHerdr {
             pixel_height: 0,
         })
         .unwrap();
-    let mut cmd = CommandBuilder::new(env!("CARGO_BIN_EXE_herdr"));
+    let mut cmd = CommandBuilder::new(env!("CARGO_BIN_EXE_herdr-forge"));
     support::isolate_herdr_test_process(&mut cmd);
     cmd.arg("server");
     cmd.env("XDG_CONFIG_HOME", config);
@@ -116,7 +120,7 @@ fn spawn_client(config: &Path, runtime: &Path, api: &Path) -> SpawnedHerdr {
             pixel_height: 0,
         })
         .unwrap();
-    let mut cmd = CommandBuilder::new(env!("CARGO_BIN_EXE_herdr"));
+    let mut cmd = CommandBuilder::new(env!("CARGO_BIN_EXE_herdr-forge"));
     support::isolate_herdr_test_process(&mut cmd);
     cmd.arg("client");
     cmd.env("HERDR_DISABLE_SOUND", "1");

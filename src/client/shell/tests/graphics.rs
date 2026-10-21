@@ -308,7 +308,10 @@ fn every_dialog_and_menu_occludes_its_panel_not_the_whole_screen() {
             y: 8,
             highlighted: 0,
         }),
-        ClientShellOverlay::GlobalMenu(ClientGlobalMenuOverlay { highlighted: 0 }),
+        ClientShellOverlay::GlobalMenu(ClientGlobalMenuOverlay {
+            query: TextEditor::default(),
+            highlighted: 0,
+        }),
         ClientShellOverlay::Settings(ClientSettingsOverlay {
             section: ClientSettingsSection::Theme,
             selected: 0,
@@ -337,6 +340,7 @@ fn every_dialog_and_menu_occludes_its_panel_not_the_whole_screen() {
                 state.hits.global_launcher,
                 menu,
                 snapshot,
+                &state.config.keybinds.keybinds,
                 &state.config.palette,
             ),
             _ => render::render_client_overlay(

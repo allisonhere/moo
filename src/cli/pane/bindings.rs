@@ -413,7 +413,11 @@ impl Leaf {
 
     pub(super) fn request(&self, args: &[String]) -> Result<Request, ParseError> {
         let mut method = projection::parse(
-            self.command().bin_name(format!("herdr pane {}", self.name)),
+            self.command().bin_name(format!(
+                "{} pane {}",
+                crate::product_identity::BINARY_NAME,
+                self.name
+            )),
             args,
             self.method,
         )?;

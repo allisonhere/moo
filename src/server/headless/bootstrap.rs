@@ -222,12 +222,13 @@ fn run_handoff_import_server(_socket_path: &Path, _token: &str) -> io::Result<()
 }
 
 fn print_ready_message(api_socket: &Path, client_socket: &Path) {
+    let binary = crate::product_identity::BINARY_NAME;
     let message = format!(
-        "herdr server running; you can use any herdr CLI command in another terminal.\n\
+        "{binary} server running; you can use any {binary} CLI command in another terminal.\n\
          api socket: {}\n\
          client socket: {}\n\
          logs: {}\n\
-         did you mean to open the Herdr TUI? run `herdr`; you do not need `herdr server`.\n",
+         did you mean to open the Herdr TUI? run `{binary}`; you do not need `{binary} server`.\n",
         api_socket.display(),
         client_socket.display(),
         crate::session::data_dir()

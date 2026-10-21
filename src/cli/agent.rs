@@ -37,7 +37,7 @@ pub(super) fn run_agent_command(args: &[String]) -> std::io::Result<i32> {
         _ => args,
     };
     let operation = match super::projection::parse(
-        command().bin_name("herdr agent"),
+        command().bin_name(format!("{} agent", crate::product_identity::BINARY_NAME)),
         args,
         bindings::from_matches,
     ) {
@@ -75,7 +75,7 @@ fn agent_explain(params: bindings::Explain) -> std::io::Result<i32> {
 
     let explain = if let Some(path) = file {
         if target.is_some() {
-            eprintln!("usage: herdr agent explain --file PATH --agent LABEL [--json]");
+            eprintln!("usage: herdr-forge agent explain --file PATH --agent LABEL [--json]");
             return Ok(2);
         }
         let Some(agent_label) = agent else {
@@ -103,8 +103,8 @@ fn agent_explain(params: bindings::Explain) -> std::io::Result<i32> {
         ))
     } else {
         let Some(target) = target else {
-            eprintln!("usage: herdr agent explain <target> [--json]");
-            eprintln!("usage: herdr agent explain --file PATH --agent LABEL [--json]");
+            eprintln!("usage: herdr-forge agent explain <target> [--json]");
+            eprintln!("usage: herdr-forge agent explain --file PATH --agent LABEL [--json]");
             return Ok(2);
         };
         if agent.is_some() {

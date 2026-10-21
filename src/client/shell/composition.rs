@@ -656,11 +656,12 @@ impl ClientShellState {
                     self.hits.global_launcher,
                     menu,
                     snapshot,
+                    &self.config.keybinds.keybinds,
                     &self.config.palette,
                 )?;
                 occlusion.cover(rendered.area);
                 self.hits.global_menu_rows = rendered.menu_rows;
-                None
+                rendered.cursor
             } else {
                 let rendered = render::render_client_overlay(
                     &mut composed,

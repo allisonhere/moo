@@ -2393,7 +2393,9 @@ impl TerminalState {
             self.manual_label.clone().or_else(|| {
                 show_agent_labels
                     .then(|| {
-                        self.effective_display_agent()
+                        self.agent_name
+                            .clone()
+                            .or_else(|| self.effective_display_agent())
                             .or_else(|| self.effective_agent_label().map(str::to_string))
                     })
                     .flatten()
@@ -4253,6 +4255,19 @@ mod tests {
 
         terminal.set_manual_label("reviewer".into());
         terminal.clear_manual_label();
+        assert_eq!(terminal.border_label(true).as_deref(), Some("claude"));
+    }
+
+    #[test]
+    fn border_label_prefers_agent_name_over_detected_kind() {
+        let mut terminal = test_terminal();
+        terminal.set_detected_state(Some(Agent::Claude), AgentState::Idle);
+        assert_eq!(terminal.border_label(true).as_deref(), Some("claude"));
+
+        terminal.set_agent_name("reviewer".into());
+        assert_eq!(terminal.border_label(true).as_deref(), Some("reviewer"));
+
+        terminal.clear_agent_name();
         assert_eq!(terminal.border_label(true).as_deref(), Some("claude"));
     }
 

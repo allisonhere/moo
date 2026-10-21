@@ -315,6 +315,9 @@ pub(super) enum ClientRenameTarget {
     Pane {
         pane_id: String,
     },
+    Agent {
+        pane_id: String,
+    },
 }
 
 #[derive(Debug)]
@@ -378,6 +381,7 @@ pub(super) struct ClientHelpOverlay {
 
 #[derive(Debug)]
 pub(super) struct ClientGlobalMenuOverlay {
+    pub(super) query: TextEditor,
     pub(super) highlighted: usize,
 }
 
@@ -519,6 +523,8 @@ pub(super) enum ClientContextMenuAction {
     NewTab,
     RenamePane,
     ClearPaneName,
+    RenameAgent,
+    ClearAgentName,
     SwapWithFocusedPane,
     SplitRight,
     SplitDown,
@@ -547,6 +553,10 @@ pub(super) enum ClientContextMenuTarget {
         source_pane_id: Option<String>,
         has_manual_label: bool,
         right_click_passthrough: bool,
+    },
+    Agent {
+        pane_id: String,
+        has_name: bool,
     },
 }
 

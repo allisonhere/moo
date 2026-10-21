@@ -122,11 +122,13 @@ fn spawn_herdr_with_options(
     path_override: Option<&Path>,
     shell: &str,
 ) -> SpawnedHerdr {
-    fs::create_dir_all(config_home.join("herdr")).unwrap();
+    fs::create_dir_all(config_home.join(support::app_dir_name())).unwrap();
     fs::create_dir_all(runtime_dir).unwrap();
     register_runtime_dir(runtime_dir);
     fs::write(
-        config_home.join("herdr/config.toml"),
+        config_home
+            .join(support::app_dir_name())
+            .join("config.toml"),
         "onboarding = false\n",
     )
     .unwrap();
@@ -140,7 +142,7 @@ fn spawn_herdr_with_options(
         })
         .unwrap();
 
-    let mut cmd = CommandBuilder::new(env!("CARGO_BIN_EXE_herdr"));
+    let mut cmd = CommandBuilder::new(env!("CARGO_BIN_EXE_herdr-forge"));
     support::isolate_herdr_test_process(&mut cmd);
     cmd.arg("server");
     cmd.env("XDG_CONFIG_HOME", config_home);
@@ -149,6 +151,7 @@ fn spawn_herdr_with_options(
     cmd.env_remove("HERDR_CLIENT_SOCKET_PATH");
     cmd.env("SHELL", shell);
     cmd.env_remove("HERDR_ENV");
+    cmd.env_remove("HERDR_PRODUCT_ID");
     if let Some(path) = path_override {
         cmd.env("PATH", path);
     }
@@ -343,11 +346,7 @@ fn spawned_server_ignores_inherited_pane_env() {
         r#"{"id":"req_1","method":"workspace.list","params":{}}"#,
     );
     assert_eq!(value["result"]["workspaces"], serde_json::json!([]));
-    let app_dir = if cfg!(debug_assertions) {
-        "herdr-dev"
-    } else {
-        "herdr"
-    };
+    let app_dir = support::app_dir_name();
     assert!(!config_home.join(app_dir).join("sessions").exists());
 
     cleanup_spawned_herdr(child, base);
@@ -364,7 +363,9 @@ fn server_reload_agent_manifests_reports_runtime_override() {
     let child = spawn_herdr(&config_home, &runtime_dir, &socket_path);
     wait_for_socket(&socket_path, Duration::from_secs(5));
 
-    let override_dir = config_home.join("herdr-dev").join("agent-detection");
+    let override_dir = config_home
+        .join(support::app_dir_name())
+        .join("agent-detection");
     fs::create_dir_all(&override_dir).unwrap();
     let override_path = override_dir.join("codex.toml");
     fs::write(
@@ -456,7 +457,12 @@ fn shutdown_preserves_session_after_shell_is_signaled() {
     child.child.wait().expect("server should stop cleanly");
 
     let session: serde_json::Value = serde_json::from_slice(
-        &fs::read(config_home.join("herdr-dev/session.json")).expect("saved session"),
+        &fs::read(
+            config_home
+                .join(support::app_dir_name())
+                .join("session.json"),
+        )
+        .expect("saved session"),
     )
     .expect("valid session json");
     assert_eq!(session["workspaces"].as_array().map(Vec::len), Some(1));

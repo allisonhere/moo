@@ -48,7 +48,7 @@ fn startup_command(socket_path: &Path) -> String {
         // A socket override wins over an inherited HERDR_SESSION. Keep the
         // command in the current environment so it starts the overridden
         // target instead of directing the user to an unrelated session.
-        "herdr".to_string()
+        crate::product_identity::BINARY_NAME.to_string()
     }
 }
 

@@ -924,13 +924,13 @@ fn mobile_items(
     }
 
     items.push(MobileItem::section("menu", palette));
-    for (index, (label, _)) in super::global_menu::global_menu_items(snapshot)
+    for (index, item) in super::global_menu::global_menu_items(snapshot, &config.keybinds.keybinds)
         .into_iter()
         .enumerate()
     {
         items.push(MobileItem {
             lines: vec![Line::from(Span::styled(
-                format!("  {label}"),
+                format!("  {}", item.label),
                 Style::default().fg(palette.overlay1).bg(palette.panel_bg),
             ))],
             background: palette.panel_bg,
@@ -1070,10 +1070,10 @@ impl ClientShellState {
             }
             Some(ClientMobileTarget::Menu(index)) => {
                 let actionable = self.snapshot.as_deref().is_some_and(|snapshot| {
-                    super::global_menu::global_menu_items(snapshot)
+                    super::global_menu::global_menu_items(snapshot, &self.config.keybinds.keybinds)
                         .get(index)
-                        .is_some_and(|(_, action)| {
-                            *action != super::global_menu::ClientGlobalMenuAction::WhatsNew
+                        .is_some_and(|item| {
+                            item.action != super::global_menu::ClientGlobalMenuAction::WhatsNew
                                 || snapshot.release_notes.is_some()
                         })
                 });

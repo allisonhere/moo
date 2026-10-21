@@ -40,7 +40,7 @@ impl Default for UpdateConfig {
     fn default() -> Self {
         Self {
             channel: default_update_channel(),
-            version_check: true,
+            version_check: false,
             manifest_check: true,
         }
     }
@@ -357,6 +357,8 @@ pub struct KeysConfig {
     pub workspace_picker: BindingConfig,
     /// Open the session navigator. Default: "prefix+g"
     pub goto: BindingConfig,
+    /// Open the searchable command palette. Default: "prefix+space"
+    pub command_palette: BindingConfig,
     /// Move workspace selection up in navigate mode. Default: "up".
     pub navigate_workspace_up: BindingConfig,
     /// Move workspace selection down in navigate mode. Default: "down".
@@ -407,6 +409,8 @@ pub struct KeysConfig {
     pub close_tab: BindingConfig,
     /// Rename the focused pane. Default: "prefix+shift+p".
     pub rename_pane: BindingConfig,
+    /// Rename the focused agent. Default: "prefix+shift+a".
+    pub rename_agent: BindingConfig,
     /// Open the focused pane scrollback in $EDITOR. Default: "prefix+e".
     pub edit_scrollback: BindingConfig,
     pub clear_pane: BindingConfig,
@@ -495,6 +499,8 @@ pub(crate) struct KeysConfigOverlay {
     #[serde(skip_serializing_if = "Option::is_none")]
     goto: Option<BindingConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    command_palette: Option<BindingConfig>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     navigate_workspace_up: Option<BindingConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
     navigate_workspace_down: Option<BindingConfig>,
@@ -544,6 +550,8 @@ pub(crate) struct KeysConfigOverlay {
     close_tab: Option<BindingConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
     rename_pane: Option<BindingConfig>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    rename_agent: Option<BindingConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
     edit_scrollback: Option<BindingConfig>,
     clear_pane: Option<BindingConfig>,
@@ -654,6 +662,7 @@ impl<'de> Deserialize<'de> for KeysConfig {
         apply_field!(close_workspace);
         apply_field!(workspace_picker);
         apply_field!(goto);
+        apply_field!(command_palette);
         apply_field!(navigate_workspace_up);
         apply_field!(navigate_workspace_down);
         apply_field!(navigate_pane_left);
@@ -679,6 +688,7 @@ impl<'de> Deserialize<'de> for KeysConfig {
         apply_field!(switch_workspace);
         apply_field!(close_tab);
         apply_field!(rename_pane);
+        apply_field!(rename_agent);
         apply_field!(edit_scrollback);
         apply_field!(clear_pane);
         apply_field!(copy_mode);
@@ -759,6 +769,7 @@ impl KeysConfig {
         copy_effective_action_field!(close_workspace, keybinds.close_workspace);
         copy_effective_action_field!(workspace_picker, keybinds.workspace_picker);
         copy_effective_action_field!(goto, keybinds.goto);
+        copy_effective_action_field!(command_palette, keybinds.command_palette);
         copy_effective_action_field!(navigate_workspace_up, keybinds.navigate.workspace_up);
         copy_effective_action_field!(navigate_workspace_down, keybinds.navigate.workspace_down);
         copy_effective_action_field!(navigate_pane_left, keybinds.navigate.pane_left);
@@ -784,6 +795,7 @@ impl KeysConfig {
         copy_effective_indexed_field!(switch_workspace, keybinds.switch_workspace);
         copy_effective_action_field!(close_tab, keybinds.close_tab);
         copy_effective_action_field!(rename_pane, keybinds.rename_pane);
+        copy_effective_action_field!(rename_agent, keybinds.rename_agent);
         copy_effective_action_field!(edit_scrollback, keybinds.edit_scrollback);
         copy_effective_action_field!(clear_pane, keybinds.clear_pane);
         copy_effective_action_field!(copy_mode, keybinds.copy_mode);
@@ -1131,6 +1143,7 @@ impl Default for KeysConfig {
             close_workspace: BindingConfig::one("prefix+shift+d"),
             workspace_picker: BindingConfig::one("prefix+w"),
             goto: BindingConfig::one("prefix+g"),
+            command_palette: BindingConfig::one("prefix+space"),
             navigate_workspace_up: BindingConfig::one("up"),
             navigate_workspace_down: BindingConfig::one("down"),
             navigate_pane_left: BindingConfig::one("h"),
@@ -1156,6 +1169,7 @@ impl Default for KeysConfig {
             switch_workspace: BindingConfig::empty(),
             close_tab: BindingConfig::one("prefix+shift+x"),
             rename_pane: BindingConfig::one("prefix+shift+p"),
+            rename_agent: BindingConfig::one("prefix+shift+a"),
             edit_scrollback: BindingConfig::one("prefix+e"),
             clear_pane: BindingConfig::default(),
             copy_mode: BindingConfig::one("prefix+["),
@@ -1338,7 +1352,7 @@ mod tests {
     fn update_config_defaults_and_parses() {
         let default_config = Config::default();
         assert_eq!(default_config.update.channel, default_update_channel());
-        assert!(default_config.update.version_check);
+        assert!(!default_config.update.version_check);
         assert!(default_config.update.manifest_check);
 
         let toml = r#"

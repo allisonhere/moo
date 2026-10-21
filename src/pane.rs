@@ -200,6 +200,10 @@ fn apply_pane_launch_env(cmd: &mut CommandBuilder, launch_env: &PaneLaunchEnv) {
         cmd.env(key, value);
     }
     cmd.env(crate::HERDR_ENV_VAR, crate::HERDR_ENV_VALUE);
+    cmd.env(
+        crate::HERDR_PRODUCT_ENV_VAR,
+        crate::product_identity::APP_DIR_NAME,
+    );
     crate::integration::apply_pane_base_env(cmd);
     crate::platform::apply_pane_runtime_marker(cmd);
     match &launch_env.identity {

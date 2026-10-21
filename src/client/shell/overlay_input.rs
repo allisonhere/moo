@@ -444,6 +444,30 @@ impl ClientShellState {
         }));
     }
 
+    pub(super) fn open_rename_agent_overlay(&mut self) {
+        let Some(snapshot) = self.snapshot.as_deref() else {
+            return;
+        };
+        let Some(pane_id) = snapshot.focused_pane_id.as_deref() else {
+            return;
+        };
+        let Some(agent) = snapshot
+            .agents
+            .iter()
+            .find(|agent| agent.pane_id == pane_id)
+        else {
+            return;
+        };
+        let current = agent.name.as_deref();
+        self.overlay = Some(ClientShellOverlay::Rename(ClientRenameOverlay {
+            title: "rename agent",
+            input: TextEditor::new(current.unwrap_or_default(), current.is_none()),
+            target: ClientRenameTarget::Agent {
+                pane_id: pane_id.to_owned(),
+            },
+        }));
+    }
+
     pub(super) fn insert_overlay_text(&mut self, text: &str) -> bool {
         if self.insert_worktree_overlay_text(text) {
             return true;
@@ -463,6 +487,12 @@ impl ClientShellState {
                 if navigator.query.insert(text) {
                     navigator.filter = None;
                     navigator.selected = None;
+                }
+                true
+            }
+            Some(ClientShellOverlay::GlobalMenu(menu)) => {
+                if menu.query.insert(text) {
+                    menu.highlighted = 0;
                 }
                 true
             }
@@ -575,11 +605,11 @@ impl ClientShellState {
                     self.overlay = None;
                     outcome.repaint = true;
                 }
-                KeyCode::Up | KeyCode::Char('k') => {
+                KeyCode::Up => {
                     self.move_global_menu_selection(-1);
                     outcome.repaint = true;
                 }
-                KeyCode::Down | KeyCode::Char('j') => {
+                KeyCode::Down => {
                     self.move_global_menu_selection(1);
                     outcome.repaint = true;
                 }
@@ -590,7 +620,14 @@ impl ClientShellState {
                     };
                     self.activate_global_menu_item(highlighted, outcome);
                 }
-                _ => {}
+                _ => {
+                    if let Some(ClientShellOverlay::GlobalMenu(menu)) = self.overlay.as_mut() {
+                        if menu.query.handle_key(key).is_some() {
+                            menu.highlighted = 0;
+                            outcome.repaint = true;
+                        }
+                    }
+                }
             }
             return;
         }
@@ -985,6 +1022,12 @@ impl ClientShellState {
                 crate::api::schema::PaneRenameParams {
                     pane_id,
                     label: Some(trimmed.to_owned()),
+                },
+            )),
+            ClientRenameTarget::Agent { pane_id } => Some(crate::api::schema::Method::AgentRename(
+                crate::api::schema::AgentRenameParams {
+                    target: pane_id,
+                    name: (!trimmed.is_empty()).then(|| trimmed.to_owned()),
                 },
             )),
         };

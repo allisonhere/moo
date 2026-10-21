@@ -260,10 +260,29 @@ fn mobile_header_and_switcher_render_released_sections_and_stable_targets() {
         "+ new tab",
         "menu",
         "settings",
-        "detach",
     ] {
         assert!(switcher_text.contains(expected), "missing {expected}");
     }
+    // The palette-driven menu is taller than the viewport, so the last item is
+    // reachable by scrolling rather than being visible immediately.
+    state.mobile_switcher_scroll = usize::MAX;
+    let bottom = state.compose(44, 20).expect("mobile switcher bottom");
+    let bottom_text = bottom
+        .cells
+        .chunks(bottom.width as usize)
+        .map(|row| {
+            row.iter()
+                .map(|cell| cell.symbol.as_str())
+                .collect::<String>()
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(
+        bottom_text.contains("detach"),
+        "detach should be reachable by scrolling: {bottom_text}"
+    );
+    state.mobile_switcher_scroll = 0;
+    state.compose(44, 20).expect("mobile switcher restored");
     let workspace_hit = state
         .hits
         .mobile_targets
@@ -503,12 +522,28 @@ fn mobile_menu_keeps_inert_notes_open_and_cancel_without_workspace_in_navigate()
     state.set_snapshot(Box::new(projected));
     state.set_pane_surface(surface());
     state.mode = ClientShellMode::Navigate;
+    let notes_index = super::super::global_menu::global_menu_items(
+        state.snapshot.as_deref().unwrap(),
+        &state.config.keybinds.keybinds,
+    )
+    .iter()
+    .position(|item| {
+        matches!(
+            item.action,
+            super::super::global_menu::ClientGlobalMenuAction::WhatsNew
+        )
+    })
+    .expect("what's new item");
+    state.mobile_switcher_scroll = usize::MAX;
     state.compose(44, 20).expect("mobile switcher");
     let inert_notes = state
         .hits
         .mobile_targets
         .iter()
-        .find_map(|(rect, target)| matches!(target, ClientMobileTarget::Menu(3)).then_some(*rect))
+        .find_map(|(rect, target)| {
+            matches!(target, ClientMobileTarget::Menu(index) if *index == notes_index)
+                .then_some(*rect)
+        })
         .expect("what's new row");
     state.handle_raw_events(vec![RawInputEvent::Mouse(crossterm::event::MouseEvent {
         kind: MouseEventKind::Down(MouseButton::Left),

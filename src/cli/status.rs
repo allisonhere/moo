@@ -34,12 +34,22 @@ fn parse_status_args(args: &[String]) -> Option<(StatusScope, bool)> {
     match args.first().map(|arg| arg.as_str()) {
         None => Some((StatusScope::Full, false)),
         Some("--json") if args.len() == 1 => Some((StatusScope::Full, true)),
-        Some("server") => {
-            parse_status_scope_args(args, StatusScope::Server, "herdr status server [--json]")
-        }
-        Some("client") => {
-            parse_status_scope_args(args, StatusScope::Client, "herdr status client [--json]")
-        }
+        Some("server") => parse_status_scope_args(
+            args,
+            StatusScope::Server,
+            &format!(
+                "{} status server [--json]",
+                crate::product_identity::BINARY_NAME
+            ),
+        ),
+        Some("client") => parse_status_scope_args(
+            args,
+            StatusScope::Client,
+            &format!(
+                "{} status client [--json]",
+                crate::product_identity::BINARY_NAME
+            ),
+        ),
         Some("help" | "--help" | "-h") => {
             if args.len() > 1 {
                 print_status_help();
@@ -401,7 +411,7 @@ fn current_exe_label() -> String {
 }
 
 fn print_status_help() {
-    eprintln!("herdr status commands:");
+    eprintln!("{} status commands:", crate::product_identity::BINARY_NAME);
     eprintln!("  herdr status [--json]         show local client and running server status");
     eprintln!("  herdr status server [--json]  show running server status");
     eprintln!("  herdr status client [--json]  show local client binary status");

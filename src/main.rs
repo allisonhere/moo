@@ -2,6 +2,7 @@ use std::io;
 
 pub(crate) const HERDR_ENV_VAR: &str = "HERDR_ENV";
 pub(crate) const HERDR_ENV_VALUE: &str = "1";
+pub(crate) const HERDR_PRODUCT_ENV_VAR: &str = "HERDR_PRODUCT_ID";
 const NESTED_HERDR_MESSAGES: [&str; 6] = [
     "inception detected. we need to go deeper... said no one ever.",
     "recursion is a pathway to many abilities some consider to be... unnatural.",
@@ -42,6 +43,7 @@ mod plugin_installations;
 mod plugin_paths;
 mod popup_size;
 mod product_announcements;
+mod product_identity;
 mod protocol;
 mod pty;
 mod raw_input;
@@ -64,8 +66,8 @@ mod update;
 mod workspace;
 mod worktree;
 
-const DEFAULT_CONFIG: &str = r##"# herdr configuration
-# Place this file at ~/.config/herdr/config.toml
+const DEFAULT_CONFIG: &str = r##"# Herdr Forge configuration
+# Place this file at ~/.config/herdr-forge/config.toml
 
 # Show first-run notification setup on startup.
 # Missing also shows onboarding; set false after you've chosen.
@@ -121,13 +123,13 @@ const DEFAULT_CONFIG: &str = r##"# herdr configuration
 # kitty_graphics = true
 
 [update]
-# Update channel used by background version checks and `herdr update`.
+# Update channel used by background version checks.
 # Stable builds default to "stable". Windows preview builds default to "preview"
 # so existing preview installs stay there until explicitly switched.
 # channel = "stable"
 
-# Check herdr.dev for new Herdr versions in the background.
-# version_check = true
+# Fork builds do not install upstream Herdr updates over this binary.
+# version_check = false
 
 # Check herdr.dev for remote agent-detection manifest updates in the background.
 # manifest_check = true
@@ -173,6 +175,7 @@ const DEFAULT_CONFIG: &str = r##"# herdr configuration
 # switch_workspace = ""   # optional indexed binding, e.g. "prefix+shift+1..9"
 # close_tab = "prefix+shift+x"
 # rename_pane = "prefix+shift+p"
+# rename_agent = "prefix+shift+a"
 # edit_scrollback = "prefix+e"
 # clear_pane = ""                  # unbound; e.g. "prefix+ctrl+k"
 # focus_pane_left = "prefix+h"
@@ -508,15 +511,28 @@ fn finish_cli(outcome: io::Result<cli::CommandOutcome>) -> io::Result<()> {
     }
 }
 
+fn usage_hint() -> String {
+    format!(
+        "run '{} --help' for usage",
+        crate::product_identity::BINARY_NAME
+    )
+}
+
 fn main() -> io::Result<()> {
     let raw_args: Vec<String> = match args_as_utf8(std::env::args_os()) {
         Ok(args) => args,
         Err(err) => {
             eprintln!("error: {err}");
-            eprintln!("run 'herdr --help' for usage");
+            eprintln!("{}", usage_hint());
             std::process::exit(2);
         }
     };
+    if inherited_socket_belongs_to_another_product() {
+        return Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            "refusing to use a Herdr socket inherited from another product; run herdr-forge outside that managed pane",
+        ));
+    }
     #[cfg(windows)]
     if let Some(result) = platform::maybe_activate_desktop_notification(&raw_args) {
         return result;
@@ -528,7 +544,7 @@ fn main() -> io::Result<()> {
         Ok(args) => args,
         Err(err) => {
             eprintln!("error: {err}");
-            eprintln!("run 'herdr --help' for usage");
+            eprintln!("{}", usage_hint());
             std::process::exit(2);
         }
     };
@@ -536,7 +552,7 @@ fn main() -> io::Result<()> {
         Ok(parsed) => parsed,
         Err(err) => {
             eprintln!("error: {err}");
-            eprintln!("run 'herdr --help' for usage");
+            eprintln!("{}", usage_hint());
             std::process::exit(2);
         }
     };
@@ -551,7 +567,7 @@ fn main() -> io::Result<()> {
         })
     {
         eprintln!("error: --remote can only be used with the default launch command");
-        eprintln!("run 'herdr --help' for usage");
+        eprintln!("{}", usage_hint());
         std::process::exit(2);
     }
 
@@ -586,7 +602,7 @@ fn main() -> io::Result<()> {
             }
             Err(err) => {
                 eprintln!("{err}");
-                eprintln!("usage: herdr update [--handoff]");
+                eprintln!("usage: herdr-forge update [--handoff]");
                 std::process::exit(2);
             }
         };
@@ -605,93 +621,105 @@ fn main() -> io::Result<()> {
 
     if args.iter().any(|a| a == "--help" || a == "-h") {
         platform::begin_cli_output();
-        println!("herdr — terminal workspace manager for AI coding agents");
+        println!("herdr-forge — terminal workspace manager for AI coding agents");
         println!();
-        println!("Usage: herdr [options]");
-        println!("       herdr --session <name> [options]");
-        println!("       herdr --machine <label-or-id> <command>");
-        println!("       herdr --remote <ssh-target> [--session <name>]");
-        println!("       herdr session attach <name>");
-        println!("       herdr completion zsh");
-        println!("       herdr update [--handoff]");
-        println!("       herdr channel set <stable|preview>");
-        println!("       herdr machine <subcommand> ...");
-        println!("       herdr server stop");
-        println!("       herdr server reload-config");
-        println!("       herdr api <subcommand> ...");
-        println!("       herdr completion <shell>");
-        println!("       herdr config <subcommand> ...");
-        println!("       herdr channel <subcommand> ...");
-        println!("       herdr workspace <subcommand> ...");
-        println!("       herdr worktree <subcommand> ...");
-        println!("       herdr tab <subcommand> ...");
-        println!("       herdr notification <subcommand> ...");
-        println!("       herdr agent <subcommand> ...");
-        println!("       herdr pane <subcommand> ...");
-        println!("       herdr session <subcommand> ...");
-        println!("       herdr integration <subcommand> ...");
+        println!("Usage: herdr-forge [options]");
+        println!("       herdr-forge --session <name> [options]");
+        println!("       herdr-forge --machine <label-or-id> <command>");
+        println!("       herdr-forge --remote <ssh-target> [--session <name>]");
+        println!("       herdr-forge session attach <name>");
+        println!("       herdr-forge completion zsh");
+        println!("       herdr-forge update [--handoff]");
+        println!("       herdr-forge channel set <stable|preview>");
+        println!("       herdr-forge machine <subcommand> ...");
+        println!("       herdr-forge server stop");
+        println!("       herdr-forge server reload-config");
+        println!("       herdr-forge api <subcommand> ...");
+        println!("       herdr-forge completion <shell>");
+        println!("       herdr-forge config <subcommand> ...");
+        println!("       herdr-forge channel <subcommand> ...");
+        println!("       herdr-forge workspace <subcommand> ...");
+        println!("       herdr-forge worktree <subcommand> ...");
+        println!("       herdr-forge tab <subcommand> ...");
+        println!("       herdr-forge notification <subcommand> ...");
+        println!("       herdr-forge agent <subcommand> ...");
+        println!("       herdr-forge pane <subcommand> ...");
+        println!("       herdr-forge session <subcommand> ...");
+        println!("       herdr-forge integration <subcommand> ...");
         println!();
         println!("Common commands:");
         for (command, description) in [
-            ("herdr", "Launch or attach to the persistent session"),
+            ("herdr-forge", "Launch or attach to the persistent session"),
             (
-                "herdr status [server|client]",
+                "herdr-forge status [server|client]",
                 "Show local client and running server status",
             ),
-            ("herdr update", "Download and install the latest version"),
-            ("herdr completion zsh", "Generate shell completions for zsh"),
             (
-                "herdr server stop",
+                "herdr-forge update",
+                "Explain how to install a newer fork build",
+            ),
+            (
+                "herdr-forge completion zsh",
+                "Generate shell completions for zsh",
+            ),
+            (
+                "herdr-forge server stop",
                 "Stop the running server via the API socket",
             ),
             (
-                "herdr channel set <stable|preview>",
+                "herdr-forge channel set <stable|preview>",
                 "Choose the stable or preview update channel",
             ),
             (
-                "herdr server reload-config",
+                "herdr-forge server reload-config",
                 "Reload config.toml in the running server",
             ),
             (
-                "herdr config reset-keys",
+                "herdr-forge config reset-keys",
                 "Back up config.toml and remove custom keybindings",
             ),
             (
-                "herdr channel <subcommand>",
+                "herdr-forge channel <subcommand>",
                 "Manage the stable or preview update channel",
             ),
-            ("herdr machine <subcommand>", "Manage saved SSH machines"),
             (
-                "herdr api <subcommand>",
+                "herdr-forge machine <subcommand>",
+                "Manage saved SSH machines",
+            ),
+            (
+                "herdr-forge api <subcommand>",
                 "Inspect socket API metadata and live runtime state",
             ),
             (
-                "herdr workspace <subcommand>",
+                "herdr-forge workspace <subcommand>",
                 "Workspace helpers over the socket API",
             ),
             (
-                "herdr worktree <subcommand>",
+                "herdr-forge worktree <subcommand>",
                 "Git worktree helpers over the socket API",
             ),
-            ("herdr tab <subcommand>", "Tab helpers over the socket API"),
             (
-                "herdr notification <subcommand>",
+                "herdr-forge tab <subcommand>",
+                "Tab helpers over the socket API",
+            ),
+            (
+                "herdr-forge notification <subcommand>",
                 "Notification helpers over the socket API",
             ),
             (
-                "herdr agent <subcommand>",
+                "herdr-forge agent <subcommand>",
                 "Agent/terminal helpers over the socket API",
             ),
             (
-                "herdr pane <subcommand>",
+                "herdr-forge pane <subcommand>",
                 "Pane control helpers over the socket API",
             ),
             (
-                "herdr session <subcommand>",
+                "herdr-forge session <subcommand>",
                 "Manage named persistent sessions",
             ),
             (
-                "herdr integration <subcommand>",
+                "herdr-forge integration <subcommand>",
                 "Manage built-in agent integrations",
             ),
         ] {
@@ -699,7 +727,7 @@ fn main() -> io::Result<()> {
         }
         println!();
         println!("Advanced commands:");
-        println!("  {:<32} Run as headless server", "herdr server");
+        println!("  {:<32} Run as headless server", "herdr-forge server");
         println!();
         println!("Options:");
         println!("  --session <name>    Use or create a named persistent session");
@@ -724,7 +752,7 @@ fn main() -> io::Result<()> {
 
     if args.iter().any(|a| a == "--version" || a == "-V") {
         platform::begin_cli_output();
-        println!("herdr {}", crate::build_info::version());
+        println!("herdr-forge {}", crate::build_info::version());
         return Ok(());
     }
 
@@ -757,7 +785,7 @@ fn main() -> io::Result<()> {
         let arg_name = arg.split_once('=').map(|(name, _)| name).unwrap_or(arg);
         if arg.starts_with('-') && !known_flags.contains(&arg_name) {
             eprintln!("unknown option: {arg}");
-            eprintln!("run 'herdr --help' for usage");
+            eprintln!("{}", usage_hint());
             std::process::exit(2);
         }
         if !arg.starts_with('-')
@@ -779,7 +807,7 @@ fn main() -> io::Result<()> {
             .contains(&arg.as_str())
         {
             eprintln!("unknown command: {arg}");
-            eprintln!("run 'herdr --help' for usage");
+            eprintln!("{}", usage_hint());
             std::process::exit(2);
         }
     }
@@ -800,10 +828,32 @@ fn main() -> io::Result<()> {
     let saved_federation =
         client::endpoint::EndpointCatalog::load().is_ok_and(|catalog| catalog.has_enabled_ssh());
     if let Err(err) = server::autodetect::auto_detect_launch(saved_federation) {
-        eprintln!("herdr: {err}");
+        eprintln!("{}: {err}", crate::product_identity::BINARY_NAME);
         std::process::exit(1);
     }
     Ok(())
+}
+
+fn inherited_socket_belongs_to_another_product() -> bool {
+    let inherited_socket = std::env::var_os("HERDR_SOCKET_PATH").is_some()
+        || std::env::var_os("HERDR_CLIENT_SOCKET_PATH").is_some();
+    let managed_pane = std::env::var(HERDR_ENV_VAR).ok().as_deref() == Some(HERDR_ENV_VALUE);
+    socket_product_mismatch(
+        inherited_socket,
+        managed_pane,
+        std::env::var(HERDR_PRODUCT_ENV_VAR).ok().as_deref(),
+    )
+}
+
+/// A socket path inherited from a managed pane of another product must not be
+/// reused. An explicit override (tests, scripts) that is not running inside a
+/// managed pane stays valid.
+fn socket_product_mismatch(
+    inherited_socket: bool,
+    managed_pane: bool,
+    product_id: Option<&str>,
+) -> bool {
+    inherited_socket && managed_pane && product_id != Some(crate::product_identity::APP_DIR_NAME)
 }
 
 #[cfg(test)]
@@ -838,6 +888,15 @@ mod tests {
     fn nested_herdr_does_not_block_without_env() {
         let config = config::Config::default();
         assert!(!should_block_nested_for_env(&config, None));
+    }
+
+    #[test]
+    fn inherited_socket_requires_matching_fork_identity() {
+        assert!(socket_product_mismatch(true, true, None));
+        assert!(socket_product_mismatch(true, true, Some("herdr")));
+        assert!(!socket_product_mismatch(true, true, Some("herdr-forge")));
+        assert!(!socket_product_mismatch(true, false, None));
+        assert!(!socket_product_mismatch(false, true, None));
     }
 
     #[test]

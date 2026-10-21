@@ -548,6 +548,12 @@
           "description": "Open the session navigator."
         },
         {
+          "key": "keys.command_palette",
+          "type": "keybinding",
+          "default": "\"prefix+space\"",
+          "description": "Open the searchable command palette. Uses a prefix binding by default so terminal applications continue to receive Ctrl+K."
+        },
+        {
           "key": "keys.navigate_workspace_up",
           "type": "keybinding",
           "default": "\"up\"",
@@ -696,6 +702,12 @@
           "type": "keybinding",
           "default": "\"prefix+shift+p\"",
           "description": "Rename the focused pane."
+        },
+        {
+          "key": "keys.rename_agent",
+          "type": "keybinding",
+          "default": "\"prefix+shift+a\"",
+          "description": "Rename the focused agent."
         },
         {
           "key": "keys.edit_scrollback",

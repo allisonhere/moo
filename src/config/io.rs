@@ -20,11 +20,7 @@ const KNOWN_TOP_LEVEL_CONFIG_KEYS: &[&str] = &[
 ];
 
 pub fn app_dir_name() -> &'static str {
-    if cfg!(debug_assertions) {
-        "herdr-dev"
-    } else {
-        "herdr"
-    }
+    crate::product_identity::app_dir_name()
 }
 
 pub fn config_dir() -> PathBuf {

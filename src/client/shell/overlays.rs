@@ -85,38 +85,101 @@ pub(crate) fn render_client_overlay(
 
 pub(crate) fn render_global_menu(
     buffer: &mut Buffer,
-    launcher: Rect,
+    _launcher: Rect,
     menu: &ClientGlobalMenuOverlay,
     snapshot: &ClientShellSnapshot,
+    keybinds: &crate::config::Keybinds,
     palette: &Palette,
 ) -> Option<OverlayRender> {
-    let items = super::super::global_menu::global_menu_items(snapshot);
+    let items = super::super::global_menu::filtered_global_menu_items(
+        snapshot,
+        keybinds,
+        menu.query.as_str(),
+    );
     let screen = buffer.area;
     let width = items
         .iter()
-        .map(|(label, action)| {
-            display_width(label)
+        .map(|item| {
+            display_width(&item.label)
+                + item
+                    .shortcut
+                    .as_deref()
+                    .map_or(0, |shortcut| display_width(shortcut).saturating_add(3))
                 + u16::from(super::super::global_menu::global_menu_item_has_badge(
-                    snapshot, *action,
+                    snapshot,
+                    &item.action,
                 )) * 2
         })
         .max()
-        .unwrap_or(8)
+        .unwrap_or(24)
         .saturating_add(4)
+        .max(42)
         .min(screen.width.max(1));
     let height = (items.len() as u16)
-        .saturating_add(2)
+        .saturating_add(5)
+        .min(18)
         .min(screen.height.max(1));
-    let x = launcher
-        .right()
-        .saturating_sub(width)
-        .min(screen.right().saturating_sub(width));
-    let y = launcher.y.saturating_sub(height).max(screen.y);
+    let x = screen
+        .x
+        .saturating_add(screen.width.saturating_sub(width) / 2);
+    let y = screen
+        .y
+        .saturating_add(screen.height.saturating_sub(height) / 3);
     let rect = Rect::new(x, y, width, height);
     let inner = panel(buffer, rect, palette.accent, palette.panel_bg)?;
+    if inner.height == 0 {
+        return None;
+    }
+    let query_row = Rect::new(inner.x, inner.y, inner.width, 1);
+    let query_style = Style::default().fg(palette.text).bg(palette.panel_bg);
+    buffer.set_style(query_row, query_style);
+    let (query, cursor) = menu.query.viewport(inner.width.saturating_sub(4));
+    put_text(
+        buffer,
+        query_row.x,
+        query_row.y,
+        2,
+        " ›",
+        Style::default().fg(palette.accent).bg(palette.panel_bg),
+    );
+    put_text(
+        buffer,
+        query_row.x.saturating_add(3),
+        query_row.y,
+        query_row.width.saturating_sub(3),
+        query,
+        query_style,
+    );
+    let separator_y = inner.y.saturating_add(1);
+    if separator_y < inner.bottom() {
+        put_text(
+            buffer,
+            inner.x,
+            separator_y,
+            inner.width,
+            &"─".repeat(usize::from(inner.width)),
+            Style::default()
+                .fg(palette.surface_dim)
+                .bg(palette.panel_bg),
+        );
+    }
     let mut rows = Vec::new();
-    for (index, (label, action)) in items.iter().enumerate() {
-        let row_y = inner.y.saturating_add(index as u16);
+    let visible_rows = usize::from(inner.height.saturating_sub(2));
+    let first_visible = menu
+        .highlighted
+        .saturating_add(1)
+        .saturating_sub(visible_rows)
+        .min(items.len().saturating_sub(visible_rows));
+    for (index, item) in items
+        .iter()
+        .enumerate()
+        .skip(first_visible)
+        .take(visible_rows)
+    {
+        let row_y = inner
+            .y
+            .saturating_add(2)
+            .saturating_add(index.saturating_sub(first_visible) as u16);
         if row_y >= inner.bottom() {
             break;
         }
@@ -131,7 +194,8 @@ pub(crate) fn render_global_menu(
             Style::default().fg(palette.text).bg(palette.panel_bg)
         };
         buffer.set_style(row, style);
-        let has_badge = super::super::global_menu::global_menu_item_has_badge(snapshot, *action);
+        let has_badge =
+            super::super::global_menu::global_menu_item_has_badge(snapshot, &item.action);
         if has_badge {
             let badge_style = if highlighted {
                 style
@@ -147,17 +211,57 @@ pub(crate) fn render_global_menu(
                 row.x.saturating_add(2),
                 row.y,
                 row.width.saturating_sub(2),
-                &format!(" {label}"),
+                &format!(" {}", item.label),
                 style,
             );
         } else {
-            put_text(buffer, row.x, row.y, row.width, &format!(" {label}"), style);
+            put_text(
+                buffer,
+                row.x,
+                row.y,
+                row.width,
+                &format!(" {}", item.label),
+                style,
+            );
+        }
+        if let Some(shortcut) = item.shortcut.as_deref() {
+            let shortcut_width = display_width(shortcut);
+            if shortcut_width.saturating_add(2) < row.width {
+                put_text(
+                    buffer,
+                    row.right().saturating_sub(shortcut_width).saturating_sub(1),
+                    row.y,
+                    shortcut_width,
+                    shortcut,
+                    if highlighted {
+                        style
+                    } else {
+                        Style::default().fg(palette.overlay0).bg(palette.panel_bg)
+                    },
+                );
+            }
         }
         rows.push((row, index));
+    }
+    if items.is_empty() && inner.height > 2 {
+        put_text(
+            buffer,
+            inner.x,
+            inner.y.saturating_add(2),
+            inner.width,
+            " No matching commands",
+            Style::default().fg(palette.overlay0).bg(palette.panel_bg),
+        );
     }
     Some(OverlayRender {
         area: rect,
         menu_rows: rows,
+        cursor: Some(crate::protocol::CursorState {
+            x: query_row.x.saturating_add(3).saturating_add(cursor),
+            y: query_row.y,
+            visible: true,
+            shape: 5,
+        }),
         ..OverlayRender::default()
     })
 }

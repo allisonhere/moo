@@ -109,8 +109,11 @@ pub(crate) struct Leaf {
 impl Leaf {
     pub(crate) fn request(&self, args: &[String]) -> Result<Request, ParseError> {
         let method = super::projection::parse(
-            self.command()
-                .bin_name(format!("herdr workspace {}", self.name)),
+            self.command().bin_name(format!(
+                "{} workspace {}",
+                crate::product_identity::BINARY_NAME,
+                self.name
+            )),
             args,
             self.method,
         )?;

@@ -250,24 +250,42 @@ pub(crate) fn command() -> Command {
         .subcommand(leaf("get", TargetProjection::arguments(), "Show an agent"))
         .subcommand(leaf("focus", TargetProjection::arguments(), "Focus an agent"))
         .subcommand(leaf("read", AgentReadProjection::arguments(), "Read agent terminal output")
-            .override_usage("herdr agent read <TARGET> [OPTIONS]"))
+            .override_usage(format!(
+                "{} agent read <TARGET> [OPTIONS]",
+                crate::product_identity::BINARY_NAME
+            )))
         .subcommand(leaf("send-keys", AgentSendKeysProjection::arguments(), "Send key presses to an agent")
             .after_help("Use esc as the canonical Escape key name; escape is also accepted."))
         .subcommand(leaf("rename", AgentRenameProjection::arguments(), "Rename an agent")
-            .override_usage("herdr agent rename <TARGET> <NAME>|--clear")
+            .override_usage(format!(
+                "{} agent rename <TARGET> <NAME>|--clear",
+                crate::product_identity::BINARY_NAME
+            ))
             .group(ArgGroup::new("rename").args(["name", "clear"]).required(true)))
         .subcommand(leaf("wait", AgentWaitProjection::arguments(), "Wait until an agent reaches one of the requested states")
-            .override_usage("herdr agent wait <TARGET> [OPTIONS]")
+            .override_usage(format!(
+                "{} agent wait <TARGET> [OPTIONS]",
+                crate::product_identity::BINARY_NAME
+            ))
             .after_help("Without --until, matches idle, done, or blocked. Use --until unknown explicitly when needed. Without --timeout, waits indefinitely."))
         .subcommand(leaf("prompt", AgentPromptProjection::arguments(), "Submit a prompt to an agent")
             .args(AgentPromptWaitProjection::arguments().into_iter().map(|arg| arg.requires("wait")))
-            .override_usage("herdr agent prompt <TARGET> <TEXT> [OPTIONS]")
+            .override_usage(format!(
+                "{} agent prompt <TARGET> <TEXT> [OPTIONS]",
+                crate::product_identity::BINARY_NAME
+            ))
             .after_help("If the agent is already blocked, submission is rejected with agent_blocked before any input is sent. When an accepted submission starts from another non-working state, --wait requires an observed working or blocked state within 5000ms; otherwise it returns agent_prompt_stalled. A caller timeout that expires first returns timeout. It then matches idle, done, or blocked by default, or any exact --until state. It does not track turns: if the agent is already working, that active turn's completion may match."))
         .subcommand(leaf("start", AgentStartProjection::arguments(), "Start a supported interactive agent in an existing pane")
-            .override_usage("herdr agent start <NAME> --kind <KIND> --pane <ID> [OPTIONS] [-- [AGENT_ARG]...]")
-            .after_help("The pane must be at its interactive shell prompt. Success means the expected agent was detected in the same terminal and is ready for input.\n\nnext: herdr agent prompt <TARGET> <TEXT> --wait"))
+            .override_usage(format!(
+                "{} agent start <NAME> --kind <KIND> --pane <ID> [OPTIONS] [-- [AGENT_ARG]...]",
+                crate::product_identity::BINARY_NAME
+            ))
+            .after_help(format!("The pane must be at its interactive shell prompt. Success means the expected agent was detected in the same terminal and is ready for input.\n\nnext: {} agent prompt <TARGET> <TEXT> --wait", crate::product_identity::BINARY_NAME)))
         .subcommand(leaf("attach", AttachProjection::arguments(), "Attach directly to an agent terminal")
-            .override_usage("herdr agent attach <TARGET> [OPTIONS]"))
+            .override_usage(format!(
+                "{} agent attach <TARGET> [OPTIONS]",
+                crate::product_identity::BINARY_NAME
+            )))
         .subcommand(leaf("explain", ExplainProjection::arguments(), "Explain agent detection state")
             .group(ArgGroup::new("explain_source").args(["target", "file"]).required(true)))
 }

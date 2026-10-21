@@ -40,6 +40,7 @@ pub(crate) enum KeybindAction {
     MoveTabNext,
     CloseTab,
     RenamePane,
+    RenameAgent,
     FocusPaneLeft,
     FocusPaneDown,
     FocusPaneUp,
@@ -70,6 +71,7 @@ pub(crate) enum KeybindAction {
     OpenNotificationTarget,
     Detach,
     OpenNavigator,
+    OpenCommandPalette,
 }
 
 pub(crate) fn resolve_direct_binding(
@@ -120,6 +122,7 @@ pub(crate) fn resolve_non_indexed_action(
         (&keybinds.move_tab_next, KeybindAction::MoveTabNext),
         (&keybinds.close_tab, KeybindAction::CloseTab),
         (&keybinds.rename_pane, KeybindAction::RenamePane),
+        (&keybinds.rename_agent, KeybindAction::RenameAgent),
         (&keybinds.edit_scrollback, KeybindAction::EditScrollback),
         (&keybinds.clear_pane, KeybindAction::ClearPane),
         (&keybinds.copy_mode, KeybindAction::CopyMode),
@@ -154,6 +157,7 @@ pub(crate) fn resolve_non_indexed_action(
         ),
         (&keybinds.detach, KeybindAction::Detach),
         (&keybinds.goto, KeybindAction::OpenNavigator),
+        (&keybinds.command_palette, KeybindAction::OpenCommandPalette),
     ] {
         if action_matches(bindings, key, dispatch) {
             return Some(action);
@@ -318,6 +322,19 @@ mod tests {
             resolve_prefix_binding(&keybinds, &one),
             Some(KeybindMatch::Action(KeybindAction::SwitchTab(0)))
         ));
+    }
+
+    #[test]
+    fn command_palette_uses_prefix_space_without_stealing_shell_ctrl_k() {
+        let keybinds = crate::config::Config::default().keybinds();
+        let palette_key = TerminalKey::new(KeyCode::Char(' '), KeyModifiers::empty());
+        let shell_key = TerminalKey::new(KeyCode::Char('k'), KeyModifiers::CONTROL);
+
+        assert!(matches!(
+            resolve_prefix_binding(&keybinds, &palette_key),
+            Some(KeybindMatch::Action(KeybindAction::OpenCommandPalette))
+        ));
+        assert!(resolve_direct_binding(&keybinds, &shell_key).is_none());
     }
 
     #[test]

@@ -1,0 +1,38 @@
+---
+title: Herdr Forge development build
+description: Build and install the downstream development fork beside Herdr without sharing runtime state.
+---
+
+Herdr Forge is the temporary name for this downstream development fork. It keeps Herdr's provider integrations and socket API, but it uses a separate binary, config directory, state directory, and socket.
+
+## Build and install
+
+From the repository root, run:
+
+```sh
+./scripts/install-herdr-forge.sh
+```
+
+The script builds the locked release target and installs `herdr-forge` to `~/.local/bin`. Set `HERDR_FORGE_INSTALL_DIR` to choose another binary directory. The script does not edit your shell configuration.
+
+Start the fork with:
+
+```sh
+herdr-forge
+```
+
+Release builds use these paths by default:
+
+- Config: `~/.config/herdr-forge/config.toml`
+- State and logs: `~/.local/state/herdr-forge/`
+- API and client sockets: below the fork config directory
+
+Debug builds use `herdr-forge-dev` directories. Upstream Herdr continues to use `herdr` or `herdr-dev`, so the two applications cannot attach to each other's default server.
+
+## Update and remove
+
+Herdr Forge does not consume upstream Herdr binary updates. To update, pull a reviewed fork revision and run the install script again.
+
+Remote attach discovers and installs the fork's own `herdr-forge` binary; it never discovers or downloads upstream `herdr`. Set `HERDR_REMOTE_BINARY` to an explicit fork binary or package to override that. Windows remote installation requires an explicit package until fork-owned Windows packages exist.
+
+To remove the fork, delete the `herdr-forge` binary. Its config and state stay in place until you explicitly remove the `herdr-forge` directories. Removing the fork does not touch upstream Herdr data.

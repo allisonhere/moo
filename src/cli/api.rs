@@ -55,7 +55,7 @@ fn api_schema(args: &[String]) -> std::io::Result<i32> {
 
 fn api_snapshot(args: &[String]) -> std::io::Result<i32> {
     if !args.is_empty() {
-        eprintln!("usage: herdr api snapshot");
+        eprintln!("usage: herdr-forge api snapshot");
         return Ok(2);
     }
 
@@ -89,21 +89,22 @@ fn schema_summary_text() -> std::io::Result<String> {
     schemas.sort();
 
     Ok(format!(
-        "Herdr API schema\nprotocol: {}\nschema_version: {}\nschemas: {}\n\nUse `herdr api schema --json` to print the full schema.\nUse `herdr api schema --output PATH` to write it to a file.\n",
+        "Herdr API schema\nprotocol: {}\nschema_version: {}\nschemas: {}\n\nUse `{binary} api schema --json` to print the full schema.\nUse `{binary} api schema --output PATH` to write it to a file.\n",
         protocol,
         schema_version,
-        schemas.join(", ")
+        schemas.join(", "),
+        binary = crate::product_identity::BINARY_NAME,
     ))
 }
 
 fn print_api_help() {
-    eprintln!("herdr api commands:");
+    eprintln!("{} api commands:", crate::product_identity::BINARY_NAME);
     eprintln!("  herdr api snapshot");
     eprintln!("  herdr api schema [--json | --output PATH]");
 }
 
 fn print_api_schema_help() {
-    eprintln!("usage: herdr api schema [--json | --output PATH]");
+    eprintln!("usage: herdr-forge api schema [--json | --output PATH]");
 }
 
 #[cfg(test)]
@@ -112,7 +113,7 @@ mod tests {
     fn schema_summary_text_stays_human_sized() {
         let text = super::schema_summary_text().unwrap();
         assert!(text.contains("Herdr API schema"));
-        assert!(text.contains("Use `herdr api schema --json`"));
+        assert!(text.contains("Use `herdr-forge api schema --json`"));
         assert!(text.len() < 400);
     }
 }

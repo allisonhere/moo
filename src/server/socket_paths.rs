@@ -51,7 +51,7 @@ pub(crate) fn derive_client_socket_from_api_socket(api_socket_path: &Path) -> Pa
     let stem = api_socket_path
         .file_stem()
         .and_then(|s| s.to_str())
-        .unwrap_or("herdr");
+        .unwrap_or(crate::product_identity::APP_DIR_NAME);
     let parent = api_socket_path.parent().unwrap_or_else(|| Path::new(""));
 
     parent.join(format!("{stem}-client.sock"))

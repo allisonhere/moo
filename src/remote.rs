@@ -33,7 +33,7 @@ pub(crate) fn run_remote_api_bridge(args: &[String]) -> std::io::Result<()> {
         }
         _ => Err(std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
-            "usage: herdr remote-api-bridge [--check]",
+            "usage: herdr-forge remote-api-bridge [--check]",
         )),
     }
 }
