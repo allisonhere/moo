@@ -857,6 +857,42 @@ mod tests {
     }
 
     #[test]
+    fn config_state_and_socket_roots_never_use_upstream_dirs() {
+        let _guard = crate::config::test_config_env_lock().lock().unwrap();
+        let saved: Vec<_> = ["XDG_CONFIG_HOME", "XDG_STATE_HOME"]
+            .into_iter()
+            .map(|key| (key, std::env::var_os(key)))
+            .collect();
+        std::env::remove_var("XDG_CONFIG_HOME");
+        std::env::remove_var("XDG_STATE_HOME");
+
+        let roots = [
+            config_dir(),
+            state_dir(),
+            crate::session::data_dir_for(None),
+            crate::session::api_socket_path_for(Some("named")),
+            crate::session::client_socket_path_for(None),
+        ];
+        for root in &roots {
+            let upstream = root
+                .components()
+                .any(|part| matches!(part.as_os_str().to_str(), Some("herdr" | "herdr-dev")));
+            assert!(
+                !upstream,
+                "{} resolves into an upstream herdr dir",
+                root.display()
+            );
+        }
+
+        for (key, value) in saved {
+            match value {
+                Some(value) => std::env::set_var(key, value),
+                None => std::env::remove_var(key),
+            }
+        }
+    }
+
+    #[test]
     fn config_loaders_report_unreadable_path() {
         let _guard = crate::config::test_config_env_lock().lock().unwrap();
         let path =
