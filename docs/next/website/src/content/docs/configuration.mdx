@@ -359,6 +359,15 @@ status_indicators = "symbols"
 
 The symbols are static, so this option does not enable spinner animation.
 
+To mark which tabs contain an agent, turn on **tab agent pill** in Settings or configure:
+
+```toml
+[ui]
+tab_agent_pill = true
+```
+
+Each tab that contains an agent then starts with a dot colored by the tab's agent status. It is off by default.
+
 ### Sidebar row layouts
 
 The expanded desktop sidebar renders each inner array in `rows` as one line. These are the complete default layouts:

@@ -1073,6 +1073,12 @@
           ]
         },
         {
+          "key": "ui.tab_agent_pill",
+          "type": "boolean",
+          "default": "false",
+          "description": "Show a status-colored dot at the start of each tab that contains an agent."
+        },
+        {
           "key": "ui.sidebar.agents.row_gap",
           "type": "integer",
           "default": "0",

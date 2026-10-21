@@ -170,6 +170,18 @@ pub(super) fn render_settings_overlay(
                 &mut choice_hits,
             );
         }
+        ClientSettingsSection::TabPill => {
+            render_choice_section(
+                buffer,
+                content,
+                "tab agent pill",
+                "show a status-colored dot on tabs that contain an agent",
+                &["on", "off"],
+                settings.selected,
+                palette,
+                &mut choice_hits,
+            );
+        }
         ClientSettingsSection::Sound => {
             render_choice_section(
                 buffer,

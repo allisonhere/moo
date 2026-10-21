@@ -528,3 +528,31 @@ fn close_confirmation_error_becomes_client_owned_overlay_and_stable_workspace_cl
             if params.workspace_id == "ws_1" && !params.close_group
     ));
 }
+
+#[test]
+fn tab_agent_pill_is_optional_and_only_marks_tabs_with_an_agent() {
+    let mut snapshot = snapshot();
+    snapshot.tabs[0].agent_status = AgentStatus::Blocked;
+    let tab_text = |pill: bool, agent_status: AgentStatus| {
+        let mut snapshot = snapshot.clone();
+        snapshot.tabs[0].agent_status = agent_status;
+        let mut config = ClientShellConfig::from_config(&Config::default());
+        config.tab_agent_pill = pill;
+        let mut state = ClientShellState::new(config);
+        state.set_snapshot(Box::new(snapshot));
+        state.set_pane_surface(surface());
+        let frame = state.compose(80, 20).expect("tab bar");
+        let rect = state.hits.tabs[0].0;
+        (rect.x..rect.right())
+            .map(|x| {
+                frame.cells[(rect.y * frame.width + x) as usize]
+                    .symbol
+                    .as_str()
+            })
+            .collect::<String>()
+    };
+
+    assert!(!tab_text(false, AgentStatus::Blocked).contains('●'));
+    assert!(tab_text(true, AgentStatus::Blocked).contains('●'));
+    assert!(!tab_text(true, AgentStatus::Unknown).contains('●'));
+}

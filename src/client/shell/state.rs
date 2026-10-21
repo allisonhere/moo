@@ -25,6 +25,7 @@ pub(crate) struct ClientShellConfig {
     pub(super) agents: crate::config::AgentsSidebarConfig,
     pub(super) agent_panel_sort: crate::config::AgentPanelSortConfig,
     pub(super) status_indicators: crate::config::StatusIndicatorStyle,
+    pub(super) tab_agent_pill: bool,
     pub(super) sound_enabled: bool,
     pub(super) toast_delivery: crate::config::ToastDelivery,
     pub(super) toast_delay_seconds: u64,
@@ -389,6 +390,7 @@ pub(super) struct ClientGlobalMenuOverlay {
 pub(super) enum ClientSettingsSection {
     Theme,
     Indicators,
+    TabPill,
     Sound,
     Toast,
     Integrations,
@@ -398,6 +400,7 @@ impl ClientSettingsSection {
     pub(super) const ALL: &[Self] = &[
         Self::Theme,
         Self::Indicators,
+        Self::TabPill,
         Self::Sound,
         Self::Toast,
         Self::Integrations,
@@ -407,6 +410,7 @@ impl ClientSettingsSection {
         match self {
             Self::Theme => "theme",
             Self::Indicators => "indicators",
+            Self::TabPill => "tab pill",
             Self::Sound => "sound",
             Self::Toast => "toasts",
             Self::Integrations => "integrations",

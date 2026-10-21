@@ -24,7 +24,7 @@ pub(crate) fn render_tab_bar(
     let desired_widths = tabs
         .iter()
         .map(|tab| {
-            let label = tab_label(tab);
+            let label = tab_label(tab, config.tab_agent_pill);
             display_width(&label).saturating_add(4).max(MIN_TAB_WIDTH)
         })
         .collect::<Vec<_>>();
@@ -92,7 +92,7 @@ pub(crate) fn render_tab_bar(
     let mut first_visible = None;
     let mut last_visible = None;
     for (index, tab) in tabs.iter().enumerate().skip(*tab_scroll) {
-        let name = tab_label(tab);
+        let name = tab_label(tab, config.tab_agent_pill);
         let desired = desired_widths[index];
         let remaining = tab_right.saturating_sub(x);
         let width = desired.min(remaining);
@@ -123,6 +123,18 @@ pub(crate) fn render_tab_bar(
             right_padding = padding.saturating_sub(left) as usize,
         );
         put_text(buffer, rect.x, rect.y, rect.width, &text, style);
+        if tab_shows_pill(tab, config.tab_agent_pill) && left < rect.width {
+            put_text(
+                buffer,
+                rect.x + left,
+                rect.y,
+                1,
+                TAB_PILL,
+                Style::default()
+                    .fg(status_color(tab.agent_status, palette))
+                    .bg(style.bg.unwrap_or(palette.surface0)),
+            );
+        }
         hits.tabs.push((rect, tab.tab_id.clone()));
         first_visible.get_or_insert(index);
         last_visible = Some(index);
@@ -371,11 +383,22 @@ fn max_tab_scroll(widths: &[u16], available: u16) -> usize {
     start
 }
 
-fn tab_label(tab: &ClientShellTab) -> String {
-    if tab.zoomed {
-        format!("{} Z", tab.label)
+const TAB_PILL: &str = "●";
+
+fn tab_shows_pill(tab: &ClientShellTab, enabled: bool) -> bool {
+    enabled && tab.agent_status != crate::api::schema::AgentStatus::Unknown
+}
+
+fn tab_label(tab: &ClientShellTab, pill: bool) -> String {
+    let lead = if tab_shows_pill(tab, pill) {
+        format!("{TAB_PILL} ")
     } else {
-        tab.label.clone()
+        String::new()
+    };
+    if tab.zoomed {
+        format!("{lead}{} Z", tab.label)
+    } else {
+        format!("{lead}{}", tab.label)
     }
 }
 
