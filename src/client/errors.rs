@@ -59,7 +59,7 @@ impl std::fmt::Display for ClientError {
             ClientError::ConnectionLost(err) => {
                 if let Ok(reattach_command) = std::env::var(crate::remote::REATTACH_COMMAND_ENV_VAR)
                 {
-                    write!(f, "lost connection to remote Herdr: {err}")?;
+                    write!(f, "lost connection to remote Moo: {err}")?;
                     write!(f, "\nIf the remote server survived the SSH or network drop, its panes may still be running.")?;
                     write!(f, "\nRun `{reattach_command}` to reattach")
                 } else {

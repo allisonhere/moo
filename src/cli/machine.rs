@@ -201,7 +201,7 @@ fn reconnect(args: &[String]) -> std::io::Result<i32> {
     }
     crate::remote::check_saved_ssh(&profile.target, &profile.session)?;
     println!(
-        "Machine {} is reachable. Open Herdr clients retry within 30 seconds.",
+        "Machine {} is reachable. Open Moo clients retry within 30 seconds.",
         profile.id
     );
     Ok(0)
@@ -385,7 +385,7 @@ fn add(args: &[String]) -> std::io::Result<i32> {
             .store(&metadata);
     }
     println!("Saved SSH machine {id}. Remote server is ready.");
-    println!("Open Herdr clients connect automatically.");
+    println!("Open Moo clients connect automatically.");
     Ok(0)
 }
 

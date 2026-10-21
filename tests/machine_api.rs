@@ -721,7 +721,7 @@ fn machine_api_usage_errors_do_not_connect() {
 #[test]
 fn machine_api_rejects_old_bridges_and_disconnected_machines() {
     for (mode, message) in [
-        ("old", "update Herdr"),
+        ("old", "update Moo"),
         ("offline", "test remote connection failed"),
     ] {
         let harness = Harness::new();

@@ -289,7 +289,7 @@ fn root_and_command_group_help_point_agents_to_plain_text_docs() {
             "Are you an AI? Use these resources ONLY IF your task specifically asks you to:",
             "https://herdr.dev/agent-guide.md",
             "https://herdr.dev/llms.txt",
-            "herdr --skill",
+            "moo --skill",
         ] {
             assert!(
                 stdout.contains(expected),
@@ -490,7 +490,7 @@ fn api_schema_default_output_is_a_short_summary() {
 
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("Herdr API schema"), "stdout: {stdout}");
+    assert!(stdout.contains("Moo API schema"), "stdout: {stdout}");
     assert!(
         stdout.contains("Use `moo api schema --json`"),
         "stdout: {stdout}"

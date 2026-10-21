@@ -19,9 +19,9 @@ use windows_sys::Win32::{
     UI::WindowsAndMessaging::*,
 };
 
-const APP_ID: &str = "Herdr.Desktop";
+const APP_ID: &str = "Moo.Desktop";
 const WINDOW_CLASS: &str = "HerdrNotificationActivation";
-const ACTIVATION_MESSAGE: &str = "Herdr.Notification.Activate";
+const ACTIVATION_MESSAGE: &str = "Moo.Notification.Activate";
 const SHOW_MESSAGE: u32 = WM_APP + 1;
 const ACTIVATOR: &str = "{D58C72D3-4548-4A40-B55B-092EF0B365C3}";
 
@@ -166,7 +166,7 @@ fn register(executable: &std::path::Path, scheme: &str) -> io::Result<()> {
         ));
     }
     let identity = RegistryKey::create(&format!(r"Software\Classes\AppUserModelId\{APP_ID}"))?;
-    identity.set("DisplayName", "Herdr")?;
+    identity.set("DisplayName", "Moo")?;
     // Unpackaged protocol toasts use a stub activator; no COM server is installed.
     identity.set("CustomActivator", ACTIVATOR)?;
     let protocol = RegistryKey::create(&format!(r"Software\Classes\{scheme}"))?;

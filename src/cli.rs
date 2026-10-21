@@ -46,12 +46,12 @@ const TERMINAL_SESSION_CONTROL_USAGE: &str =
     "usage: moo terminal session control <target> [--takeover] [--cols N] [--rows N]";
 pub(crate) const AGENT_HELP_FOOTER: &str = concat!(
     "Are you an AI? Use these resources ONLY IF your task specifically asks you to:\n",
-    "  Help a human understand or set up Herdr for the first time:\n",
+    "  Help a human understand or set up Moo for the first time:\n",
     "    https://herdr.dev/agent-guide.md\n",
-    "  Debug or investigate a problem with Herdr:\n",
+    "  Debug or investigate a problem with Moo:\n",
     "    https://herdr.dev/llms.txt\n",
-    "  Control Herdr panes, agents, or workspaces:\n",
-    "    SKIP if a Herdr skill is already in your context. Otherwise run: herdr --skill",
+    "  Control Moo panes, agents, or workspaces:\n",
+    "    SKIP if a Moo skill is already in your context. Otherwise run: moo --skill",
 );
 
 pub(crate) fn parse_token_assignment(raw: &str) -> Result<(String, Option<String>), String> {
@@ -220,10 +220,7 @@ fn channel_set(args: &[String]) -> std::io::Result<i32> {
         std::fs::create_dir_all(parent)?;
     }
     std::fs::write(&path, updated)?;
-    println!(
-        "Herdr update channel set to {channel} in {}.",
-        path.display()
-    );
+    println!("Moo update channel set to {channel} in {}.", path.display());
 
     match channel_set_install_action(
         crate::update::package_manager_channel_update_guidance_for_current_install(),
@@ -399,8 +396,8 @@ fn config_reset_keys(args: &[String]) -> std::io::Result<i32> {
         "Removed [keys], [keys.indexed], and [[keys.command]] from {}.",
         path.display()
     );
-    println!("Built-in v2 keybindings will apply after Herdr restarts or reloads config.");
-    println!("If a Herdr server is running, run `moo server reload-config` to apply this now.");
+    println!("Built-in v2 keybindings will apply after Moo restarts or reloads config.");
+    println!("If a Moo server is running, run `moo server reload-config` to apply this now.");
     println!(
         "To restore: cp {} {}",
         backup_path.display(),
@@ -731,11 +728,11 @@ pub(super) fn parse_attach_target(args: &[String], usage: &str) -> Result<(Strin
 
 pub(super) fn print_response(response: &serde_json::Value) -> std::io::Result<i32> {
     if response.get("error").is_some() {
-        eprintln!("{}", serde_json::to_string(response).unwrap());
+        eprintln!("{}", crate::api::json_string(response));
         return Ok(1);
     }
 
-    println!("{}", serde_json::to_string(response).unwrap());
+    println!("{}", crate::api::json_string(response));
     Ok(0)
 }
 
@@ -767,7 +764,7 @@ pub(super) fn send_ok_request(method: Method) -> std::io::Result<i32> {
     })?;
 
     if response.get("error").is_some() {
-        eprintln!("{}", serde_json::to_string(&response).unwrap());
+        eprintln!("{}", crate::api::json_string(&response));
         return Ok(1);
     }
 
@@ -968,13 +965,12 @@ fn print_session_table(sessions: &[crate::session::SessionInfo]) {
 fn print_session_error(code: &str, message: &str) {
     eprintln!(
         "{}",
-        serde_json::to_string(&serde_json::json!({
+        crate::api::json_string(&serde_json::json!({
             "error": {
                 "code": code,
                 "message": message,
             }
         }))
-        .unwrap()
     );
 }
 
@@ -1007,7 +1003,7 @@ fn print_session_help() {
 }
 
 fn _print_json<T: Serialize>(value: &T) {
-    println!("{}", serde_json::to_string(value).unwrap());
+    println!("{}", crate::api::json_string(value));
 }
 
 #[cfg(test)]

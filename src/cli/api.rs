@@ -89,7 +89,7 @@ fn schema_summary_text() -> std::io::Result<String> {
     schemas.sort();
 
     Ok(format!(
-        "Herdr API schema\nprotocol: {}\nschema_version: {}\nschemas: {}\n\nUse `{binary} api schema --json` to print the full schema.\nUse `{binary} api schema --output PATH` to write it to a file.\n",
+        "Moo API schema\nprotocol: {}\nschema_version: {}\nschemas: {}\n\nUse `{binary} api schema --json` to print the full schema.\nUse `{binary} api schema --output PATH` to write it to a file.\n",
         protocol,
         schema_version,
         schemas.join(", "),
@@ -112,7 +112,7 @@ mod tests {
     #[test]
     fn schema_summary_text_stays_human_sized() {
         let text = super::schema_summary_text().unwrap();
-        assert!(text.contains("Herdr API schema"));
+        assert!(text.contains("Moo API schema"));
         assert!(text.contains("Use `moo api schema --json`"));
         assert!(text.len() < 400);
     }

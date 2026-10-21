@@ -20,7 +20,7 @@ pub(crate) fn run_remote_api_bridge(args: &[String]) -> std::io::Result<()> {
                 std::io::Error::new(
                     error.kind(),
                     format!(
-                        "failed to connect to remote Herdr API socket {}: {error}",
+                        "failed to connect to remote Moo API socket {}: {error}",
                         path.display()
                     ),
                 )

@@ -288,9 +288,7 @@ pub(crate) fn resume() -> Input<Option<Vec<String>>> {
     })
     .value_name("RESUME_ARG")
     .configure(|arg| arg.required(false).num_args(0..).last(true))
-    .help(
-        "Command that resumes this session after a Herdr restart; starts with a plain command name",
-    )
+    .help("Command that resumes this session after a Moo restart; starts with a plain command name")
 }
 
 pub(crate) fn token() -> Input<HashMap<String, Option<String>>> {

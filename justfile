@@ -34,6 +34,8 @@ ui-hot-path-architecture-test:
 lint:
     cargo fmt --check
     cargo clippy --all-targets --locked -- -D warnings
+    # Production code only: the non-test bin build excludes #[cfg(test)] and tests/.
+    cargo clippy --bin moo --locked -- -D clippy::unwrap_used
 
 [script("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File")]
 [windows]

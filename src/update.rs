@@ -790,8 +790,8 @@ fn windows_installed_herdr_exe_path() -> Result<PathBuf, String> {
         return Ok(PathBuf::from(install_dir).join("herdr.exe"));
     }
 
-    let local_app_data = env::var_os("LOCALAPPDATA")
-        .ok_or("LOCALAPPDATA is not set; cannot locate Herdr install")?;
+    let local_app_data =
+        env::var_os("LOCALAPPDATA").ok_or("LOCALAPPDATA is not set; cannot locate Moo install")?;
     Ok(PathBuf::from(local_app_data)
         .join("Programs")
         .join("Herdr")
@@ -1133,7 +1133,7 @@ fn prompt_to_stop_old_servers_before_update(
 ) -> Result<bool, String> {
     if !io::stdin().is_terminal() {
         return Err(
-            "one or more Herdr sessions must stop for this update. Stop running Herdr sessions when ready, then run `moo update` again from an interactive terminal."
+            "one or more Moo sessions must stop for this update. Stop running Moo sessions when ready, then run `moo update` again from an interactive terminal."
                 .to_string(),
         );
     }
@@ -1264,7 +1264,7 @@ fn prompt_to_complete_plain_update(
     let (singular, plural) = target_group_nouns(&plans);
     let noun = if plans.len() == 1 { singular } else { plural };
     eprintln!(
-        "To complete the update, Herdr must stop {} running {}.",
+        "To complete the update, Moo must stop {} running {}.",
         plans.len(),
         noun
     );
@@ -1829,7 +1829,7 @@ fn print_running_session_update_outcomes(
                         release.label()
                     ),
                     None => eprintln!(
-                        "Run `{}`, then restart Herdr with the same socket override when ready to use {}.",
+                        "Run `{}`, then restart Moo with the same socket override when ready to use {}.",
                         outcome.stop_command,
                         release.label()
                     ),
@@ -1901,19 +1901,19 @@ pub(crate) fn update_install_command() -> &'static str {
 pub(crate) fn update_install_instruction(install_command: &str) -> String {
     match install_command {
         MOO_UPDATE_COMMAND => {
-            "detach, run `moo update`, then run Herdr again to reconnect".to_string()
+            "detach, run `moo update`, then run Moo again to reconnect".to_string()
         }
         HOMEBREW_UPDATE_COMMAND => {
-            "detach, run `brew update && brew upgrade herdr`, then run Herdr again to reconnect"
+            "detach, run `brew update && brew upgrade herdr`, then run Moo again to reconnect"
                 .to_string()
         }
         MISE_UPDATE_COMMAND => {
-            "detach, run `mise upgrade herdr`, then run Herdr again to reconnect".to_string()
+            "detach, run `mise upgrade herdr`, then run Moo again to reconnect".to_string()
         }
         NIX_UPDATE_COMMAND => {
-            "detach, update through Nix, then run Herdr again to reconnect".to_string()
+            "detach, update through Nix, then run Moo again to reconnect".to_string()
         }
-        command => format!("detach, run `{command}`, then run Herdr again to reconnect"),
+        command => format!("detach, run `{command}`, then run Moo again to reconnect"),
     }
 }
 
@@ -1956,7 +1956,7 @@ pub(crate) fn package_manager_channel_update_guidance_for_current_install() -> O
     } else if is_mise_managed_install() {
         Some("Use `mise upgrade herdr` to update mise installs.")
     } else if is_nix_managed_install() {
-        Some("Update through Nix to update Nix-managed Herdr installs.")
+        Some("Update through Nix to update Nix-managed Moo installs.")
     } else {
         None
     }
@@ -1965,14 +1965,14 @@ pub(crate) fn package_manager_channel_update_guidance_for_current_install() -> O
 fn preview_channel_rejection_for_exe_path(path: &Path) -> Option<&'static str> {
     if is_homebrew_managed_exe_path_following_links(path) {
         Some(
-            "preview channel is only available for direct Herdr installs; Homebrew installs update through `brew update && brew upgrade herdr`",
+            "preview channel is only available for direct Moo installs; Homebrew installs update through `brew update && brew upgrade herdr`",
         )
     } else if is_mise_managed_exe_path_following_links(path) {
         Some(
-            "preview channel is only available for direct Herdr installs; mise installs update through `mise upgrade herdr`",
+            "preview channel is only available for direct Moo installs; mise installs update through `mise upgrade herdr`",
         )
     } else if is_nix_store_exe_path_following_links(path) {
-        Some("preview channel is only available for direct Herdr installs; Nix installs update through Nix")
+        Some("preview channel is only available for direct Moo installs; Nix installs update through Nix")
     } else {
         None
     }
@@ -2129,7 +2129,7 @@ pub fn self_update(options: SelfUpdateOptions) -> Result<Version, String> {
     if is_homebrew_managed_install() {
         if channel == UpdateChannel::Preview {
             return Err(
-                "self-update is disabled for Homebrew installs; preview is only available for direct Herdr installs".into(),
+                "self-update is disabled for Homebrew installs; preview is only available for direct Moo installs".into(),
             );
         }
         return Err(format!(
@@ -2140,7 +2140,7 @@ pub fn self_update(options: SelfUpdateOptions) -> Result<Version, String> {
     if is_mise_managed_install() {
         if channel == UpdateChannel::Preview {
             return Err(
-                "self-update is disabled for mise installs; preview is only available for direct Herdr installs".into(),
+                "self-update is disabled for mise installs; preview is only available for direct Moo installs".into(),
             );
         }
         return Err(format!(
@@ -2151,11 +2151,11 @@ pub fn self_update(options: SelfUpdateOptions) -> Result<Version, String> {
     if is_nix_managed_install() {
         if channel == UpdateChannel::Preview {
             return Err(
-                "self-update is disabled for Nix installs; preview is only available for direct Herdr installs".into(),
+                "self-update is disabled for Nix installs; preview is only available for direct Moo installs".into(),
             );
         }
         return Err(
-            "self-update is disabled for Nix installs; update with `nix profile upgrade` or update the flake input that provides Herdr".into(),
+            "self-update is disabled for Nix installs; update with `nix profile upgrade` or update the flake input that provides Moo".into(),
         );
     }
 
@@ -2201,7 +2201,7 @@ pub fn self_update(options: SelfUpdateOptions) -> Result<Version, String> {
         eprintln!("installed {}", release.label());
         print_outdated_integration_notice_with_updated_binary(&updated_exe);
         eprintln!(
-            "Open a new terminal, or reconnect SSH, then start Herdr again to use the updated client. Running servers remain active; restart them later only if you need server-side changes from {}.",
+            "Open a new terminal, or reconnect SSH, then start Moo again to use the updated client. Running servers remain active; restart them later only if you need server-side changes from {}.",
             release.label()
         );
         print_saved_machine_update_notice();
@@ -2220,8 +2220,8 @@ pub fn self_update(options: SelfUpdateOptions) -> Result<Version, String> {
         if !options.live_handoff
             && !prompt_to_complete_plain_update(&server_update_decisions, &release)?
         {
-            eprintln!("Herdr was not updated.");
-            eprintln!("Stop running Herdr sessions when ready, then run `moo update` again.");
+            eprintln!("Moo was not updated.");
+            eprintln!("Stop running Moo sessions when ready, then run `moo update` again.");
             return Ok(current);
         }
         install_downloaded_update(downloaded_update)?;
@@ -2974,15 +2974,15 @@ mod tests {
     fn update_install_instruction_distinguishes_install_from_restart() {
         assert_eq!(
             update_install_instruction(MOO_UPDATE_COMMAND),
-            "detach, run `moo update`, then run Herdr again to reconnect"
+            "detach, run `moo update`, then run Moo again to reconnect"
         );
         assert_eq!(
             update_install_instruction(HOMEBREW_UPDATE_COMMAND),
-            "detach, run `brew update && brew upgrade herdr`, then run Herdr again to reconnect"
+            "detach, run `brew update && brew upgrade herdr`, then run Moo again to reconnect"
         );
         assert_eq!(
             update_install_instruction(MISE_UPDATE_COMMAND),
-            "detach, run `mise upgrade herdr`, then run Herdr again to reconnect"
+            "detach, run `mise upgrade herdr`, then run Moo again to reconnect"
         );
     }
 

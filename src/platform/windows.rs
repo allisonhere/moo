@@ -4263,7 +4263,7 @@ mod tests {
     fn windows_process_cwd_reads_normalized_child_launch_directory() {
         use std::path::PathBuf;
 
-        let name = format!("Herdr-Cwd-Case-{}", std::process::id());
+        let name = format!("Moo-Cwd-Case-{}", std::process::id());
         let cwd = std::env::temp_dir().join(&name);
         fs::create_dir_all(&cwd).expect("create cwd fixture");
         let cwd = super::normalize_cwd_for_launch_platform(&cwd);

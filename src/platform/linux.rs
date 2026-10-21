@@ -983,7 +983,7 @@ fn show_desktop_notification_with_command(
     }
 
     let mut cmd = command("notify-send");
-    cmd.arg("--app-name").arg("Herdr").arg("--").arg(title);
+    cmd.arg("--app-name").arg("Moo").arg("--").arg(title);
     if let Some(body) = body.filter(|body| !body.is_empty()) {
         cmd.arg(body);
     }
@@ -2260,7 +2260,7 @@ mod tests {
         assert!(shown);
         let args = std::fs::read_to_string(&path).expect("args file");
         let _ = std::fs::remove_file(&path);
-        assert_eq!(args, "--app-name\nHerdr\n--\n-danger\nbody\n");
+        assert_eq!(args, "--app-name\nMoo\n--\n-danger\nbody\n");
     }
 
     #[test]

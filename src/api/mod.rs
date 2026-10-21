@@ -19,6 +19,15 @@ use crate::api::schema::Request;
 
 pub const SOCKET_PATH_ENV_VAR: &str = "MOO_SOCKET_PATH";
 
+/// Serializes an API value. These types always serialize, but a failure must still
+/// produce a well-formed error response instead of panicking the server.
+pub(crate) fn json_string<T: serde::Serialize + ?Sized>(value: &T) -> String {
+    serde_json::to_string(value).unwrap_or_else(|error| {
+        tracing::error!(%error, "failed to serialize API value");
+        r#"{"error":{"code":"encode_failed","message":"failed to encode response"}}"#.to_owned()
+    })
+}
+
 pub(crate) fn request_changes_ui(request: &Request) -> bool {
     request.method.operation().changes_ui
 }

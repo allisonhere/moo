@@ -191,7 +191,7 @@ impl App {
             let space = crate::workspace::git_space_metadata(&path).ok_or_else(|| {
                 ApiFailure::new(
                     "not_git_worktree",
-                    "Herdr worktree actions require a path inside a Git work tree",
+                    "Moo worktree actions require a path inside a Git work tree",
                 )
             })?;
             if space.is_linked_worktree {
@@ -256,7 +256,7 @@ impl App {
         let Some(space) = git_space else {
             return Err(ApiFailure::new(
                 "not_git_worktree",
-                "Herdr worktree actions require a workspace inside a Git work tree",
+                "Moo worktree actions require a workspace inside a Git work tree",
             ));
         };
         if space.is_linked_worktree {

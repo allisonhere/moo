@@ -234,7 +234,7 @@ mod tests {
         for message in [
             "Permission denied (publickey)",
             "Host key verification failed",
-            "matching Herdr is not ready; install or update",
+            "matching Moo is not ready; install or update",
             "handshake rejected",
         ] {
             assert!(saved_ssh_failure_needs_attention(&io::Error::other(

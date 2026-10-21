@@ -133,7 +133,7 @@ pub(crate) fn check_saved_ssh(target: &str, session: &str) -> io::Result<()> {
                 Ok(())
             }
             _ => Err(io::Error::other(format!(
-                "remote Herdr server is stopped or incompatible; run `{}`",
+                "remote Moo server is stopped or incompatible; run `{}`",
                 super::saved_ssh_bootstrap_command(target, session),
             ))),
         }
@@ -206,7 +206,7 @@ impl SavedSshSetup {
             }
         }
         Err(io::Error::other(format!(
-            "could not discover remote Herdr sessions: {failure}; specify --remote-session to continue"
+            "could not discover remote Moo sessions: {failure}; specify --remote-session to continue"
         )))
     }
 
@@ -773,7 +773,7 @@ pub(crate) fn ssh_authentication_command(target: &str) -> io::Result<SshAuthenti
         ));
     }
     if !crate::platform::remote_ssh_config_paths().multiplexing {
-        return Err(io::Error::new(io::ErrorKind::Unsupported, "interactive SSH recovery requires Unix OpenSSH multiplexing; authenticate outside Herdr on this platform"));
+        return Err(io::Error::new(io::ErrorKind::Unsupported, "interactive SSH recovery requires Unix OpenSSH multiplexing; authenticate outside Moo on this platform"));
     }
     if !crate::config::Config::load()
         .config
@@ -1362,7 +1362,7 @@ fn windows_remote_install_command(remote_dir: &str, identity: &str, sha256: &str
     let package =
         crate::platform::quote_powershell_arg(&format!(r"{remote_dir}\herdr-windows-x86_64.zip"));
     windows_powershell_script_command(&format!(
-        r#"$herdrInstaller = {installer}; $herdrPackage = {package}; & powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $herdrInstaller -Channel {channel} -LocalPackagePath $herdrPackage -LocalPackageFormat zip -LocalPackageIdentity {identity} -LocalPackageSha256 {sha256}; if ($LASTEXITCODE -ne 0) {{ exit $LASTEXITCODE }}; $herdrHome = if ([string]::IsNullOrWhiteSpace($env:MOO_HOME)) {{ Join-Path $env:USERPROFILE '.herdr' }} else {{ $env:MOO_HOME }}; $activeJunction = Join-Path $herdrHome 'packages\standalone\current'; $activeTarget = [string](Get-Item -LiteralPath $activeJunction -Force -ErrorAction Stop).Target; if ([string]::IsNullOrWhiteSpace($activeTarget)) {{ throw 'Herdr installer did not activate a concrete release.' }}; $installedHerdr = Join-Path $activeTarget 'herdr.exe'; if (-not (Test-Path -LiteralPath $installedHerdr -PathType Leaf)) {{ throw 'Herdr installer result does not contain herdr.exe.' }}; $encodedResult = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes([System.IO.Path]::GetFullPath($installedHerdr))); [Console]::Out.WriteLine('{WINDOWS_REMOTE_INSTALL_RESULT_MARKER}' + $encodedResult); exit 0"#,
+        r#"$herdrInstaller = {installer}; $herdrPackage = {package}; & powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $herdrInstaller -Channel {channel} -LocalPackagePath $herdrPackage -LocalPackageFormat zip -LocalPackageIdentity {identity} -LocalPackageSha256 {sha256}; if ($LASTEXITCODE -ne 0) {{ exit $LASTEXITCODE }}; $herdrHome = if ([string]::IsNullOrWhiteSpace($env:MOO_HOME)) {{ Join-Path $env:USERPROFILE '.herdr' }} else {{ $env:MOO_HOME }}; $activeJunction = Join-Path $herdrHome 'packages\standalone\current'; $activeTarget = [string](Get-Item -LiteralPath $activeJunction -Force -ErrorAction Stop).Target; if ([string]::IsNullOrWhiteSpace($activeTarget)) {{ throw 'Moo installer did not activate a concrete release.' }}; $installedHerdr = Join-Path $activeTarget 'herdr.exe'; if (-not (Test-Path -LiteralPath $installedHerdr -PathType Leaf)) {{ throw 'Moo installer result does not contain herdr.exe.' }}; $encodedResult = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes([System.IO.Path]::GetFullPath($installedHerdr))); [Console]::Out.WriteLine('{WINDOWS_REMOTE_INSTALL_RESULT_MARKER}' + $encodedResult); exit 0"#,
         channel = crate::platform::quote_powershell_arg(current_channel()),
         identity = crate::platform::quote_powershell_arg(identity),
         sha256 = crate::platform::quote_powershell_arg(sha256),
@@ -1594,7 +1594,7 @@ pub(super) fn find_installed_remote_herdr(ssh: &RemoteSsh) -> io::Result<RemoteH
     Err(io::Error::new(
         io::ErrorKind::Unsupported,
         format!(
-            "matching Herdr is not ready on {}; run `herdr --remote {}` interactively to install or update it",
+            "matching Moo is not ready on {}; run `herdr --remote {}` interactively to install or update it",
             ssh.target(),
             ssh.target()
         ),
@@ -1703,7 +1703,7 @@ pub(super) fn discover_remote_api_metadata(
         if !metadata.is_valid() {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                "invalid remote Herdr executable path",
+                "invalid remote Moo executable path",
             ));
         }
         return Ok(metadata);
@@ -1727,7 +1727,7 @@ pub(super) fn discover_remote_api_metadata(
     }
     Err(io::Error::new(
         io::ErrorKind::Unsupported,
-        "remote Herdr does not support machine API forwarding; update Herdr on this machine",
+        "remote Moo does not support machine API forwarding; update Moo on this machine",
     ))
 }
 
@@ -2297,7 +2297,7 @@ fn confirm_remote_install_with_running_server(
             eprintln!("remote moo server on {target} is already compatible:");
             eprintln!("  server: v{}", version_label(version.as_deref()));
             eprintln!(
-                "Herdr will install {} without stopping the running remote server.",
+                "Moo will install {} without stopping the running remote server.",
                 current_version()
             );
         }
@@ -2321,7 +2321,7 @@ fn confirm_remote_install_with_running_server(
         eprintln!("remote moo server on {target} is currently running:");
         eprintln!("  server: v{}", version_label(version.as_deref()));
         eprintln!(
-            "Herdr will install {} and hand off live pane processes to the prepared server.",
+            "Moo will install {} and hand off live pane processes to the prepared server.",
             current_version()
         );
         return Ok(false);
@@ -2330,7 +2330,7 @@ fn confirm_remote_install_with_running_server(
     eprintln!("remote moo server on {target} is currently running:");
     eprintln!("  server: v{}", version_label(version.as_deref()));
     eprintln!(
-        "To complete the remote update, Herdr must stop the running remote server after installing."
+        "To complete the remote update, Moo must stop the running remote server after installing."
     );
     eprintln!("This stops active remote pane processes, including shells, agents, dev servers, and tests.");
     eprintln!();
@@ -2552,7 +2552,7 @@ fn confirm_remote_server_stop(
     match reason {
         RemoteServerRestartReason::EndpointProtocol => {
             eprintln!(
-                "the remote server predates Herdr's stable endpoint protocol and must update before this client can attach."
+                "the remote server predates Moo's stable endpoint protocol and must update before this client can attach."
             );
         }
         RemoteServerRestartReason::SurfaceInterest => {
@@ -2762,7 +2762,7 @@ fn preview_assets_for_build<'a>(
 fn remote_release_asset(asset_key: &str) -> io::Result<RemoteReleaseAsset> {
     if crate::build_info::is_preview() {
         let build_id = crate::build_info::build_id().ok_or_else(|| {
-            io::Error::other("preview client has no build id; set MOO_REMOTE_BINARY or install Herdr on the remote manually")
+            io::Error::other("preview client has no build id; set MOO_REMOTE_BINARY or install Moo on the remote manually")
         })?;
         let manifest_bytes = fetch_remote_manifest(PREVIEW_UPDATE_MANIFEST_URL)?;
         let manifest: RemotePreviewManifest =
@@ -2772,7 +2772,7 @@ fn remote_release_asset(asset_key: &str) -> io::Result<RemoteReleaseAsset> {
         let (protocol, assets) = preview_assets_for_build(&manifest, build_id)?;
         if protocol != CURRENT_PROTOCOL {
             return Err(io::Error::other(format!(
-                "preview manifest has build {build_id} protocol {protocol}, but this client needs protocol {CURRENT_PROTOCOL}; set {REMOTE_BINARY_ENV_VAR}=target/release/herdr or install a matching Herdr on the remote host manually"
+                "preview manifest has build {build_id} protocol {protocol}, but this client needs protocol {CURRENT_PROTOCOL}; set {REMOTE_BINARY_ENV_VAR}=target/release/herdr or install a matching Moo on the remote host manually"
             )));
         }
         return assets.get(asset_key).map(remote_asset_info).ok_or_else(|| {
@@ -2913,7 +2913,7 @@ for candidate in $candidates; do
         exit 0
     fi
 done
-printf '%s\n' 'remote Herdr does not support machine API forwarding; update Herdr on this machine' >&2
+printf '%s\n' 'remote Moo does not support machine API forwarding; update Moo on this machine' >&2
 exit 2"#,
         binary = crate::product_identity::BINARY_NAME,
         discovery = known_remote_binary_candidate_script(platform),
@@ -5282,13 +5282,13 @@ mod tests {
             windows_scp_target("example", r"C:\Temp\A+B%20 C\install.ps1"),
             "example:C:/Temp/A+B%20 C/install.ps1"
         );
-        let remote_dir = r"C:\Temp\Herdr O'Brien\测试";
+        let remote_dir = r"C:\Temp\Moo O'Brien\测试";
         assert_eq!(
             windows_scp_target(
                 "user@example",
                 &format!(r"{remote_dir}\herdr-windows-x86_64.zip")
             ),
-            "user@example:C:/Temp/Herdr O'Brien/测试/herdr-windows-x86_64.zip"
+            "user@example:C:/Temp/Moo O'Brien/测试/herdr-windows-x86_64.zip"
         );
         assert_eq!(
             windows_scp_target("ssh://user@example:2222", r"C:\Temp\install.ps1"),
@@ -5483,7 +5483,7 @@ function Get-Process {
         let executable = std::env::current_exe().expect("current test executable");
         assert_eq!(
             reattach_command(
-                r"C:\Program Files\Herdr\herdr.exe",
+                r"C:\Program Files\Moo\herdr.exe",
                 "host'name",
                 "work'name",
                 RemoteKeybindings::Local,

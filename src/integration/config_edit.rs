@@ -133,7 +133,7 @@ pub(crate) fn ensure_flat_command_hook(
         "type": "command",
         "command": command,
         "timeout": timeout_ms,
-        "description": "Report MastraCode agent state to Herdr",
+        "description": "Report MastraCode agent state to Moo",
     }));
     Ok(())
 }

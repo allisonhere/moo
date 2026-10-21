@@ -7,7 +7,7 @@ use super::super::projection::{self, ParseError};
 
 pub(crate) fn command() -> Command {
     Command::new("notification")
-        .about("Show Herdr notifications")
+        .about("Show Moo notifications")
         .subcommand_required(true)
         .subcommand(
             projection::command("show", NotificationShowProjection::arguments())

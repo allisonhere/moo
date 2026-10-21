@@ -1359,7 +1359,7 @@ impl App {
             }
         };
 
-        serde_json::to_string(&response).unwrap()
+        crate::api::json_string(&response)
     }
 
     fn handle_notification_show(

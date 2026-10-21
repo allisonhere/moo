@@ -895,10 +895,13 @@ impl PtyIoActorRunner {
         if Instant::now() >= *deadline {
             let enter = enter.clone();
             if enter.is_empty() {
-                let submission = self.active_submission.take().unwrap();
-                let _ = submission.reply.send(Ok(()));
+                if let Some(submission) = self.active_submission.take() {
+                    let _ = submission.reply.send(Ok(()));
+                }
             } else {
-                self.active_submission.as_mut().unwrap().phase = SubmissionPhase::WritingEnter;
+                if let Some(submission) = self.active_submission.as_mut() {
+                    submission.phase = SubmissionPhase::WritingEnter;
+                }
                 self.enqueue_submission_write(enter, SubmissionBoundary::Enter);
             }
         }
@@ -948,7 +951,9 @@ impl PtyIoActorRunner {
                 Ok(written) => {
                     self.current_write_offset += written;
                     if self.current_write_offset >= write.bytes.len() {
-                        let completed = self.pending_writes.pop_front().unwrap();
+                        let Some(completed) = self.pending_writes.pop_front() else {
+                            return Ok(None);
+                        };
                         self.current_write_offset = 0;
                         if let Some(boundary) = completed.boundary {
                             self.file.as_ref().flush()?;

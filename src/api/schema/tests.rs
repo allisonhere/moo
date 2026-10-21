@@ -32,7 +32,7 @@ fn rewrite_schema_refs(value: &mut serde_json::Value, schema_name: &str) {
 fn protocol_schema_document() -> serde_json::Value {
     serde_json::json!({
         "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "title": "Herdr API",
+        "title": "Moo API",
         "schema_version": 1,
         "protocol": crate::protocol::PROTOCOL_VERSION,
         "schemas": {

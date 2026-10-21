@@ -28,7 +28,7 @@ pub(crate) fn run_remote_client_bridge(args: &[String]) -> io::Result<()> {
         io::Error::new(
             err.kind(),
             format!(
-                "failed to connect to remote Herdr client socket {}: {err}",
+                "failed to connect to remote Moo client socket {}: {err}",
                 socket_path.display()
             ),
         )

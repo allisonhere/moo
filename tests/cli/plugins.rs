@@ -851,7 +851,7 @@ id = "example.layout"
 name = "Layout"
 version = "0.1.0"
 min_herdr_version = "0.6.10"
-description = "Apply a preferred Herdr layout"
+description = "Apply a preferred Moo layout"
 
 [[actions]]
 id = "apply"

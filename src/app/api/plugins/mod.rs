@@ -1339,7 +1339,7 @@ command = ["echo", " a", "first "]
                 "plugin-missing-min-herdr",
                 r#"
 id = "example.missing-min-herdr"
-name = "Missing Min Herdr"
+name = "Missing Min Moo"
 version = "0.1.0"
 platforms = ["linux", "macos", "windows"]
 "#,
@@ -1349,7 +1349,7 @@ platforms = ["linux", "macos", "windows"]
                 "plugin-invalid-min-herdr",
                 r#"
 id = "example.invalid-min-herdr"
-name = "Invalid Min Herdr"
+name = "Invalid Min Moo"
 version = "0.1.0"
 min_herdr_version = "soon"
 platforms = ["linux", "macos", "windows"]
@@ -1360,7 +1360,7 @@ platforms = ["linux", "macos", "windows"]
                 "plugin-future-min-herdr",
                 r#"
 id = "example.future-min-herdr"
-name = "Future Min Herdr"
+name = "Future Min Moo"
 version = "0.1.0"
 min_herdr_version = "999.0.0"
 platforms = ["linux", "macos", "windows"]
@@ -1876,7 +1876,7 @@ command = ["sh", "-c", '"$MOO_BIN_PATH" --list >/dev/null; printf "%s\n" "$?" > 
             assert_eq!(
                 (action_status.trim(), pane_status.trim()),
                 ("0", "0"),
-                "plugin action and pane must launch Herdr after its executable is replaced"
+                "plugin action and pane must launch Moo after its executable is replaced"
             );
             return;
         }

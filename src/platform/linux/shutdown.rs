@@ -50,12 +50,7 @@ async fn watch_connection(
     let inhibitor: zbus::zvariant::OwnedFd = manager
         .call(
             "Inhibit",
-            &(
-                "shutdown",
-                "Herdr",
-                "Save terminal workspace layout",
-                "delay",
-            ),
+            &("shutdown", "Moo", "Save terminal workspace layout", "delay"),
         )
         .await?;
     tracing::debug!("host shutdown notification ready");

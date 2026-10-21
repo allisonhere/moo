@@ -176,7 +176,7 @@ fn validate_running_server_compatibility(saved_federation: bool) -> io::Result<(
         "the stable endpoint generation is incompatible"
     };
     Err(io::Error::other(format!(
-        "This session needs one final server update before Herdr can attach ({requirement}).\n\nserver: v{} endpoint generation {}\nclient: v{} endpoint generation {}\n\n{}",
+        "This session needs one final server update before Moo can attach ({requirement}).\n\nserver: v{} endpoint generation {}\nclient: v{} endpoint generation {}\n\n{}",
         status.version.as_deref().unwrap_or("unknown"),
         endpoint_generation
             .map(|value| value.to_string())

@@ -530,7 +530,7 @@ fn main() -> io::Result<()> {
     if inherited_socket_belongs_to_another_product() {
         return Err(io::Error::new(
             io::ErrorKind::PermissionDenied,
-            "refusing to use a Herdr socket inherited from another product; run moo outside that managed pane",
+            "refusing to use a Moo socket inherited from another product; run moo outside that managed pane",
         ));
     }
     #[cfg(windows)]
@@ -720,7 +720,7 @@ fn main() -> io::Result<()> {
         println!("Options:");
         println!("  --session <name>    Use or create a named persistent session");
         println!("  --machine <label-or-id>  Run an API command on a saved SSH machine");
-        println!("  --remote <target>   Attach through SSH to a remote Herdr server");
+        println!("  --remote <target>   Attach through SSH to a remote Moo server");
         println!("  --remote-keybindings <local|server>");
         println!("                      Keybindings for --remote app attach (default: local)");
         println!("  --handoff           Opt into live handoff for update or remote attach");

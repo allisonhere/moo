@@ -764,9 +764,7 @@ fn live_installed_plugin_info(plugin_id: &str) -> std::io::Result<Option<Install
         }),
     })?;
     if response.get("error").is_some() {
-        return Err(std::io::Error::other(
-            serde_json::to_string(&response).unwrap(),
-        ));
+        return Err(std::io::Error::other(crate::api::json_string(&response)));
     }
     plugin_info_from_list_response(response)
 }
@@ -788,9 +786,7 @@ fn live_installed_plugins() -> std::io::Result<Vec<InstalledPluginInfo>> {
         method: Method::PluginList(PluginListParams { plugin_id: None }),
     })?;
     if response.get("error").is_some() {
-        return Err(std::io::Error::other(
-            serde_json::to_string(&response).unwrap(),
-        ));
+        return Err(std::io::Error::other(crate::api::json_string(&response)));
     }
     plugin_list_from_response(response)
 }

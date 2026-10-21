@@ -703,9 +703,8 @@ fn blit_frame_to_with_cursor_memory_and_clear_policy(
             let _ = writer.write_all(b"\x1b[2J");
         }
         write_all_cells(&mut writer, frame);
-    } else {
+    } else if let Some(prev) = prev {
         // Diff-based update: only write changed cells.
-        let prev = prev.unwrap();
         write_changed_cells(&mut writer, frame, prev);
     }
 

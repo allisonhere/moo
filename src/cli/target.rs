@@ -171,7 +171,7 @@ pub(super) fn remote_error(error: io::Error) -> io::Error {
 
 pub(super) fn restart_guidance() -> String {
     TARGET.with(|target| match target.borrow().as_ref() {
-        Some(target) => format!("Update Herdr and restart the server on machine '{}' (session {}). Stopping the server exits its pane processes.", target.profile.label, target.profile.session),
+        Some(target) => format!("Update Moo and restart the server on machine '{}' (session {}). Stopping the server exits its pane processes.", target.profile.label, target.profile.session),
         None => crate::session::active_restart_after_update_guidance(),
     })
 }

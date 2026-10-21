@@ -2109,7 +2109,7 @@ impl HeadlessServer {
                 size,
                 max,
             } => {
-                let detail = format!("Input message is {size} bytes; Herdr's limit is {max} bytes");
+                let detail = format!("Input message is {size} bytes; Moo's limit is {max} bytes");
                 let message = if matches!(
                     self.clients.get(&client_id).map(|client| &client.mode),
                     Some(ClientConnectionMode::ClientShell)
