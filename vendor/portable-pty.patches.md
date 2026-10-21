@@ -34,7 +34,7 @@ verifies the exact DLL and x64/ARM64 host hashes, rejects reparse points and
 unexpected files, then loads the DLL by absolute path with its dependency search
 limited to that directory and System32. Installations without a bundle continue
 using the ConPTY exports from the already loaded `kernel32.dll`. Set
-`HERDR_WINDOWS_CONPTY=system` to bypass the bundle during compatibility
+`MOO_WINDOWS_CONPTY=system` to bypass the bundle during compatibility
 recovery.
 
 remove when: upstream `portable-pty` exposes hash-verified app-local and system
