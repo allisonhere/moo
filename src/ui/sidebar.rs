@@ -131,6 +131,7 @@ pub(crate) fn resolved_token_spans(
             ResolvedTokenKind::StateText(text)
             | ResolvedTokenKind::Machine(text)
             | ResolvedTokenKind::Workspace(text)
+            | ResolvedTokenKind::Folder(text)
             | ResolvedTokenKind::Tab(text)
             | ResolvedTokenKind::Pane(text)
             | ResolvedTokenKind::Agent(text)
@@ -236,6 +237,7 @@ pub(crate) fn resolved_token_spans(
                 apply_token_style(workspace_style, token.style),
             )),
             ResolvedTokenKind::Machine(text)
+            | ResolvedTokenKind::Folder(text)
             | ResolvedTokenKind::Tab(text)
             | ResolvedTokenKind::Pane(text)
             | ResolvedTokenKind::Agent(text)

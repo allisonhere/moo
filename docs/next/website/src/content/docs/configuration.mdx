@@ -376,7 +376,7 @@ The expanded desktop sidebar renders each inner array in `rows` as one line. The
 [ui.sidebar.agents]
 row_gap = 0
 rows = [
-  ["state_icon", "machine", "workspace", "tab"],
+  ["state_icon", "machine", "folder", "tab"],
   ["agent"],
 ]
 
@@ -394,6 +394,7 @@ Agent rows accept these built-in tokens:
 - `state_text` — `idle`, `working`, `blocked`, `done`, or `unknown`, including a reported display label when present.
 - `machine` — machine label when the client has multiple machines; omitted for a single local machine.
 - `workspace` — workspace name.
+- `folder` — current folder of the agent's pane, falling back to the workspace name when unavailable.
 - `tab` — tab name when available.
 - `pane` — pane name when available.
 - `agent` — detected or reported agent display name.

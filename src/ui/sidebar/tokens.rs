@@ -15,6 +15,7 @@ pub(crate) enum ResolvedTokenKind {
     StateText(String),
     Machine(String),
     Workspace(String),
+    Folder(String),
     Tab(String),
     Pane(String),
     Agent(String),
@@ -30,6 +31,7 @@ impl ResolvedTokenKind {
             Self::StateText(value)
             | Self::Machine(value)
             | Self::Workspace(value)
+            | Self::Folder(value)
             | Self::Tab(value)
             | Self::Pane(value)
             | Self::Agent(value)
@@ -55,6 +57,7 @@ impl ResolvedToken {
 pub(crate) struct AgentTokenContext<'a> {
     pub(crate) machine: Option<&'a str>,
     pub(crate) workspace: &'a str,
+    pub(crate) folder: &'a str,
     pub(crate) tab: Option<&'a str>,
     pub(crate) pane: Option<&'a str>,
     pub(crate) agent_label: Option<&'a str>,
@@ -87,6 +90,9 @@ pub(crate) fn agent_rows(
                             .map(|value| ResolvedTokenKind::Machine(value.to_string())),
                         AgentSidebarToken::Workspace => {
                             Some(ResolvedTokenKind::Workspace(context.workspace.to_string()))
+                        }
+                        AgentSidebarToken::Folder => {
+                            Some(ResolvedTokenKind::Folder(context.folder.to_string()))
                         }
                         AgentSidebarToken::Tab => context
                             .tab
@@ -194,6 +200,7 @@ mod tests {
 
     struct Entry {
         workspace: String,
+        folder: String,
         tab: Option<String>,
         pane: Option<String>,
         agent_label: Option<String>,
@@ -206,6 +213,7 @@ mod tests {
     fn entry() -> Entry {
         Entry {
             workspace: "repo".into(),
+            folder: "feature".into(),
             tab: None,
             pane: None,
             agent_label: Some("pi".into()),
@@ -220,6 +228,7 @@ mod tests {
         AgentTokenContext {
             machine: None,
             workspace: &entry.workspace,
+            folder: &entry.folder,
             tab: entry.tab.as_deref(),
             pane: entry.pane.as_deref(),
             agent_label: entry.agent_label.as_deref(),
@@ -455,6 +464,32 @@ rows = [[{ token = "$load", rules = [{ lt = 50, hide = true }] }], ["workspace"]
                 ResolvedToken::unstyled(ResolvedTokenKind::Machine("Build".into())),
                 ResolvedToken::unstyled(ResolvedTokenKind::Workspace("repo".into())),
             ]]
+        );
+    }
+
+    #[test]
+    fn folder_and_agent_name_resolve_independently() {
+        let mut entry = entry();
+        entry.folder = "second-project".into();
+        entry.agent_label = Some("reviewer".into());
+        let config = AgentsSidebarConfig {
+            rows: vec![
+                vec![AgentSidebarToken::Folder],
+                vec![AgentSidebarToken::Agent],
+            ],
+            ..Default::default()
+        };
+
+        assert_eq!(
+            agent_rows(&config, context(&entry), "working"),
+            vec![
+                vec![ResolvedToken::unstyled(ResolvedTokenKind::Folder(
+                    "second-project".into()
+                ))],
+                vec![ResolvedToken::unstyled(ResolvedTokenKind::Agent(
+                    "reviewer".into()
+                ))],
+            ]
         );
     }
 

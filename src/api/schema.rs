@@ -83,7 +83,7 @@ operations::define_operations! {
     AgentRead(AgentReadParams) => "agent.read", false, false;
     AgentExplain(AgentTarget) => "agent.explain", false, false;
     AgentSendKeys(AgentSendKeysParams) => "agent.send_keys", true, false;
-    AgentRename(AgentRenameParams) => "agent.rename", true, false;
+    AgentRename(AgentRenameParams) => "agent.rename", true, true;
     AgentViewSet(AgentViewSetParams) => "agent.view.set", true, false;
     AgentViewClear(AgentViewClearParams) => "agent.view.clear", true, false;
     AgentFocus(AgentTarget) => "agent.focus", true, false;

@@ -110,6 +110,7 @@ pub enum AgentSidebarToken {
     StateText,
     Machine,
     Workspace,
+    Folder,
     Tab,
     Pane,
     Agent,
@@ -274,6 +275,7 @@ fn agent_token_name(token: &AgentSidebarToken) -> String {
         AgentSidebarToken::StateText => "state_text".into(),
         AgentSidebarToken::Machine => "machine".into(),
         AgentSidebarToken::Workspace => "workspace".into(),
+        AgentSidebarToken::Folder => "folder".into(),
         AgentSidebarToken::Tab => "tab".into(),
         AgentSidebarToken::Pane => "pane".into(),
         AgentSidebarToken::Agent => "agent".into(),
@@ -333,6 +335,7 @@ impl<'de> Deserialize<'de> for AgentSidebarToken {
                 ("state_text", Self::StateText),
                 ("machine", Self::Machine),
                 ("workspace", Self::Workspace),
+                ("folder", Self::Folder),
                 ("tab", Self::Tab),
                 ("pane", Self::Pane),
                 ("agent", Self::Agent),
@@ -444,7 +447,7 @@ impl Default for AgentsSidebarConfig {
                 vec![
                     AgentSidebarToken::StateIcon,
                     AgentSidebarToken::Machine,
-                    AgentSidebarToken::Workspace,
+                    AgentSidebarToken::Folder,
                     AgentSidebarToken::Tab,
                 ],
                 vec![AgentSidebarToken::Agent],
@@ -495,7 +498,7 @@ mod tests {
                 vec![
                     AgentSidebarToken::StateIcon,
                     AgentSidebarToken::Machine,
-                    AgentSidebarToken::Workspace,
+                    AgentSidebarToken::Folder,
                     AgentSidebarToken::Tab,
                 ],
                 vec![AgentSidebarToken::Agent],
@@ -518,7 +521,7 @@ mod tests {
         let config: crate::config::Config = toml::from_str(
             r#"
 [ui.sidebar.agents]
-rows = [["state_icon", "workspace"], ["state_text", "agent", "$summary"], ["terminal_title", "terminal_title_stripped", "$terminal_title"]]
+rows = [["state_icon", "workspace", "folder"], ["state_text", "agent", "$summary"], ["terminal_title", "terminal_title_stripped", "$terminal_title"]]
 row_gap = 1
 
 [ui.sidebar.agents.rows_by_agent]
@@ -530,6 +533,15 @@ row_gap = 3
 "#,
         )
         .expect("sidebar token config");
+
+        assert_eq!(
+            config.ui.sidebar.agents.rows[0],
+            vec![
+                AgentSidebarToken::StateIcon,
+                AgentSidebarToken::Workspace,
+                AgentSidebarToken::Folder,
+            ]
+        );
 
         assert_eq!(
             config.ui.sidebar.agents.rows[1],

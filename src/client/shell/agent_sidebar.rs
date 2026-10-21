@@ -266,6 +266,10 @@ pub(super) fn agent_row(
         .panes
         .iter()
         .find(|pane| pane.pane_id == agent.pane_id);
+    let folder = pane
+        .and_then(|pane| pane.cwd.as_deref())
+        .and_then(folder_name_from_cwd)
+        .unwrap_or(workspace.label.as_str());
     let tab_count = snapshot
         .tabs
         .iter()
@@ -301,6 +305,7 @@ pub(super) fn agent_row(
         crate::ui::AgentTokenContext {
             machine,
             workspace: &workspace.label,
+            folder,
             tab: tab_label,
             pane: agent
                 .title
@@ -323,6 +328,31 @@ pub(super) fn agent_row(
             .and_then(|tab| tab.color.as_deref())
             .and_then(crate::api::schema::TabColor::from_name),
     })
+}
+
+fn folder_name_from_cwd(cwd: &str) -> Option<&str> {
+    let trimmed = cwd.trim_end_matches(['/', '\\']);
+    if trimmed.is_empty() {
+        return (!cwd.is_empty()).then_some(cwd);
+    }
+    trimmed
+        .rsplit(['/', '\\'])
+        .next()
+        .filter(|folder| !folder.is_empty())
+}
+
+#[cfg(test)]
+mod folder_tests {
+    use super::folder_name_from_cwd;
+
+    #[test]
+    fn folder_name_supports_local_and_remote_path_styles() {
+        assert_eq!(folder_name_from_cwd("/work/first"), Some("first"));
+        assert_eq!(folder_name_from_cwd("/work/second/"), Some("second"));
+        assert_eq!(folder_name_from_cwd(r"C:\work\second"), Some("second"));
+        assert_eq!(folder_name_from_cwd("/"), Some("/"));
+        assert_eq!(folder_name_from_cwd(""), None);
+    }
 }
 
 pub(super) fn render_agent_row(

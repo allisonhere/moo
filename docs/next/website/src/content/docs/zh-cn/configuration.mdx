@@ -363,7 +363,7 @@ status_indicators = "symbols"
 [ui.sidebar.agents]
 row_gap = 0
 rows = [
-  ["state_icon", "machine", "workspace", "tab"],
+  ["state_icon", "machine", "folder", "tab"],
   ["agent"],
 ]
 
@@ -381,6 +381,7 @@ Agent 行支持以下内置 token：
 - `state_text` — `idle`、`working`、`blocked`、`done` 或 `unknown`；如果报告中包含显示标签，也会一并显示。
 - `machine` — 客户端连接多台机器时显示机器标签；只有一台本地机器时省略。
 - `workspace` — 工作区名称。
+- `folder` — 智能体窗格的当前文件夹；无法获取时使用工作区名称。
 - `tab` — 标签页名称（如有）。
 - `pane` — 窗格名称（如有）。
 - `agent` — 检测到或报告的智能体显示名称。
