@@ -28,8 +28,8 @@ jobs:
           DEPLOY_HOOK: ${{ secrets.MOO_WEBSITE_DEPLOY_HOOK }}
         run: |
           if [ -z "$DEPLOY_HOOK" ]; then
-            echo "::error::MOO_WEBSITE_DEPLOY_HOOK is not configured"
-            exit 1
+            echo "::notice::MOO_WEBSITE_DEPLOY_HOOK is not configured; skipping website deploy"
+            exit 0
           fi
           curl -fsS -X POST "$DEPLOY_HOOK" > /dev/null
           echo "Triggered private website deploy"
