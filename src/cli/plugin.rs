@@ -19,7 +19,7 @@ pub(crate) fn command() -> clap::Command {
 
 const PLUGIN_BUILD_OUTPUT_MAX_BYTES: usize = 64 * 1024;
 const PLUGIN_INSTALL_USAGE: &str =
-    "usage: herdr-forge plugin install [--ref REF] [--yes|-y] <owner>/<repo>[/subdir...]";
+    "usage: moo plugin install [--ref REF] [--yes|-y] <owner>/<repo>[/subdir...]";
 
 pub(super) fn run_plugin_command(args: &[String]) -> std::io::Result<i32> {
     match args.first().map(String::as_str) {
@@ -63,11 +63,11 @@ fn plugin_link(params: PluginLinkParams) -> std::io::Result<i32> {
 
 fn plugin_config_dir_command(args: &[String]) -> std::io::Result<i32> {
     let Some(plugin_id) = args.first() else {
-        eprintln!("usage: herdr-forge plugin config-dir <plugin_id>");
+        eprintln!("usage: moo plugin config-dir <plugin_id>");
         return Ok(2);
     };
     if args.len() != 1 {
-        eprintln!("usage: herdr-forge plugin config-dir <plugin_id>");
+        eprintln!("usage: moo plugin config-dir <plugin_id>");
         return Ok(2);
     }
     let path = crate::plugin_paths::plugin_config_dir(plugin_id);
@@ -388,11 +388,11 @@ fn install_github_plugin(
 
 fn plugin_uninstall(args: &[String]) -> std::io::Result<i32> {
     let Some(target) = args.first() else {
-        eprintln!("usage: herdr-forge plugin uninstall <plugin_id|owner/repo[/subdir...]>");
+        eprintln!("usage: moo plugin uninstall <plugin_id|owner/repo[/subdir...]>");
         return Ok(2);
     };
     if args.len() != 1 {
-        eprintln!("usage: herdr-forge plugin uninstall <plugin_id|owner/repo[/subdir...]>");
+        eprintln!("usage: moo plugin uninstall <plugin_id|owner/repo[/subdir...]>");
         return Ok(2);
     }
 

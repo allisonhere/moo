@@ -66,8 +66,8 @@ mod update;
 mod workspace;
 mod worktree;
 
-const DEFAULT_CONFIG: &str = r##"# Herdr Forge configuration
-# Place this file at ~/.config/herdr-forge/config.toml
+const DEFAULT_CONFIG: &str = r##"# Moo configuration
+# Place this file at ~/.config/moo/config.toml
 
 # Show first-run notification setup on startup.
 # Missing also shows onboarding; set false after you've chosen.
@@ -530,7 +530,7 @@ fn main() -> io::Result<()> {
     if inherited_socket_belongs_to_another_product() {
         return Err(io::Error::new(
             io::ErrorKind::PermissionDenied,
-            "refusing to use a Herdr socket inherited from another product; run herdr-forge outside that managed pane",
+            "refusing to use a Herdr socket inherited from another product; run moo outside that managed pane",
         ));
     }
     #[cfg(windows)]
@@ -602,7 +602,7 @@ fn main() -> io::Result<()> {
             }
             Err(err) => {
                 eprintln!("{err}");
-                eprintln!("usage: herdr-forge update [--handoff]");
+                eprintln!("usage: moo update [--handoff]");
                 std::process::exit(2);
             }
         };
@@ -621,105 +621,93 @@ fn main() -> io::Result<()> {
 
     if args.iter().any(|a| a == "--help" || a == "-h") {
         platform::begin_cli_output();
-        println!("herdr-forge — terminal workspace manager for AI coding agents");
+        println!("moo — terminal workspace manager for AI coding agents");
         println!();
-        println!("Usage: herdr-forge [options]");
-        println!("       herdr-forge --session <name> [options]");
-        println!("       herdr-forge --machine <label-or-id> <command>");
-        println!("       herdr-forge --remote <ssh-target> [--session <name>]");
-        println!("       herdr-forge session attach <name>");
-        println!("       herdr-forge completion zsh");
-        println!("       herdr-forge update [--handoff]");
-        println!("       herdr-forge channel set <stable|preview>");
-        println!("       herdr-forge machine <subcommand> ...");
-        println!("       herdr-forge server stop");
-        println!("       herdr-forge server reload-config");
-        println!("       herdr-forge api <subcommand> ...");
-        println!("       herdr-forge completion <shell>");
-        println!("       herdr-forge config <subcommand> ...");
-        println!("       herdr-forge channel <subcommand> ...");
-        println!("       herdr-forge workspace <subcommand> ...");
-        println!("       herdr-forge worktree <subcommand> ...");
-        println!("       herdr-forge tab <subcommand> ...");
-        println!("       herdr-forge notification <subcommand> ...");
-        println!("       herdr-forge agent <subcommand> ...");
-        println!("       herdr-forge pane <subcommand> ...");
-        println!("       herdr-forge session <subcommand> ...");
-        println!("       herdr-forge integration <subcommand> ...");
+        println!("Usage: moo [options]");
+        println!("       moo --session <name> [options]");
+        println!("       moo --machine <label-or-id> <command>");
+        println!("       moo --remote <ssh-target> [--session <name>]");
+        println!("       moo session attach <name>");
+        println!("       moo completion zsh");
+        println!("       moo update [--handoff]");
+        println!("       moo channel set <stable|preview>");
+        println!("       moo machine <subcommand> ...");
+        println!("       moo server stop");
+        println!("       moo server reload-config");
+        println!("       moo api <subcommand> ...");
+        println!("       moo completion <shell>");
+        println!("       moo config <subcommand> ...");
+        println!("       moo channel <subcommand> ...");
+        println!("       moo workspace <subcommand> ...");
+        println!("       moo worktree <subcommand> ...");
+        println!("       moo tab <subcommand> ...");
+        println!("       moo notification <subcommand> ...");
+        println!("       moo agent <subcommand> ...");
+        println!("       moo pane <subcommand> ...");
+        println!("       moo session <subcommand> ...");
+        println!("       moo integration <subcommand> ...");
         println!();
         println!("Common commands:");
         for (command, description) in [
-            ("herdr-forge", "Launch or attach to the persistent session"),
+            ("moo", "Launch or attach to the persistent session"),
             (
-                "herdr-forge status [server|client]",
+                "moo status [server|client]",
                 "Show local client and running server status",
             ),
+            ("moo update", "Explain how to install a newer fork build"),
+            ("moo completion zsh", "Generate shell completions for zsh"),
             (
-                "herdr-forge update",
-                "Explain how to install a newer fork build",
-            ),
-            (
-                "herdr-forge completion zsh",
-                "Generate shell completions for zsh",
-            ),
-            (
-                "herdr-forge server stop",
+                "moo server stop",
                 "Stop the running server via the API socket",
             ),
             (
-                "herdr-forge channel set <stable|preview>",
+                "moo channel set <stable|preview>",
                 "Choose the stable or preview update channel",
             ),
             (
-                "herdr-forge server reload-config",
+                "moo server reload-config",
                 "Reload config.toml in the running server",
             ),
             (
-                "herdr-forge config reset-keys",
+                "moo config reset-keys",
                 "Back up config.toml and remove custom keybindings",
             ),
             (
-                "herdr-forge channel <subcommand>",
+                "moo channel <subcommand>",
                 "Manage the stable or preview update channel",
             ),
+            ("moo machine <subcommand>", "Manage saved SSH machines"),
             (
-                "herdr-forge machine <subcommand>",
-                "Manage saved SSH machines",
-            ),
-            (
-                "herdr-forge api <subcommand>",
+                "moo api <subcommand>",
                 "Inspect socket API metadata and live runtime state",
             ),
             (
-                "herdr-forge workspace <subcommand>",
+                "moo workspace <subcommand>",
                 "Workspace helpers over the socket API",
             ),
             (
-                "herdr-forge worktree <subcommand>",
+                "moo worktree <subcommand>",
                 "Git worktree helpers over the socket API",
             ),
+            ("moo tab <subcommand>", "Tab helpers over the socket API"),
             (
-                "herdr-forge tab <subcommand>",
-                "Tab helpers over the socket API",
-            ),
-            (
-                "herdr-forge notification <subcommand>",
+                "moo notification <subcommand>",
                 "Notification helpers over the socket API",
             ),
             (
-                "herdr-forge agent <subcommand>",
+                "moo agent <subcommand>",
                 "Agent/terminal helpers over the socket API",
             ),
             (
-                "herdr-forge pane <subcommand>",
+                "moo pane <subcommand>",
                 "Pane control helpers over the socket API",
             ),
             (
-                "herdr-forge session <subcommand>",
+                "moo session <subcommand>",
                 "Manage named persistent sessions",
             ),
             (
-                "herdr-forge integration <subcommand>",
+                "moo integration <subcommand>",
                 "Manage built-in agent integrations",
             ),
         ] {
@@ -727,7 +715,7 @@ fn main() -> io::Result<()> {
         }
         println!();
         println!("Advanced commands:");
-        println!("  {:<32} Run as headless server", "herdr-forge server");
+        println!("  {:<32} Run as headless server", "moo server");
         println!();
         println!("Options:");
         println!("  --session <name>    Use or create a named persistent session");
@@ -752,7 +740,7 @@ fn main() -> io::Result<()> {
 
     if args.iter().any(|a| a == "--version" || a == "-V") {
         platform::begin_cli_output();
-        println!("herdr-forge {}", crate::build_info::version());
+        println!("moo {}", crate::build_info::version());
         return Ok(());
     }
 
@@ -894,7 +882,7 @@ mod tests {
     fn inherited_socket_requires_matching_fork_identity() {
         assert!(socket_product_mismatch(true, true, None));
         assert!(socket_product_mismatch(true, true, Some("herdr")));
-        assert!(!socket_product_mismatch(true, true, Some("herdr-forge")));
+        assert!(!socket_product_mismatch(true, true, Some("moo")));
         assert!(!socket_product_mismatch(true, false, None));
         assert!(!socket_product_mismatch(false, true, None));
     }

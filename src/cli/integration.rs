@@ -26,7 +26,7 @@ fn integration_status(args: &[String]) -> std::io::Result<i32> {
         [] => false,
         [flag] if flag == "--outdated-only" => true,
         _ => {
-            eprintln!("usage: herdr-forge integration status [--outdated-only]");
+            eprintln!("usage: moo integration status [--outdated-only]");
             return Ok(2);
         }
     };
@@ -147,13 +147,13 @@ fn parse_integration_target(
 ) -> std::io::Result<Option<IntegrationCommandTarget>> {
     let Some(target) = args.first().map(|arg| arg.as_str()) else {
         eprintln!(
-            "usage: herdr-forge integration {action} <pi|omp|claude|codex|copilot|devin|droid|kimi|opencode|kilo|hermes|qodercli|qwen|letta|cursor|mastracode|grok>"
+            "usage: moo integration {action} <pi|omp|claude|codex|copilot|devin|droid|kimi|opencode|kilo|hermes|qodercli|qwen|letta|cursor|mastracode|grok>"
         );
         return Ok(None);
     };
     if args.len() != 1 {
         eprintln!(
-            "usage: herdr-forge integration {action} <pi|omp|claude|codex|copilot|devin|droid|kimi|opencode|kilo|hermes|qodercli|qwen|letta|cursor|mastracode|grok>"
+            "usage: moo integration {action} <pi|omp|claude|codex|copilot|devin|droid|kimi|opencode|kilo|hermes|qodercli|qwen|letta|cursor|mastracode|grok>"
         );
         return Ok(None);
     }

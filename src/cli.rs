@@ -41,9 +41,9 @@ pub(crate) mod workspace_bindings;
 pub(crate) mod worktree;
 
 const TERMINAL_SESSION_OBSERVE_USAGE: &str =
-    "usage: herdr-forge terminal session observe <target> [--cols N] [--rows N]";
+    "usage: moo terminal session observe <target> [--cols N] [--rows N]";
 const TERMINAL_SESSION_CONTROL_USAGE: &str =
-    "usage: herdr-forge terminal session control <target> [--takeover] [--cols N] [--rows N]";
+    "usage: moo terminal session control <target> [--takeover] [--cols N] [--rows N]";
 pub(crate) const AGENT_HELP_FOOTER: &str = concat!(
     "Are you an AI? Use these resources ONLY IF your task specifically asks you to:\n",
     "  Help a human understand or set up Herdr for the first time:\n",
@@ -177,7 +177,7 @@ fn run_channel_command(args: &[String]) -> std::io::Result<i32> {
 
 fn channel_set(args: &[String]) -> std::io::Result<i32> {
     let Some(channel) = parse_channel_set_arg(args) else {
-        eprintln!("usage: herdr-forge channel set <stable|preview>");
+        eprintln!("usage: moo channel set <stable|preview>");
         return Ok(2);
     };
 
@@ -310,11 +310,11 @@ fn config_check(args: &[String]) -> std::io::Result<i32> {
     match args {
         [] => {}
         [flag] if matches!(flag.as_str(), "help" | "--help" | "-h") => {
-            eprintln!("usage: herdr-forge config check");
+            eprintln!("usage: moo config check");
             return Ok(0);
         }
         _ => {
-            eprintln!("usage: herdr-forge config check");
+            eprintln!("usage: moo config check");
             return Ok(2);
         }
     }
@@ -334,7 +334,7 @@ fn config_check(args: &[String]) -> std::io::Result<i32> {
 
 fn config_reset_keys(args: &[String]) -> std::io::Result<i32> {
     if !args.is_empty() {
-        eprintln!("usage: herdr-forge config reset-keys");
+        eprintln!("usage: moo config reset-keys");
         return Ok(2);
     }
 
@@ -469,15 +469,15 @@ fn session_attach_help(args: &[String]) -> std::io::Result<i32> {
         args.first().map(String::as_str),
         Some("help" | "--help" | "-h")
     ) {
-        eprintln!("usage: herdr-forge session attach <name>");
+        eprintln!("usage: moo session attach <name>");
         return Ok(0);
     }
-    eprintln!("usage: herdr-forge session attach <name>");
+    eprintln!("usage: moo session attach <name>");
     Ok(2)
 }
 
 fn session_list(args: &[String]) -> std::io::Result<i32> {
-    let json = match parse_session_json_only(args, "usage: herdr-forge session list [--json]") {
+    let json = match parse_session_json_only(args, "usage: moo session list [--json]") {
         Ok(json) => json,
         Err(code) => return Ok(code),
     };
@@ -494,13 +494,11 @@ fn session_list(args: &[String]) -> std::io::Result<i32> {
 }
 
 fn session_stop(args: &[String]) -> std::io::Result<i32> {
-    let (name, json) = match parse_session_name_and_json(
-        args,
-        "usage: herdr-forge session stop <name> [--json]",
-    ) {
-        Ok(parsed) => parsed,
-        Err(code) => return Ok(code),
-    };
+    let (name, json) =
+        match parse_session_name_and_json(args, "usage: moo session stop <name> [--json]") {
+            Ok(parsed) => parsed,
+            Err(code) => return Ok(code),
+        };
 
     let target = match crate::session::parse_target_name(&name) {
         Ok(target) => target,
@@ -529,13 +527,11 @@ fn session_stop(args: &[String]) -> std::io::Result<i32> {
 }
 
 fn session_delete(args: &[String]) -> std::io::Result<i32> {
-    let (name, json) = match parse_session_name_and_json(
-        args,
-        "usage: herdr-forge session delete <name> [--json]",
-    ) {
-        Ok(parsed) => parsed,
-        Err(code) => return Ok(code),
-    };
+    let (name, json) =
+        match parse_session_name_and_json(args, "usage: moo session delete <name> [--json]") {
+            Ok(parsed) => parsed,
+            Err(code) => return Ok(code),
+        };
 
     match crate::session::delete_session(&name) {
         Ok(session) => {
@@ -559,7 +555,7 @@ fn session_delete(args: &[String]) -> std::io::Result<i32> {
 fn terminal_attach(args: &[String]) -> std::io::Result<i32> {
     let (terminal_id, takeover) = match parse_attach_target(
         args,
-        "usage: herdr-forge terminal attach <terminal_id> [--takeover]",
+        "usage: moo terminal attach <terminal_id> [--takeover]",
     ) {
         Ok(parsed) => parsed,
         Err(code) => return Ok(code),

@@ -43,6 +43,6 @@ mod tests {
 
         output.clear();
         write_window_title(&mut output, None).unwrap();
-        assert_eq!(output, b"\x1b]0;Herdr Forge\x07");
+        assert_eq!(output, b"\x1b]0;Moo\x07");
     }
 }

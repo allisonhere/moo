@@ -124,7 +124,7 @@ fn spawn_client_process_with_args_and_env(
         })
         .unwrap();
 
-    let mut cmd = CommandBuilder::new(env!("CARGO_BIN_EXE_herdr-forge"));
+    let mut cmd = CommandBuilder::new(env!("CARGO_BIN_EXE_moo"));
     support::isolate_herdr_test_process(&mut cmd);
     cmd.args(args);
     cmd.env("HERDR_DISABLE_SOUND", "1");
@@ -185,7 +185,7 @@ fn spawn_server_with_config(
         })
         .unwrap();
 
-    let mut cmd = CommandBuilder::new(env!("CARGO_BIN_EXE_herdr-forge"));
+    let mut cmd = CommandBuilder::new(env!("CARGO_BIN_EXE_moo"));
     support::isolate_herdr_test_process(&mut cmd);
     cmd.arg("server");
     cmd.env("XDG_CONFIG_HOME", config_home);
@@ -248,9 +248,9 @@ fn first_pane_id_in_workspace(socket_path: &PathBuf, workspace_id: &str) -> Stri
 
 fn app_dir_name() -> &'static str {
     if cfg!(debug_assertions) {
-        "herdr-forge-dev"
+        "moo-dev"
     } else {
-        "herdr-forge"
+        "moo"
     }
 }
 
@@ -432,7 +432,7 @@ fn client_sees_headless_startup_config_diagnostic() {
         })
         .unwrap();
 
-    let mut cmd = CommandBuilder::new(env!("CARGO_BIN_EXE_herdr-forge"));
+    let mut cmd = CommandBuilder::new(env!("CARGO_BIN_EXE_moo"));
     support::isolate_herdr_test_process(&mut cmd);
     cmd.arg("server");
     cmd.env("XDG_CONFIG_HOME", &config_home);
@@ -496,7 +496,7 @@ fn server_unreachable_shows_clear_error() {
     )
     .unwrap();
 
-    let output = std::process::Command::new(env!("CARGO_BIN_EXE_herdr-forge"))
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_moo"))
         .arg("client")
         .env("HERDR_DISABLE_SOUND", "1")
         .env("XDG_CONFIG_HOME", &config_home)
@@ -1040,7 +1040,7 @@ fn federated_client_starts_without_local_and_survives_its_restart() {
     let bin = base.join("bin");
     fs::create_dir_all(&bin).unwrap();
     fs::create_dir_all(base.join("home")).unwrap();
-    std::os::unix::fs::symlink(env!("CARGO_BIN_EXE_herdr-forge"), bin.join("herdr-forge")).unwrap();
+    std::os::unix::fs::symlink(env!("CARGO_BIN_EXE_moo"), bin.join("moo")).unwrap();
     let quote =
         |path: &std::path::Path| format!("'{}'", path.display().to_string().replace('\'', "'\\''"));
     let ssh_commands = base.join("ssh-commands");
@@ -2075,7 +2075,7 @@ fn client_receives_notify_on_agent_state_change() {
         })
         .unwrap();
 
-    let mut cmd = CommandBuilder::new(env!("CARGO_BIN_EXE_herdr-forge"));
+    let mut cmd = CommandBuilder::new(env!("CARGO_BIN_EXE_moo"));
     support::isolate_herdr_test_process(&mut cmd);
     cmd.arg("server");
     cmd.env("XDG_CONFIG_HOME", &config_home);

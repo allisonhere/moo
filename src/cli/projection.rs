@@ -848,7 +848,7 @@ mod tests {
             );
         assert_eq!(
             group_commands(&group),
-            "herdr-forge group commands:\n  herdr-forge group label <id> [<LABEL>...] [--clear]\n  herdr-forge group nested numbers [--seq N] [--pattern TEXT]\n  herdr-forge group pick (--seq N | --pattern TEXT)"
+            "moo group commands:\n  moo group label <id> [<LABEL>...] [--clear]\n  moo group nested numbers [--seq N] [--pattern TEXT]\n  moo group pick (--seq N | --pattern TEXT)"
         );
     }
 

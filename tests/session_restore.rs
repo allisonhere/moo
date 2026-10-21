@@ -123,7 +123,7 @@ fn server_restores_while_git_metadata_is_blocked() {
         fs::write(data_dir.join("config.toml"),
             "onboarding = false\n[terminal]\ndefault_shell = \"/bin/sh\"\n[ui.sidebar.spaces]\nrows = [[\"workspace\"]]\n").unwrap();
         support::register_runtime_dir(&runtime_dir);
-        let child = Command::new(env!("CARGO_BIN_EXE_herdr-forge"))
+        let child = Command::new(env!("CARGO_BIN_EXE_moo"))
             .arg("server")
             .env("XDG_CONFIG_HOME", &config_home)
             .env("XDG_RUNTIME_DIR", &runtime_dir)

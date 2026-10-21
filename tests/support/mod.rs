@@ -11,9 +11,9 @@ use portable_pty::CommandBuilder;
 
 /// Application data directory owned by the binary under test.
 pub const APP_DIR_NAME: &str = if cfg!(debug_assertions) {
-    "herdr-forge-dev"
+    "moo-dev"
 } else {
-    "herdr-forge"
+    "moo"
 };
 
 pub fn app_dir_name() -> &'static str {
@@ -789,7 +789,7 @@ fn is_test_herdr_binary(path: &Path) -> bool {
     // custom target directories; binary identity alone never grants ownership.
     static TEST_BINARY: OnceLock<Option<PathBuf>> = OnceLock::new();
     TEST_BINARY
-        .get_or_init(|| fs::canonicalize(env!("CARGO_BIN_EXE_herdr-forge")).ok())
+        .get_or_init(|| fs::canonicalize(env!("CARGO_BIN_EXE_moo")).ok())
         .as_deref()
         .is_some_and(|binary| path == binary)
 }
@@ -930,7 +930,7 @@ mod tests {
 
     #[test]
     fn test_binary_matcher_accepts_cargo_test_binary() {
-        let binary = std::fs::canonicalize(env!("CARGO_BIN_EXE_herdr-forge"))
+        let binary = std::fs::canonicalize(env!("CARGO_BIN_EXE_moo"))
             .expect("Cargo-built binary must exist");
         assert!(
             is_test_herdr_binary(&binary),
@@ -941,7 +941,7 @@ mod tests {
     #[test]
     fn test_binary_matcher_rejects_other_binaries() {
         let nested_build = Path::new(env!("CARGO_MANIFEST_DIR")).join("other/target/debug/herdr");
-        let sibling_build = Path::new(env!("CARGO_BIN_EXE_herdr-forge"))
+        let sibling_build = Path::new(env!("CARGO_BIN_EXE_moo"))
             .parent()
             .unwrap()
             .join("other-build/herdr");

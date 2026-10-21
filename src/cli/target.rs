@@ -254,7 +254,7 @@ fn parse_machine_prefix(args: &[String]) -> Result<Option<(String, Vec<String>)>
         return Err("--machine cannot be combined with other launch options; it uses the saved machine's session".into());
     }
     if index >= args.len() || args[index] == "--" {
-        return Err("usage: herdr-forge --machine <label-or-id> <command>".into());
+        return Err("usage: moo --machine <label-or-id> <command>".into());
     }
     let mut cleaned = vec![args[0].clone()];
     cleaned.extend_from_slice(&args[index..]);

@@ -150,10 +150,7 @@ fn parse_shell(shell: &str) -> Option<Shell> {
 }
 
 fn print_completion_help() {
-    eprintln!(
-        "usage: herdr-forge completion <{}>",
-        supported_shells_usage()
-    );
+    eprintln!("usage: moo completion <{}>", supported_shells_usage());
 }
 
 #[cfg(test)]

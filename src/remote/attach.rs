@@ -493,10 +493,10 @@ impl RemoteHerdr {
         let (install_suffix, executable) = if platform.is_windows() {
             (
                 String::new(),
-                RemoteExecutable::WindowsPath("herdr-forge.exe".to_string()),
+                RemoteExecutable::WindowsPath("moo.exe".to_string()),
             )
         } else {
-            let install_suffix = ".local/bin/herdr-forge".to_string();
+            let install_suffix = ".local/bin/moo".to_string();
             let shell_path = format!("\"$HOME/{install_suffix}\"");
             (install_suffix, RemoteExecutable::PosixShellPath(shell_path))
         };
@@ -1651,7 +1651,7 @@ fn prepare_windows_remote_herdr(
             return Err(io::Error::new(
                 io::ErrorKind::Unsupported,
                 format!(
-                    "{} cannot safely install its Windows remote package yet; set {} to a herdr-forge.exe package",
+                    "{} cannot safely install its Windows remote package yet; set {} to a moo.exe package",
                     crate::product_identity::NAME,
                     REMOTE_BINARY_ENV_VAR
                 ),
@@ -1894,7 +1894,7 @@ fn remote_binary_candidates(
 
 fn windows_remote_binary_candidate_command() -> String {
     windows_powershell_script_command(&format!(
-        r#"function Emit-HerdrPath([string]$CandidatePath) {{ if ([string]::IsNullOrWhiteSpace($CandidatePath) -or -not (Test-Path -LiteralPath $CandidatePath -PathType Leaf)) {{ return }}; $candidateFullPath = [System.IO.Path]::GetFullPath($CandidatePath); $encodedCandidate = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($candidateFullPath)); [Console]::Out.WriteLine('{WINDOWS_REMOTE_PATH_MARKER}' + $encodedCandidate) }}; $pathCommand = Get-Command herdr-forge.exe -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1; if ($null -ne $pathCommand) {{ Emit-HerdrPath $pathCommand.Source }}; $userSid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value; Get-CimInstance Win32_Process -Filter "Name = 'herdr-forge.exe' OR Name = 'herdr-forge-dev.exe'" -ErrorAction SilentlyContinue | ForEach-Object {{ $owner = Invoke-CimMethod -InputObject $_ -MethodName GetOwnerSid -ErrorAction SilentlyContinue; if ($owner.ReturnValue -eq 0 -and $owner.Sid -eq $userSid) {{ Emit-HerdrPath $_.ExecutablePath }} }}; $herdrHome = if ([string]::IsNullOrWhiteSpace($env:HERDR_HOME)) {{ Join-Path $env:USERPROFILE '.herdr' }} else {{ $env:HERDR_HOME }}; $activeJunction = Get-Item -LiteralPath (Join-Path $herdrHome 'packages\standalone\current') -Force -ErrorAction SilentlyContinue; if ($null -ne $activeJunction -and -not [string]::IsNullOrWhiteSpace([string]$activeJunction.Target)) {{ Emit-HerdrPath (Join-Path ([string]$activeJunction.Target) 'herdr-forge.exe') }}; exit 0"#
+        r#"function Emit-HerdrPath([string]$CandidatePath) {{ if ([string]::IsNullOrWhiteSpace($CandidatePath) -or -not (Test-Path -LiteralPath $CandidatePath -PathType Leaf)) {{ return }}; $candidateFullPath = [System.IO.Path]::GetFullPath($CandidatePath); $encodedCandidate = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($candidateFullPath)); [Console]::Out.WriteLine('{WINDOWS_REMOTE_PATH_MARKER}' + $encodedCandidate) }}; $pathCommand = Get-Command moo.exe -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1; if ($null -ne $pathCommand) {{ Emit-HerdrPath $pathCommand.Source }}; $userSid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value; Get-CimInstance Win32_Process -Filter "Name = 'moo.exe' OR Name = 'moo-dev.exe'" -ErrorAction SilentlyContinue | ForEach-Object {{ $owner = Invoke-CimMethod -InputObject $_ -MethodName GetOwnerSid -ErrorAction SilentlyContinue; if ($owner.ReturnValue -eq 0 -and $owner.Sid -eq $userSid) {{ Emit-HerdrPath $_.ExecutablePath }} }}; $herdrHome = if ([string]::IsNullOrWhiteSpace($env:HERDR_HOME)) {{ Join-Path $env:USERPROFILE '.herdr' }} else {{ $env:HERDR_HOME }}; $activeJunction = Get-Item -LiteralPath (Join-Path $herdrHome 'packages\standalone\current') -Force -ErrorAction SilentlyContinue; if ($null -ne $activeJunction -and -not [string]::IsNullOrWhiteSpace([string]$activeJunction.Target)) {{ Emit-HerdrPath (Join-Path ([string]$activeJunction.Target) 'moo.exe') }}; exit 0"#
     ))
 }
 
@@ -1938,7 +1938,7 @@ emit() {
     fi
 }
 if [ -n "$home" ]; then
-    emit "$home/.local/bin/herdr-forge"
+    emit "$home/.local/bin/moo"
 fi
 "#,
     );
@@ -2116,7 +2116,7 @@ fn install_source_description_for(
     }
 
     if local_binary_can_seed_remote {
-        "the current local herdr-forge binary".to_string()
+        "the current local moo binary".to_string()
     } else {
         format!("an explicit {REMOTE_BINARY_ENV_VAR} path")
     }
@@ -2137,7 +2137,7 @@ fn resolve_install_source(
     Err(io::Error::new(
         io::ErrorKind::Unsupported,
         format!(
-            "no fork remote package is available for {}; set {} to a herdr-forge binary",
+            "no fork remote package is available for {}; set {} to a moo binary",
             platform.asset_key(),
             REMOTE_BINARY_ENV_VAR
         ),
@@ -2670,7 +2670,7 @@ fn warn_if_remote_bin_not_on_path(ssh: &RemoteSsh) -> io::Result<()> {
     }
 
     eprintln!(
-        "{}: installed remote binary to ~/.local/bin/herdr-forge, but the remote shell does not resolve `{binary}` to that path",
+        "{}: installed remote binary to ~/.local/bin/moo, but the remote shell does not resolve `{binary}` to that path",
         crate::product_identity::BINARY_NAME
     );
     Ok(())
@@ -2681,7 +2681,7 @@ fn remote_shell_resolves_managed_install(stdout: &str) -> bool {
         .lines()
         .next()
         .map(str::trim)
-        .is_some_and(|path| path.ends_with("/.local/bin/herdr-forge"))
+        .is_some_and(|path| path.ends_with("/.local/bin/moo"))
 }
 
 // Kept for when the fork publishes its own remote packages. The fork must never
@@ -4633,9 +4633,9 @@ mod tests {
 
     #[test]
     fn remote_install_stream_command_avoids_shell_c_wrapper() {
-        let command = remote_install_stream_command("/home/a b/.local/bin/herdr-forge.tmp.123");
+        let command = remote_install_stream_command("/home/a b/.local/bin/moo.tmp.123");
 
-        assert_eq!(command, "tee '/home/a b/.local/bin/herdr-forge.tmp.123'");
+        assert_eq!(command, "tee '/home/a b/.local/bin/moo.tmp.123'");
     }
 
     #[test]
@@ -5140,7 +5140,7 @@ mod tests {
 
     #[test]
     fn windows_remote_commands_use_one_encoded_powershell_grammar() {
-        let executable = RemoteExecutable::WindowsPath("herdr-forge.exe".to_string());
+        let executable = RemoteExecutable::WindowsPath("moo.exe".to_string());
         let commands = [
             (
                 "platform probe",
@@ -5150,42 +5150,42 @@ mod tests {
             (
                 "PATH lookup",
                 executable.exists_command(),
-                "if ($null -ne (Get-Command herdr-forge.exe -CommandType Application -ErrorAction SilentlyContinue)) { exit 0 }; exit 1",
+                "if ($null -ne (Get-Command moo.exe -CommandType Application -ErrorAction SilentlyContinue)) { exit 0 }; exit 1",
             ),
             (
                 "client status",
                 executable.status_client_command(),
-                "& herdr-forge.exe status client '--json'; exit $LASTEXITCODE",
+                "& moo.exe status client '--json'; exit $LASTEXITCODE",
             ),
             (
                 "named server status",
                 executable.session_command("agents", &["status", "server", "--json"]),
-                "& herdr-forge.exe '--session' agents status server '--json'; exit $LASTEXITCODE",
+                "& moo.exe '--session' agents status server '--json'; exit $LASTEXITCODE",
             ),
             (
                 "server stop",
                 executable.session_command("agents", &["server", "stop"]),
-                "& herdr-forge.exe '--session' agents server stop; exit $LASTEXITCODE",
+                "& moo.exe '--session' agents server stop; exit $LASTEXITCODE",
             ),
             (
                 "direct bridge",
                 executable.bridge_command("agents"),
-                "$process = Start-Process -FilePath herdr-forge.exe -ArgumentList '--session agents remote-client-bridge' -NoNewWindow -PassThru -ErrorAction Stop; $null = $process.Handle; $process.WaitForExit(); exit $process.ExitCode",
+                "$process = Start-Process -FilePath moo.exe -ArgumentList '--session agents remote-client-bridge' -NoNewWindow -PassThru -ErrorAction Stop; $null = $process.Handle; $process.WaitForExit(); exit $process.ExitCode",
             ),
             (
                 "API bridge with explicit default session",
                 remote_api_bridge_command(&RemoteHerdr::for_platform(RemotePlatform { os: "windows", arch: "x86_64" }), "default", false),
-                "$process = Start-Process -FilePath herdr-forge.exe -ArgumentList '--session default remote-api-bridge' -NoNewWindow -PassThru -ErrorAction Stop; $null = $process.Handle; $process.WaitForExit(); exit $process.ExitCode",
+                "$process = Start-Process -FilePath moo.exe -ArgumentList '--session default remote-api-bridge' -NoNewWindow -PassThru -ErrorAction Stop; $null = $process.Handle; $process.WaitForExit(); exit $process.ExitCode",
             ),
             (
                 "API bridge capability probe",
                 remote_api_bridge_command(&RemoteHerdr::for_platform(RemotePlatform { os: "windows", arch: "x86_64" }), "agents", true),
-                "$process = Start-Process -FilePath herdr-forge.exe -ArgumentList '--session agents remote-api-bridge --check' -NoNewWindow -PassThru -ErrorAction Stop; $null = $process.Handle; $process.WaitForExit(); exit $process.ExitCode",
+                "$process = Start-Process -FilePath moo.exe -ArgumentList '--session agents remote-api-bridge --check' -NoNewWindow -PassThru -ErrorAction Stop; $null = $process.Handle; $process.WaitForExit(); exit $process.ExitCode",
             ),
             (
                 "saved bridge with closed stdin",
                 executable.saved_bridge_command("agents"),
-                "$process = Start-Process -FilePath herdr-forge.exe -ArgumentList '--session agents remote-client-bridge' -NoNewWindow -PassThru -ErrorAction Stop; $null = $process.Handle; $process.WaitForExit(); exit $process.ExitCode",
+                "$process = Start-Process -FilePath moo.exe -ArgumentList '--session agents remote-client-bridge' -NoNewWindow -PassThru -ErrorAction Stop; $null = $process.Handle; $process.WaitForExit(); exit $process.ExitCode",
             ),
         ];
 
@@ -5345,7 +5345,7 @@ mod tests {
         );
 
         let command = decode_windows_command(&windows_remote_binary_candidate_command());
-        assert!(command.contains("Get-Command herdr-forge.exe"));
+        assert!(command.contains("Get-Command moo.exe"));
         assert!(command.contains("$activeJunction.Target"));
     }
 
@@ -5503,7 +5503,7 @@ function Get-Process {
             assert_eq!(
                 remote_api_bridge_command(&remote_herdr, session, false),
                 posix_remote_output_command(&format!(
-                    "exec \"$HOME/.local/bin/herdr-forge\" --session {session} remote-api-bridge"
+                    "exec \"$HOME/.local/bin/moo\" --session {session} remote-api-bridge"
                 ))
             );
         }
@@ -5538,11 +5538,11 @@ function Get-Process {
             remote_herdr
                 .executable
                 .bridge_command(crate::session::DEFAULT_SESSION_NAME),
-            "printf '\n%s\n' 'herdr-remote-output-ready:1'\nexec \"$HOME/.local/bin/herdr-forge\" remote-client-bridge"
+            "printf '\n%s\n' 'herdr-remote-output-ready:1'\nexec \"$HOME/.local/bin/moo\" remote-client-bridge"
         );
         assert_eq!(
             remote_herdr.executable.saved_bridge_command("agents"),
-            "exec \"$HOME/.local/bin/herdr-forge\" --session agents remote-client-bridge </dev/null"
+            "exec \"$HOME/.local/bin/moo\" --session agents remote-client-bridge </dev/null"
         );
     }
 
@@ -5649,7 +5649,7 @@ function Get-Process {
             arch: "x86_64",
         });
 
-        assert!(script.contains("emit \"$home/.local/bin/herdr-forge\""));
+        assert!(script.contains("emit \"$home/.local/bin/moo\""));
         assert!(!script.contains("mise/shims/herdr"));
         assert!(script.contains(&format!("version={}", shell_quote(&current_version()))));
         assert!(
@@ -5721,10 +5721,10 @@ function Get-Process {
     #[test]
     fn remote_shell_path_warning_accepts_managed_install() {
         assert!(remote_shell_resolves_managed_install(
-            "/home/can/.local/bin/herdr-forge\n"
+            "/home/can/.local/bin/moo\n"
         ));
         assert!(remote_shell_resolves_managed_install(
-            "/Users/can/.local/bin/herdr-forge\n"
+            "/Users/can/.local/bin/moo\n"
         ));
         assert!(!remote_shell_resolves_managed_install(
             "/usr/local/bin/herdr\n"
@@ -6084,7 +6084,7 @@ function Get-Process {
 
         assert_eq!(
             install_source_description_for(&platform, None, true),
-            "the current local herdr-forge binary"
+            "the current local moo binary"
         );
     }
 

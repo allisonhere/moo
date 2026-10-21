@@ -45,8 +45,8 @@ case "$*" in
         fi
         exit 1 ;;
 esac
-if [ "$last" = 'command -v herdr-forge' ]; then
-    if [ "$FAKE_INSTALLED" != missing ]; then echo /home/remote/.local/bin/herdr-forge; fi
+if [ "$last" = 'command -v moo' ]; then
+    if [ "$FAKE_INSTALLED" != missing ]; then echo /home/remote/.local/bin/moo; fi
     exit 0
 fi
 case "$last" in
@@ -61,7 +61,7 @@ case "$script" in
     *'uname -s'*) echo platform >>"$FAKE_ROOT/probes"; uname -s; uname -m ;;
     *'version='*)
         echo candidates >>"$FAKE_ROOT/probes"
-        if [ "$FAKE_INSTALLED" != missing ]; then echo /home/remote/.local/bin/herdr-forge; fi ;;
+        if [ "$FAKE_INSTALLED" != missing ]; then echo /home/remote/.local/bin/moo; fi ;;
     *'status client --json'*)
         if [ "$FAKE_INSTALLED" = new ] || [ -f "$FAKE_ROOT/installed" ]; then
             printf '%s\n' "$FAKE_CLIENT_STATUS"
@@ -87,7 +87,7 @@ case "$script" in
         echo start >>"$FAKE_ROOT/actions"; echo 'test startup failure' >&2; exit 1 ;;
     *'mkdir -p'*) printf '/fake/tmp\000/fake/herdr\000' ;;
     *'chmod 755'*) echo install >>"$FAKE_ROOT/actions"; touch "$FAKE_ROOT/installed" ;;
-    *'command -v herdr-forge'*) if [ "$FAKE_INSTALLED" != missing ]; then echo /home/remote/.local/bin/herdr-forge; fi ;;
+    *'command -v moo'*) if [ "$FAKE_INSTALLED" != missing ]; then echo /home/remote/.local/bin/moo; fi ;;
     *'test -x '*) exit 1 ;;
     *) echo "unexpected fake SSH script: $script" >&2; exit 1 ;;
 esac
@@ -161,14 +161,14 @@ fn setup_options(
         "onboarding = false\n[remote]\nmanage_ssh_config = false\n",
     )
     .unwrap();
-    let status = Command::new(env!("CARGO_BIN_EXE_herdr-forge"))
+    let status = Command::new(env!("CARGO_BIN_EXE_moo"))
         .args(["status", "client", "--json"])
         .output()
         .unwrap();
     assert!(status.status.success());
 
     let pair = native_pty_system().openpty(PtySize::default()).unwrap();
-    let mut command = CommandBuilder::new(env!("CARGO_BIN_EXE_herdr-forge"));
+    let mut command = CommandBuilder::new(env!("CARGO_BIN_EXE_moo"));
     if handoff {
         command.args(["--remote", "fake-host", "--handoff"]);
     } else {
@@ -328,7 +328,7 @@ fn machine_add_accepts_help_argument_order() {
         "onboarding = false\n[remote]\nmanage_ssh_config = false\n",
     )
     .unwrap();
-    let mut command = Command::new(env!("CARGO_BIN_EXE_herdr-forge"));
+    let mut command = Command::new(env!("CARGO_BIN_EXE_moo"));
     command.args(["machine", "add", "--label", "coder", "workstation.coder"]);
     // Reach remote preparation, but never execute SSH or start a server.
     command.env("PATH", root.join("no-executables"));

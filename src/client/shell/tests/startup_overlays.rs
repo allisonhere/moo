@@ -872,7 +872,7 @@ fn update_ready_menu_opens_client_owned_release_notes_and_dismisses_by_version()
         .join("\n");
     assert!(text.contains("v0.8.3"));
     assert!(text.contains("update ready"));
-    assert!(text.contains("detach, run herdr-forge update"));
+    assert!(text.contains("detach, run moo update"));
     assert!(!state.hits.release_notes_scrollbar.is_empty());
     let outer = crate::ui::centered_popup_rect(
         Rect::new(0, 0, 106, 30),
@@ -1090,7 +1090,7 @@ fn coalesced_release_notes_open_and_mouse_uses_current_geometry() {
     };
     let metrics = crate::ui::release_notes_scroll_metrics(
         &notes,
-        "herdr-forge update",
+        "moo update",
         stack.content,
         &state.config.palette,
     );

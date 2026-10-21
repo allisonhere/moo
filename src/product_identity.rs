@@ -1,9 +1,9 @@
 //! Product identity for this downstream fork.
 
-pub const NAME: &str = "Herdr Forge";
-pub const BINARY_NAME: &str = "herdr-forge";
-pub const APP_DIR_NAME: &str = "herdr-forge";
-pub const DEV_APP_DIR_NAME: &str = "herdr-forge-dev";
+pub const NAME: &str = "Moo";
+pub const BINARY_NAME: &str = "moo";
+pub const APP_DIR_NAME: &str = "moo";
+pub const DEV_APP_DIR_NAME: &str = "moo-dev";
 
 pub const fn supports_upstream_self_update() -> bool {
     false

@@ -646,7 +646,7 @@ fn config_check_rejects_json_output() {
     assert!(checked.stdout.is_empty());
     assert_eq!(
         String::from_utf8_lossy(&checked.stderr),
-        "usage: herdr-forge config check\n"
+        "usage: moo config check\n"
     );
 
     cleanup_test_base(&base);

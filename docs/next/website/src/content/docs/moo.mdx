@@ -1,19 +1,19 @@
 ---
-title: Herdr Forge
-description: Build, run, and use the downstream Herdr Forge development fork alongside upstream Herdr.
+title: Moo
+description: Build, run, and use the downstream Moo development fork alongside upstream Herdr.
 ---
 
-Herdr Forge is the temporary name for this downstream development fork. It keeps Herdr's terminal engine, agent detection, provider integrations, session format, and socket API, but runs as a separate application with its own binary, config, state, and sockets. It can sit next to upstream Herdr without either application attaching to the other's server.
+Moo is the temporary name for this downstream development fork. It keeps Herdr's terminal engine, agent detection, provider integrations, session format, and socket API, but runs as a separate application with its own binary, config, state, and sockets. It can sit next to upstream Herdr without either application attaching to the other's server.
 
 :::note
-Herdr Forge is a development build, not a published product. The name, install paths, and release process can change. Build it from a reviewed revision you trust.
+Moo is a development build, not a published product. The name, install paths, and release process can change. Build it from a reviewed revision you trust.
 :::
 
 ## Requirements
 
 - A Rust toolchain compatible with the repository. Use the `rust-toolchain`/`Cargo.lock` versions the checkout expects.
 - [Zig](https://ziglang.org/download/) 0.16.0 for the vendored libghostty-vt terminal core. Put `zig` on your `PATH`, or set `ZIG=/path/to/zig` before building.
-- A terminal emulator with normal ANSI and mouse support. Herdr Forge is a TUI, so it needs a real terminal.
+- A terminal emulator with normal ANSI and mouse support. Moo is a TUI, so it needs a real terminal.
 - Linux is the primary development target. macOS and Windows build support is inherited from upstream, but this fork is not yet validated on every platform.
 
 ## Build and install
@@ -23,15 +23,15 @@ Herdr Forge is a development build, not a published product. The name, install p
 From the repository root:
 
 ```sh
-./scripts/install-herdr-forge.sh
+./scripts/install-moo.sh
 ```
 
-The script builds the locked release target with `cargo build --release --locked --bin herdr-forge` and installs `herdr-forge` to `~/.local/bin` by default. Set `HERDR_FORGE_INSTALL_DIR` to choose another binary directory. The script does not edit your shell configuration.
+The script builds the locked release target with `cargo build --release --locked --bin moo` and installs `moo` to `~/.local/bin` by default. Set `MOO_INSTALL_DIR` to choose another binary directory. The script does not edit your shell configuration.
 
 Make sure the install directory is on your `PATH`, then start it:
 
 ```sh
-herdr-forge
+moo
 ```
 
 ### Run from the checkout
@@ -39,51 +39,51 @@ herdr-forge
 For development, run the debug binary directly:
 
 ```sh
-cargo run --bin herdr-forge
+cargo run --bin moo
 ```
 
 or, after a build:
 
 ```sh
-./target/debug/herdr-forge
+./target/debug/moo
 ```
 
-Debug builds use the `herdr-forge-dev` directories, so they do not share state with a release install or with upstream Herdr.
+Debug builds use the `moo-dev` directories, so they do not share state with a release install or with upstream Herdr.
 
 ## Run
 
 Start the TUI where you want to work:
 
 ```sh
-herdr-forge
+moo
 ```
 
-The first launch creates a config file and onboarding state. Detach with `prefix+q` (the default prefix is `ctrl+b`) and reattach with `herdr-forge`.
+The first launch creates a config file and onboarding state. Detach with `prefix+q` (the default prefix is `ctrl+b`) and reattach with `moo`.
 
 Useful commands:
 
 ```sh
-herdr-forge --version
-herdr-forge --help
-herdr-forge --default-config
-herdr-forge status server --json
-herdr-forge workspace list
+moo --version
+moo --help
+moo --default-config
+moo status server --json
+moo workspace list
 ```
 
 ## Separate identity
 
-Herdr Forge keeps upstream's environment variable names, session file format, and socket protocol. Only the application identity and filesystem paths change:
+Moo keeps upstream's environment variable names, session file format, and socket protocol. Only the application identity and filesystem paths change:
 
-| | Upstream Herdr | Herdr Forge release | Herdr Forge debug |
+| | Upstream Herdr | Moo release | Moo debug |
 | --- | --- | --- | --- |
-| Binary | `herdr` | `herdr-forge` | `herdr-forge` |
-| Config | `~/.config/herdr` | `~/.config/herdr-forge` | `~/.config/herdr-forge-dev` |
-| State and logs | `~/.local/state/herdr` | `~/.local/state/herdr-forge` | `~/.local/state/herdr-forge-dev` |
+| Binary | `herdr` | `moo` | `moo` |
+| Config | `~/.config/herdr` | `~/.config/moo` | `~/.config/moo-dev` |
+| State and logs | `~/.local/state/herdr` | `~/.local/state/moo` | `~/.local/state/moo-dev` |
 | Default sockets | under the config directory | under the config directory | under the config directory |
 
 The socket file names remain `herdr.sock` and `herdr-client.sock` inside the fork's own config directory. The `HERDR_*` environment names are unchanged so agents, plugins, and integrations continue to work.
 
-Herdr Forge tags panes it launches with `HERDR_PRODUCT_ID=herdr-forge`. If it inherits a socket from a managed pane belonging to another product, it refuses to reuse that socket instead of attaching to an incompatible server.
+Moo tags panes it launches with `HERDR_PRODUCT_ID=moo`. If it inherits a socket from a managed pane belonging to another product, it refuses to reuse that socket instead of attaching to an incompatible server.
 
 ## What's different
 
@@ -102,8 +102,8 @@ To rename an agent:
 - Use the CLI from another terminal:
 
 ```sh
-herdr-forge agent rename <target> <name>
-herdr-forge agent rename <target> --clear
+moo agent rename <target> <name>
+moo agent rename <target> --clear
 ```
 
 Targets accept a unique live agent name or the pane ID that currently hosts the agent. Names must start with a lowercase letter and contain only lowercase letters, digits, `-`, or `_`, up to 32 characters.
@@ -112,22 +112,22 @@ A user-assigned name takes precedence over integration-provided display labels, 
 
 ### Remote machines
 
-Remote attach and saved SSH machines discover the fork's own `herdr-forge` binary on the remote host; they never discover or download upstream `herdr`.
+Remote attach and saved SSH machines discover the fork's own `moo` binary on the remote host; they never discover or download upstream `herdr`.
 
-- For a same-platform POSIX remote, Herdr Forge installs the local fork binary when the remote copy is missing or older.
+- For a same-platform POSIX remote, Moo installs the local fork binary when the remote copy is missing or older.
 - Set `HERDR_REMOTE_BINARY` to an explicit fork binary or package to override the install source.
-- Windows remote installation requires an explicit package until fork-owned Windows packages exist. Herdr Forge will not fall back to an upstream Herdr asset.
+- Windows remote installation requires an explicit package until fork-owned Windows packages exist. Moo will not fall back to an upstream Herdr asset.
 - SSH authentication, host-key handling, and connection setup are inherited from upstream.
 
 ## Configuration
 
-Herdr Forge reads `config.toml` from its own config directory. Print the full default config with:
+Moo reads `config.toml` from its own config directory. Print the full default config with:
 
 ```sh
-herdr-forge --default-config
+moo --default-config
 ```
 
-The [config reference](/docs/config-reference/) lists every setting and keybinding. The rest of the upstream documentation applies, with `herdr-forge` in place of `herdr`:
+The [config reference](/docs/config-reference/) lists every setting and keybinding. The rest of the upstream documentation applies, with `moo` in place of `herdr`:
 
 - [Supported agents](/docs/agents/)
 - [Keyboard](/docs/keyboard/)
@@ -147,22 +147,22 @@ rename_agent = "prefix+shift+a"
 
 ## Update
 
-Herdr Forge does not consume upstream Herdr updates. To update, pull a reviewed fork revision and run the install script again:
+Moo does not consume upstream Herdr updates. To update, pull a reviewed fork revision and run the install script again:
 
 ```sh
 git pull
-./scripts/install-herdr-forge.sh
+./scripts/install-moo.sh
 ```
 
-`herdr-forge update` explains this instead of downloading an upstream binary.
+`moo update` explains this instead of downloading an upstream binary.
 
 ## Remove
 
-Delete the `herdr-forge` binary. Its config and state remain until you explicitly remove the `herdr-forge` or `herdr-forge-dev` directories:
+Delete the `moo` binary. Its config and state remain until you explicitly remove the `moo` or `moo-dev` directories:
 
 ```sh
-rm -f ~/.local/bin/herdr-forge
-rm -rf ~/.config/herdr-forge ~/.local/state/herdr-forge
+rm -f ~/.local/bin/moo
+rm -rf ~/.config/moo ~/.local/state/moo
 ```
 
 Removing the fork does not touch upstream Herdr data.
@@ -174,17 +174,17 @@ Removing the fork does not touch upstream Herdr data.
 Install Zig 0.16.0 and put it on `PATH`, or point the build at it:
 
 ```sh
-ZIG=/path/to/zig cargo build --release --locked --bin herdr-forge
+ZIG=/path/to/zig cargo build --release --locked --bin moo
 ```
 
 ### `refusing to use a Herdr socket inherited from another product`
 
-You launched Herdr Forge inside a managed pane belonging to another product, such as upstream Herdr. Start it from a normal terminal instead. If you intentionally want to bypass the inherited socket, clear the relevant variables:
+You launched Moo inside a managed pane belonging to another product, such as upstream Herdr. Start it from a normal terminal instead. If you intentionally want to bypass the inherited socket, clear the relevant variables:
 
 ```sh
 env -u HERDR_ENV -u HERDR_PRODUCT_ID \
     -u HERDR_SOCKET_PATH -u HERDR_CLIENT_SOCKET_PATH \
-    herdr-forge
+    moo
 ```
 
 ### Nested Herdr is blocked
@@ -196,7 +196,7 @@ Run outside the other Herdr session, or opt in explicitly in the fork config:
 allow_nested = true
 ```
 
-### `herdr-forge: command not found`
+### `moo: command not found`
 
 Add the install directory to your `PATH`, for example `~/.local/bin`.
 
@@ -206,7 +206,7 @@ Set `HERDR_REMOTE_BINARY` to a compatible fork binary or package for the target 
 
 ### Logs
 
-Find the server log in the fork's config directory, for example `~/.config/herdr-forge/herdr-server.log`.
+Find the server log in the fork's config directory, for example `~/.config/moo/herdr-server.log`.
 
 ## Development
 
@@ -224,10 +224,10 @@ The fork adds no telemetry, cloud account, or network dependency of its own. It 
 
 ## Current limitations
 
-- The name **Herdr Forge** is temporary while product branding is undecided.
+- The name **Moo** is temporary while product branding is undecided.
 - There are no fork-owned release downloads, update channel, or remote packages yet. POSIX remotes seed the local fork binary; Windows remotes need an explicit package.
 - The larger agent workspace features are still in progress: a unified agent dashboard, attention queue, activity history, and multi-agent orchestration are not part of this build.
 
 ## Licensing
 
-Herdr Forge preserves the upstream Git history and the Apache-2.0 `LICENSE`. Keep the license text and upstream copyright notices when you redistribute a build.
+Moo preserves the upstream Git history and the Apache-2.0 `LICENSE`. Keep the license text and upstream copyright notices when you redistribute a build.

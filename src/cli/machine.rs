@@ -60,7 +60,7 @@ fn list(args: &[String]) -> std::io::Result<i32> {
         [] => false,
         [flag] if flag == "--json" => true,
         _ => {
-            eprintln!("usage: herdr-forge machine list [--json]");
+            eprintln!("usage: moo machine list [--json]");
             return Ok(2);
         }
     };
@@ -115,7 +115,7 @@ fn status(args: &[String]) -> std::io::Result<i32> {
         } else if !arg.starts_with('-') && selector.is_none() {
             selector = Some(arg.as_str());
         } else {
-            eprintln!("usage: herdr-forge machine status [<label-or-id>] [--json]");
+            eprintln!("usage: moo machine status [<label-or-id>] [--json]");
             return Ok(2);
         }
     }
@@ -179,7 +179,7 @@ fn status(args: &[String]) -> std::io::Result<i32> {
 fn reconnect(args: &[String]) -> std::io::Result<i32> {
     use std::io::IsTerminal;
     let [selector] = args else {
-        eprintln!("usage: herdr-forge machine reconnect <label-or-id>");
+        eprintln!("usage: moo machine reconnect <label-or-id>");
         return Ok(2);
     };
     let catalog = load_catalog()?;
@@ -251,8 +251,7 @@ fn parse_add_args(args: &[String]) -> Result<AddArgs, String> {
         }
     }
     let target = target.ok_or_else(|| {
-        "usage: herdr-forge machine add <ssh-target> [--label <label>] [--remote-session <name>]"
-            .to_owned()
+        "usage: moo machine add <ssh-target> [--label <label>] [--remote-session <name>]".to_owned()
     })?;
     Ok(AddArgs {
         target,
@@ -470,11 +469,11 @@ fn render_remote_session_picker(
 fn rename(args: &[String]) -> std::io::Result<i32> {
     let args = super::expand_equals_args(args, &["--label"]);
     let [raw_id, flag, label] = args.as_slice() else {
-        eprintln!("usage: herdr-forge machine rename <profile-id> --label <label>");
+        eprintln!("usage: moo machine rename <profile-id> --label <label>");
         return Ok(2);
     };
     if flag != "--label" {
-        eprintln!("usage: herdr-forge machine rename <profile-id> --label <label>");
+        eprintln!("usage: moo machine rename <profile-id> --label <label>");
         return Ok(2);
     }
     let id = match ProfileId::parse(raw_id.clone()) {
@@ -502,7 +501,7 @@ fn rename(args: &[String]) -> std::io::Result<i32> {
 }
 
 fn remove(args: &[String]) -> std::io::Result<i32> {
-    let Some(id) = one_profile_id(args, "usage: herdr-forge machine remove <profile-id>")? else {
+    let Some(id) = one_profile_id(args, "usage: moo machine remove <profile-id>")? else {
         return Ok(2);
     };
     let mut catalog = load_catalog()?;
@@ -536,7 +535,7 @@ fn remove(args: &[String]) -> std::io::Result<i32> {
 
 fn set_enabled(args: &[String], enabled: bool) -> std::io::Result<i32> {
     let action = if enabled { "enable" } else { "disable" };
-    let usage = format!("usage: herdr-forge machine {action} <profile-id>");
+    let usage = format!("usage: moo machine {action} <profile-id>");
     let Some(id) = one_profile_id(args, &usage)? else {
         return Ok(2);
     };

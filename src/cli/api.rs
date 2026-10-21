@@ -55,7 +55,7 @@ fn api_schema(args: &[String]) -> std::io::Result<i32> {
 
 fn api_snapshot(args: &[String]) -> std::io::Result<i32> {
     if !args.is_empty() {
-        eprintln!("usage: herdr-forge api snapshot");
+        eprintln!("usage: moo api snapshot");
         return Ok(2);
     }
 
@@ -104,7 +104,7 @@ fn print_api_help() {
 }
 
 fn print_api_schema_help() {
-    eprintln!("usage: herdr-forge api schema [--json | --output PATH]");
+    eprintln!("usage: moo api schema [--json | --output PATH]");
 }
 
 #[cfg(test)]
@@ -113,7 +113,7 @@ mod tests {
     fn schema_summary_text_stays_human_sized() {
         let text = super::schema_summary_text().unwrap();
         assert!(text.contains("Herdr API schema"));
-        assert!(text.contains("Use `herdr-forge api schema --json`"));
+        assert!(text.contains("Use `moo api schema --json`"));
         assert!(text.len() < 400);
     }
 }

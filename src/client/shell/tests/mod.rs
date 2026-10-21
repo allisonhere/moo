@@ -14,7 +14,7 @@ pub(super) fn snapshot() -> ClientShellSnapshot {
         config_diagnostic: None,
         product_announcement: None,
         update_available: None,
-        update_install_command: "herdr-forge update".into(),
+        update_install_command: "moo update".into(),
         server_keybindings_toml: None,
         latest_release_notes_available: false,
         integration_updates_available: false,

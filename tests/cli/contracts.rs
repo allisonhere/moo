@@ -12,7 +12,7 @@ fn capture(args: &[&str], response: Value) -> Capture {
     let socket = base.join("contract.sock");
     let listener = UnixListener::bind(&socket).unwrap();
     listener.set_nonblocking(true).unwrap();
-    let mut child = Command::new(env!("CARGO_BIN_EXE_herdr-forge"))
+    let mut child = Command::new(env!("CARGO_BIN_EXE_moo"))
         .args(args)
         .env("HERDR_SOCKET_PATH", &socket)
         .env("XDG_CONFIG_HOME", &base)
@@ -476,10 +476,7 @@ fn workspace_help_preserves_public_and_runtime_grammar_split() {
         assert!(captured.requests.is_empty(), "{leaf}");
         assert!(captured.output.stderr.is_empty(), "{leaf}");
         let help = String::from_utf8(captured.output.stdout).unwrap();
-        assert!(
-            help.contains(&format!("herdr-forge workspace {leaf}")),
-            "{help}"
-        );
+        assert!(help.contains(&format!("moo workspace {leaf}")), "{help}");
         for fragment in fragments {
             assert!(help.contains(fragment), "missing {fragment:?}: {help}");
         }

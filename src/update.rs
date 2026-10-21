@@ -25,7 +25,7 @@ use serde::{Deserialize, Deserializer};
 const STABLE_UPDATE_MANIFEST_URL: &str = "https://herdr.dev/latest.json";
 const PREVIEW_UPDATE_MANIFEST_URL: &str = "https://herdr.dev/preview.json";
 const HOMEBREW_FORMULA_API_URL: &str = "https://formulae.brew.sh/api/formula/herdr.json";
-const HERDR_UPDATE_COMMAND: &str = "herdr-forge update";
+const HERDR_UPDATE_COMMAND: &str = "moo update";
 const HOMEBREW_UPDATE_COMMAND: &str = "brew update && brew upgrade herdr";
 const MISE_UPDATE_COMMAND: &str = "mise upgrade herdr";
 const NIX_UPDATE_COMMAND: &str = "update through Nix";
@@ -961,7 +961,7 @@ fn plan_running_server_updates(
         )
         .map_err(|err| {
             format!(
-                "failed to read status for herdr target {} at {}: {err}. stop it with `{}` and run `herdr-forge update` again",
+                "failed to read status for herdr target {} at {}: {err}. stop it with `{}` and run `moo update` again",
                 target.label,
                 target.socket_path.display(),
                 target.stop_command
@@ -970,7 +970,7 @@ fn plan_running_server_updates(
             Some(server) => server,
             None if target.must_be_running => {
                 return Err(format!(
-                        "herdr target {} looked running, but its status API did not respond at {}. stop it with `{}` and run `herdr-forge update` again",
+                        "herdr target {} looked running, but its status API did not respond at {}. stop it with `{}` and run `moo update` again",
                     target.label,
                     target.socket_path.display(),
                     target.stop_command
@@ -978,7 +978,7 @@ fn plan_running_server_updates(
             }
             None if client_protocol_server_is_running_at(&target.client_socket_path) => {
                 return Err(format!(
-                    "herdr target {} has a client socket, but its status API did not respond at {}. stop it with `{}` and run `herdr-forge update` again",
+                    "herdr target {} has a client socket, but its status API did not respond at {}. stop it with `{}` and run `moo update` again",
                     target.label,
                     target.socket_path.display(),
                     target.stop_command
@@ -1118,7 +1118,7 @@ pub(crate) fn parse_self_update_args(args: &[String]) -> Result<SelfUpdateOption
         match arg.as_str() {
             "--handoff" => options.live_handoff = true,
             "--help" | "-h" => {
-                return Err("usage: herdr-forge update [--handoff]".to_string());
+                return Err("usage: moo update [--handoff]".to_string());
             }
             _ => return Err(format!("unknown update option: {arg}")),
         }
@@ -1901,7 +1901,7 @@ pub(crate) fn update_install_command() -> &'static str {
 pub(crate) fn update_install_instruction(install_command: &str) -> String {
     match install_command {
         HERDR_UPDATE_COMMAND => {
-            "detach, run `herdr-forge update`, then run Herdr again to reconnect".to_string()
+            "detach, run `moo update`, then run Herdr again to reconnect".to_string()
         }
         HOMEBREW_UPDATE_COMMAND => {
             "detach, run `brew update && brew upgrade herdr`, then run Herdr again to reconnect"
@@ -2624,7 +2624,7 @@ mod tests {
         let lines = kept_server_notice_lines(&[socket_override], "0.10.0");
         assert_eq!(
             lines[3],
-            "when your agents are idle, run `herdr server stop`, then herdr-forge with the same socket override."
+            "when your agents are idle, run `herdr server stop`, then moo with the same socket override."
         );
     }
 
@@ -2976,7 +2976,7 @@ mod tests {
     fn update_install_instruction_distinguishes_install_from_restart() {
         assert_eq!(
             update_install_instruction(HERDR_UPDATE_COMMAND),
-            "detach, run `herdr-forge update`, then run Herdr again to reconnect"
+            "detach, run `moo update`, then run Herdr again to reconnect"
         );
         assert_eq!(
             update_install_instruction(HOMEBREW_UPDATE_COMMAND),
@@ -3275,7 +3275,7 @@ mod tests {
             "unexpected error: {err}"
         );
         assert!(
-            err.contains("herdr-forge session stop work"),
+            err.contains("moo session stop work"),
             "unexpected error: {err}"
         );
     }

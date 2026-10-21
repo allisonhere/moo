@@ -554,7 +554,7 @@ fn plugin_update_does_not_resurrect_a_plugin_unlinked_during_build() {
     run_git(&source_repo, &["add", "."]);
     run_git(&source_repo, &["commit", "--quiet", "-m", "update plugin"]);
 
-    let mut update = Command::new(env!("CARGO_BIN_EXE_herdr-forge"));
+    let mut update = Command::new(env!("CARGO_BIN_EXE_moo"));
     update
         .args([
             "--session",
@@ -996,10 +996,7 @@ fn plugin_install_usage_errors_include_options_without_installing() {
         );
         assert_eq!(output.status.code(), Some(2), "{args:?}");
         let stderr = String::from_utf8_lossy(&output.stderr);
-        assert!(
-            stderr.contains("usage: herdr-forge plugin install"),
-            "{stderr}"
-        );
+        assert!(stderr.contains("usage: moo plugin install"), "{stderr}");
         assert!(stderr.contains("[--ref REF] [--yes|-y]"), "{stderr}");
         assert!(!config_home.join(app_dir_name()).join("plugins").exists());
         assert!(!config_home

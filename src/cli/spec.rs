@@ -446,7 +446,7 @@ mod tests {
                 );
                 let output = String::from_utf8(output).unwrap();
                 assert!(
-                    output.contains(&format!("Usage: herdr-forge {}", path.join(" "))),
+                    output.contains(&format!("Usage: moo {}", path.join(" "))),
                     "unexpected help for herdr {}: {output}",
                     path.join(" ")
                 );
@@ -596,7 +596,7 @@ mod tests {
         .unwrap();
         assert!(String::from_utf8(help)
             .unwrap()
-            .contains("Usage: herdr-forge agent rename <TARGET> <NAME>|--clear"));
+            .contains("Usage: moo agent rename <TARGET> <NAME>|--clear"));
     }
 
     #[test]
@@ -736,7 +736,7 @@ mod tests {
             "agent start dropped its existing after_help: {agent_start}"
         );
         assert!(
-            agent_start.contains("next: herdr-forge agent prompt <TARGET> <TEXT> --wait"),
+            agent_start.contains("next: moo agent prompt <TARGET> <TEXT> --wait"),
             "agent start is missing its next-step hint: {agent_start}"
         );
 

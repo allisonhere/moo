@@ -33,7 +33,7 @@ pub(super) fn run_server_command(args: &[String]) -> std::io::Result<Option<i32>
 
 fn server_stop(args: &[String]) -> std::io::Result<i32> {
     if !args.is_empty() {
-        eprintln!("usage: herdr-forge server stop");
+        eprintln!("usage: moo server stop");
         return Ok(2);
     }
 
@@ -52,7 +52,7 @@ fn server_stop(args: &[String]) -> std::io::Result<i32> {
 
 fn server_reload_config(args: &[String]) -> std::io::Result<i32> {
     if !args.is_empty() {
-        eprintln!("usage: herdr-forge server reload-config");
+        eprintln!("usage: moo server reload-config");
         return Ok(2);
     }
 
@@ -67,7 +67,7 @@ fn server_agent_manifests(args: &[String]) -> std::io::Result<i32> {
         [] => false,
         [flag] if flag == "--json" => true,
         _ => {
-            eprintln!("usage: herdr-forge server agent-manifests [--json]");
+            eprintln!("usage: moo server agent-manifests [--json]");
             return Ok(2);
         }
     };
@@ -86,7 +86,7 @@ fn server_agent_manifests(args: &[String]) -> std::io::Result<i32> {
 
 fn server_reload_agent_manifests(args: &[String]) -> std::io::Result<i32> {
     if !args.is_empty() {
-        eprintln!("usage: herdr-forge server reload-agent-manifests");
+        eprintln!("usage: moo server reload-agent-manifests");
         return Ok(2);
     }
 
@@ -101,7 +101,7 @@ fn server_update_agent_manifests(args: &[String]) -> std::io::Result<i32> {
         [] => false,
         [flag] if flag == "--json" => true,
         _ => {
-            eprintln!("usage: herdr-forge server update-agent-manifests [--json]");
+            eprintln!("usage: moo server update-agent-manifests [--json]");
             return Ok(2);
         }
     };

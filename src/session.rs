@@ -44,10 +44,10 @@ pub fn configure_from_args(args: &[String]) -> Result<Vec<String>, String> {
             return Ok(args.to_vec());
         }
         let Some(name) = args.get(3) else {
-            return Err("usage: herdr-forge session attach <name>".to_string());
+            return Err("usage: moo session attach <name>".to_string());
         };
         if args.len() != 4 {
-            return Err("usage: herdr-forge session attach <name>".to_string());
+            return Err("usage: moo session attach <name>".to_string());
         }
         apply_explicit_name(name)?;
         return Ok(cleaned);
@@ -944,7 +944,7 @@ mod tests {
         let _guard = env_lock().lock().unwrap();
         std::env::remove_var(SESSION_ENV_VAR);
 
-        assert_eq!(local_attach_command(), "herdr-forge");
+        assert_eq!(local_attach_command(), "moo");
     }
 
     #[test]
@@ -952,7 +952,7 @@ mod tests {
         let _guard = env_lock().lock().unwrap();
         std::env::set_var(SESSION_ENV_VAR, "work");
 
-        assert_eq!(local_attach_command(), "herdr-forge session attach work");
+        assert_eq!(local_attach_command(), "moo session attach work");
 
         std::env::remove_var(SESSION_ENV_VAR);
     }
@@ -962,7 +962,7 @@ mod tests {
         let _guard = env_lock().lock().unwrap();
         std::env::remove_var(SESSION_ENV_VAR);
 
-        assert_eq!(local_stop_command(), "herdr-forge server stop");
+        assert_eq!(local_stop_command(), "moo server stop");
 
         std::env::remove_var(SESSION_ENV_VAR);
     }
@@ -972,7 +972,7 @@ mod tests {
         let _guard = env_lock().lock().unwrap();
         std::env::set_var(SESSION_ENV_VAR, "work");
 
-        assert_eq!(local_stop_command(), "herdr-forge session stop work");
+        assert_eq!(local_stop_command(), "moo session stop work");
 
         std::env::remove_var(SESSION_ENV_VAR);
     }
