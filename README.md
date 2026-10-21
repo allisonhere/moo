@@ -1,12 +1,12 @@
 # Moo — Multiple Operators Orchestrated
 
 <p align="center">
-  <img src="assets/logo.png" alt="Moo" width="100" />
+  <img src="assets/moo-logo.png" alt="Moo logo" width="180" />
 </p>
 
 A fork of [Herdr](https://github.com/herdrdev/herdr), the terminal runtime for coding agents. It keeps Herdr's detachable server, panes, and agent status, and adds agent-focused features. It installs and runs beside upstream Herdr without sharing state.
 
-> **Status:** the Rust test suite has not yet been run for the fork-specific changes. Static checks pass; runtime behavior is not verified. Treat builds as experimental.
+> **Status:** experimental. The full Rust test suite passes on the fork; the interactive UI has been checked in a terminal only for the features listed below.
 
 ## what's different
 
@@ -15,6 +15,7 @@ A fork of [Herdr](https://github.com/herdrdev/herdr), the terminal runtime for c
 - **agent names in the sidebar** — rename an agent from the sidebar or with `moo agent rename <target> <name>`; `--clear` resets it.
 - **attention queue** — agents that need an answer are queued, and you can acknowledge them.
 - **durable status history** — agent status changes are recorded and exposed through the API as `agent.history`.
+- **tab colors** — right-click a tab and choose **Color** to give it a theme color. Its tab dot and the bar beside its agents in the sidebar use that color.
 - **fork-only remotes** — remote attach and saved SSH machines look for `moo` on the remote host and never fetch upstream `herdr`. Automated Windows install is refused for now.
 
 Everything else follows upstream Herdr, with `moo` in place of `herdr`.
