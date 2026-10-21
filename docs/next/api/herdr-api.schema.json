@@ -1228,6 +1228,18 @@
     },
     "request": {
       "$defs": {
+        "AgentAttentionAckParams": {
+          "properties": {
+            "pane_id": {
+              "description": "Pane to acknowledge; every pane when omitted.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "type": "object"
+        },
         "AgentHistoryParams": {
           "properties": {
             "limit": {
@@ -6342,6 +6354,38 @@
             "params"
           ],
           "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
+              "const": "agent.attention.list",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/schemas/request/$defs/EmptyParams"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
+              "const": "agent.attention.ack",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/schemas/request/$defs/AgentAttentionAckParams"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
         }
       ],
       "properties": {
@@ -6572,6 +6616,10 @@
       "$defs": {
         "AgentHistoryEntry": {
           "properties": {
+            "acked": {
+              "description": "Set once the user has acknowledged this transition's attention request.",
+              "type": "boolean"
+            },
             "agent": {
               "type": [
                 "string",
@@ -10492,6 +10540,25 @@
                 },
                 "type": {
                   "const": "agent_history",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "entries"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "entries": {
+                  "items": {
+                    "$ref": "#/schemas/success_response/$defs/AgentHistoryEntry"
+                  },
+                  "type": "array"
+                },
+                "type": {
+                  "const": "agent_attention",
                   "type": "string"
                 }
               },

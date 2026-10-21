@@ -54,6 +54,7 @@ mod tests {
             agent: Some("claude".into()),
             from: AgentStatus::Working,
             to: AgentStatus::Blocked,
+            acked: false,
         };
         save(std::slice::from_ref(&entry));
         assert_eq!(load(), vec![entry]);

@@ -281,6 +281,9 @@ pub enum ResponseResult {
     AgentHistory {
         entries: Vec<super::agents::AgentHistoryEntry>,
     },
+    AgentAttention {
+        entries: Vec<super::agents::AgentHistoryEntry>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]

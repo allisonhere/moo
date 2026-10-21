@@ -728,6 +728,7 @@ impl App {
                 agent: update.agent_label.clone(),
                 from: previous_agent_status,
                 to: agent_status,
+                acked: false,
             });
         }
 
@@ -756,6 +757,39 @@ impl App {
         }
         self.agent_history.push_back(entry);
         self.state.mark_session_dirty();
+    }
+
+    /// Newest transition per pane, kept only while it still asks for attention
+    /// (blocked or done) and has not been acknowledged. A later transition away
+    /// from those states resolves the request, which also suppresses duplicates.
+    fn agent_attention(&self) -> Vec<crate::api::schema::AgentHistoryEntry> {
+        use crate::api::schema::AgentStatus;
+        let mut latest = std::collections::HashMap::new();
+        for entry in &self.agent_history {
+            latest.insert(entry.pane_id.as_str(), entry);
+        }
+        let mut entries: Vec<_> = latest
+            .into_values()
+            .filter(|entry| {
+                !entry.acked && matches!(entry.to, AgentStatus::Blocked | AgentStatus::Done)
+            })
+            .cloned()
+            .collect();
+        entries.sort_by_key(|entry| entry.at_ms);
+        entries
+    }
+
+    fn ack_agent_attention(&mut self, pane_id: Option<&str>) {
+        let mut changed = false;
+        for entry in &mut self.agent_history {
+            if !entry.acked && pane_id.is_none_or(|pane_id| entry.pane_id == pane_id) {
+                entry.acked = true;
+                changed = true;
+            }
+        }
+        if changed {
+            self.state.mark_session_dirty();
+        }
     }
 
     fn handle_agent_history(
@@ -1281,6 +1315,18 @@ impl App {
             }
             Method::PluginActionInvoke(params) => {
                 return self.handle_plugin_action_invoke(request.id, params);
+            }
+            Method::AgentAttentionList(_) => {
+                return responses::encode_success(
+                    request.id,
+                    crate::api::schema::ResponseResult::AgentAttention {
+                        entries: self.agent_attention(),
+                    },
+                );
+            }
+            Method::AgentAttentionAck(params) => {
+                self.ack_agent_attention(params.pane_id.as_deref());
+                return responses::encode_success(request.id, ResponseResult::Ok {});
             }
             Method::AgentHistory(params) => {
                 return self.handle_agent_history(request.id, params);
@@ -2571,6 +2617,7 @@ mod tests {
                 agent: None,
                 from: AgentStatus::Working,
                 to: AgentStatus::Done,
+                acked: false,
             });
         }
         assert!(app.state.session_dirty);
@@ -2596,5 +2643,65 @@ mod tests {
             crate::persist::agent_history::CAPACITY
         );
         assert_eq!(app.agent_history[0].at_ms, 5);
+    }
+    #[test]
+    fn attention_keeps_latest_unacked_blocked_or_done_per_pane() {
+        use crate::api::schema::{
+            AgentAttentionAckParams, AgentHistoryEntry, AgentStatus, EmptyParams, Method,
+        };
+
+        let (_api_tx, api_rx) = tokio::sync::mpsc::unbounded_channel();
+        let mut app = App::new(
+            &crate::config::Config::default(),
+            crate::app::AppPolicy::TEST,
+            None,
+            api_rx,
+            crate::api::EventHub::default(),
+        );
+        let mut record = |at_ms, pane: &str, to| {
+            app.record_agent_transition(AgentHistoryEntry {
+                at_ms,
+                pane_id: pane.into(),
+                workspace_id: "w1".into(),
+                agent: None,
+                from: AgentStatus::Working,
+                to,
+                acked: false,
+            });
+        };
+        record(1, "a", AgentStatus::Blocked);
+        record(2, "a", AgentStatus::Blocked);
+        record(3, "b", AgentStatus::Done);
+        record(4, "c", AgentStatus::Blocked);
+        record(5, "c", AgentStatus::Working);
+
+        let mut panes = |app: &mut App| -> Vec<String> {
+            let response = app.handle_api_request(crate::api::schema::Request {
+                id: "attention".into(),
+                method: Method::AgentAttentionList(EmptyParams::default()),
+            });
+            let response: serde_json::Value = serde_json::from_str(&response).unwrap();
+            response["result"]["entries"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|entry| format!("{}@{}", entry["pane_id"].as_str().unwrap(), entry["at_ms"]))
+                .collect()
+        };
+        assert_eq!(panes(&mut app), vec!["a@2", "b@3"]);
+
+        app.handle_api_request(crate::api::schema::Request {
+            id: "ack".into(),
+            method: Method::AgentAttentionAck(AgentAttentionAckParams {
+                pane_id: Some("a".into()),
+            }),
+        });
+        assert_eq!(panes(&mut app), vec!["b@3"]);
+
+        app.handle_api_request(crate::api::schema::Request {
+            id: "ack_all".into(),
+            method: Method::AgentAttentionAck(AgentAttentionAckParams::default()),
+        });
+        assert!(panes(&mut app).is_empty());
     }
 }

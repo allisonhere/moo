@@ -269,6 +269,16 @@ pub struct AgentHistoryEntry {
     pub agent: Option<String>,
     pub from: AgentStatus,
     pub to: AgentStatus,
+    /// Set once the user has acknowledged this transition's attention request.
+    #[serde(default, skip_serializing_if = "super::is_false")]
+    pub acked: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema, Default)]
+pub struct AgentAttentionAckParams {
+    /// Pane to acknowledge; every pane when omitted.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pane_id: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema, Default)]
