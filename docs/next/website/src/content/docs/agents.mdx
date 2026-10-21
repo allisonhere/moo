@@ -135,6 +135,8 @@ herdr agent rename reviewer --clear
 
 Targets accept a unique live agent name or the pane ID that currently hosts the agent. Terminal IDs and bare agent-kind labels are not accepted.
 
+In Herdr Forge you can also rename from the sidebar: right-click the agent row in the lower-left agents panel and choose **Rename agent** (or **Clear agent name**), or press `prefix+shift+a` for the focused agent. A user-assigned name takes precedence over integration-provided display labels, and clearing it falls back to the integration label or the detected agent kind. The name also appears on the pane border.
+
 ## Custom status labels
 
 Integrations report lifecycle state as semantic state only. Add display customization separately with pane metadata tokens.
