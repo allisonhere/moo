@@ -15,6 +15,8 @@ pub(super) struct AgentRow {
     pub(super) status: crate::api::schema::AgentStatus,
     pub(super) focused: bool,
     pub(super) rows: Vec<Vec<crate::ui::ResolvedToken>>,
+    /// Color of the tab this agent runs in, drawn as a bar that links the two.
+    pub(super) tab_color: Option<crate::api::schema::TabColor>,
 }
 
 pub(super) fn ordered_agent_pane_ids(
@@ -317,6 +319,9 @@ pub(super) fn agent_row(
         status: agent.agent_status,
         focused: agent.focused,
         rows,
+        tab_color: tab
+            .and_then(|tab| tab.color.as_deref())
+            .and_then(crate::api::schema::TabColor::from_name),
     })
 }
 
@@ -372,6 +377,17 @@ pub(super) fn render_agent_row(
             Rect::new(rect.x, rect.y + index as u16, rect.width, 1),
             buffer,
         );
+        if let Some(color) = row.tab_color {
+            // The first indent column is always blank, so the bar costs no width.
+            put_text(
+                buffer,
+                rect.x,
+                rect.y + index as u16,
+                1,
+                "▎",
+                row_style.fg(tab_color_value(color, palette)),
+            );
+        }
     }
 }
 

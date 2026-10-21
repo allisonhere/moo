@@ -634,3 +634,46 @@ fn rename_tab_dialog_color_survives_clicking_a_swatch_and_unchanged_color_sends_
     let saved = state.handle_input_bytes(b"\r");
     assert!(saved.actions.is_empty());
 }
+
+#[test]
+fn agent_rows_carry_a_bar_in_their_tabs_color() {
+    let first_column = |color: Option<&str>| {
+        let mut snapshot = snapshot();
+        snapshot.tabs[0].color = color.map(str::to_string);
+        snapshot.agents.push(crate::protocol::ClientShellAgent {
+            pane_id: "pane_1".into(),
+            workspace_id: "ws_1".into(),
+            tab_id: "tab_1".into(),
+            name: None,
+            display_agent: None,
+            agent: Some("claude".into()),
+            title: None,
+            terminal_title: None,
+            terminal_title_stripped: None,
+            agent_status: AgentStatus::Working,
+            state_change_seq: 1,
+            state_labels: Vec::new(),
+            tokens: Vec::new(),
+            focused: true,
+        });
+        let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
+        state.set_snapshot(Box::new(snapshot));
+        state.set_pane_surface(surface());
+        let frame = state.compose(100, 30).expect("sidebar with agent");
+        let (rect, _) = state
+            .hits
+            .agents
+            .first()
+            .cloned()
+            .expect("agent row rendered");
+        let cell = &frame.cells[(rect.y * frame.width + rect.x) as usize];
+        (cell.symbol.clone(), cell.fg)
+    };
+
+    let (plain, _) = first_column(None);
+    assert_ne!(plain, "▎", "uncolored tabs keep the plain indent");
+    let (green, green_fg) = first_column(Some("green"));
+    let (red, red_fg) = first_column(Some("red"));
+    assert_eq!((green.as_str(), red.as_str()), ("▎", "▎"));
+    assert_ne!(green_fg, red_fg, "the bar follows the tab's color");
+}
