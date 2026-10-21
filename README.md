@@ -26,7 +26,7 @@ Requires a Rust toolchain and Zig 0.16.0 (for the vendored libghostty-vt).
 
 ```bash
 git clone https://github.com/allisonhere/moo
-cd herdr
+cd moo
 ./scripts/install-moo.sh
 ```
 
