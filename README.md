@@ -1,85 +1,56 @@
-# herdr
-
-
-<p align="center">
-  <img src="assets/logo.png" alt="herdr" width="100" />
-</p>
+# herdr-forge
 
 <p align="center">
-  <a href="https://herdr.dev">herdr.dev</a> · <a href="#install">install</a> · <a href="https://herdr.dev/docs/quick-start/">quick start</a> · <a href="https://herdr.dev/docs/">docs</a>
+  <img src="assets/logo.png" alt="herdr-forge" width="100" />
 </p>
 
-<p align="center">
-  English · <a href="README.zh-CN.md">简体中文</a>
-</p>
+A fork of [Herdr](https://github.com/herdrdev/herdr), the terminal runtime for coding agents. It keeps Herdr's detachable server, panes, and agent status, and adds agent-focused features. It installs and runs beside upstream Herdr without sharing state.
 
-<p align="center">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-666666?labelColor=333333" alt="Apache 2.0 license" /></a>
-  <a href="https://github.com/herdrdev/herdr/releases"><img src="https://img.shields.io/github/downloads/herdrdev/herdr/total?labelColor=333333&color=666666" alt="total GitHub release downloads" /></a>
-  <a href="https://github.com/herdrdev/herdr/stargazers"><img src="https://img.shields.io/github/stars/herdrdev/herdr?labelColor=333333&color=666666&logo=github" alt="GitHub stars" /></a>
-  <a href="https://github.com/herdrdev/herdr/releases/latest"><img src="https://img.shields.io/github/v/release/herdrdev/herdr?label=release&labelColor=333333&color=666666" alt="latest stable release" /></a>
-  <a href="https://formulae.brew.sh/formula/herdr"><img src="https://img.shields.io/homebrew/v/herdr?label=homebrew&labelColor=333333&color=666666" alt="Homebrew version" /></a>
-  <a href="https://x.com/herdrdev"><img src="https://img.shields.io/badge/follow-%40herdrdev-000000?logo=x&logoColor=white" alt="follow @herdrdev on X" /></a>
-</p>
+> **Status:** the Rust test suite has not yet been run for the fork-specific changes. Static checks pass; runtime behavior is not verified. Treat builds as experimental.
 
----
+## what's different
 
-https://github.com/user-attachments/assets/043ec09f-4bdd-41d5-aee0-8fda6b83e267
+- **separate identity** — the binary is `herdr-forge`. Config, state, logs, and sockets live under `herdr-forge` paths, so it never touches an upstream install. Debug builds use `herdr-forge-dev`.
+- **agent-aware command palette** — open it with `prefix+space` (default prefix `ctrl+b`) and search actions by name.
+- **agent names in the sidebar** — rename an agent from the sidebar or with `herdr-forge agent rename <target> <name>`; `--clear` resets it.
+- **attention queue** — agents that need an answer are queued, and you can acknowledge them.
+- **durable status history** — agent status changes are recorded and exposed through the API as `agent.history`.
+- **fork-only remotes** — remote attach and saved SSH machines look for `herdr-forge` on the remote host and never fetch upstream `herdr`. Automated Windows install is refused for now.
 
-**the runtime your coding agents live on.**
-
-- **detach without stopping work** — herdr keeps terminals running in a background server when you close the client or lose your SSH connection. after a server or machine restart, herdr restores the saved layout and can resume supported agent sessions; the original processes do not survive. [session state →](https://herdr.dev/docs/session-state/)
-- **several machines, one window** — keep local work and saved ssh machines together, with a combined agent list and independent reconnects. [remote machines →](https://herdr.dev/docs/connecting-machines/)
-- **never hunt for the stuck one** — every pane is marked working, blocked, or idle. when an agent stops and needs an answer, herdr says so.
-- **agent-native** — agents drive herdr through the cli and socket api: they can spawn panes, prompt each other, and wait until another agent is genuinely blocked. [agent skill →](https://herdr.dev/docs/agent-skill/)
-- **runs what you already run** — claude code, codex, cursor, opencode, grok and the rest. herdr doesn't wrap or replace them; it owns their terminals. building an agent? [add herdr support →](https://herdr.dev/docs/add-herdr-support/)
-- **keyboard and mouse, both first-class** — tmux-style prefix keys *and* click, drag, split. pick per moment, not per tool.
-- **plugins** — extend panes and workflows. [browse the marketplace →](https://herdr.dev/plugins/)
-- **one rust binary, no electron** — runs in whatever terminal you already use.
-
----
+Everything else follows upstream Herdr, with `herdr-forge` in place of `herdr`.
 
 ## install
 
-```bash
-curl -fsSL https://herdr.dev/install.sh | sh
-```
-
-or `brew install herdr` · `mise use -g herdr` · windows: `powershell -ExecutionPolicy Bypass -c "irm https://herdr.dev/install.ps1 | iex"` · [endpoint-protected Windows](https://herdr.dev/docs/windows-beta/) · [binaries](https://github.com/herdrdev/herdr/releases)
-
-then start it where the work lives:
+Requires a Rust toolchain and Zig 0.16.0 (for the vendored libghostty-vt).
 
 ```bash
-herdr
+git clone https://github.com/allisonhere/herdr
+cd herdr
+./scripts/install-herdr-forge.sh
 ```
 
-run your agents, split panes, walk away. `ctrl+b q` detaches, `herdr` reattaches. [quick start →](https://herdr.dev/docs/quick-start/)
+This builds the locked release binary and installs it to `~/.local/bin`; set `HERDR_FORGE_INSTALL_DIR` to change that. Then run:
+
+```bash
+herdr-forge
+```
+
+`ctrl+b q` detaches and `herdr-forge` reattaches. `herdr-forge update` does not download anything; rerun the install script to update.
 
 ## docs
 
-everything lives at [herdr.dev/docs](https://herdr.dev/docs/): [quick start](https://herdr.dev/docs/quick-start/) · [concepts](https://herdr.dev/docs/concepts/) · [supported agents](https://herdr.dev/docs/agents/) · [keyboard](https://herdr.dev/docs/keyboard/) · [configuration](https://herdr.dev/docs/configuration/) · [session state](https://herdr.dev/docs/session-state/) · [connecting machines](https://herdr.dev/docs/connecting-machines/) · [remote](https://herdr.dev/docs/persistence-remote/) · [integrations](https://herdr.dev/docs/integrations/) · [add herdr support to your agent](https://herdr.dev/docs/add-herdr-support/) · [plugins](https://herdr.dev/docs/plugins/) · [socket api](https://herdr.dev/docs/socket-api/)
-
-## thanks
-
-every past sponsor and backer is listed in [SPONSORS.md](./SPONSORS.md) — thank you 🐑
-
-enterprise / partnership: hey@herdr.dev
-
-## agent instructions
-
-if you are an ai agent helping with this repository, read [`AGENTS.md`](./AGENTS.md) before making changes and read [`CONTRIBUTING.md`](./CONTRIBUTING.md) before opening issues or PRs.
+The fork guide is [`docs/next/website/src/content/docs/herdr-forge.mdx`](docs/next/website/src/content/docs/herdr-forge.mdx): requirements, identity paths, troubleshooting, removal, and current limitations. Upstream docs at [herdr.dev/docs](https://herdr.dev/docs/) apply to everything the fork has not changed.
 
 ## development
 
 ```bash
-git clone https://github.com/herdrdev/herdr
-cd herdr
-cargo build --release
-
+cargo build --release --locked --bin herdr-forge
 just test        # unit tests
 just check       # formatting, tests, and maintenance checks
 ```
 
+Read [`AGENTS.md`](./AGENTS.md) and [`CLAUDE.md`](./CLAUDE.md) before making changes.
+
 ## license
 
-Herdr is licensed under the [Apache License 2.0](LICENSE).
+Apache License 2.0, the same as upstream Herdr. See [LICENSE](LICENSE). Herdr is by [herdrdev](https://github.com/herdrdev/herdr).
