@@ -87,6 +87,9 @@ struct LegacyWorkspaceSnapshot {
 pub struct TabSnapshot {
     #[serde(default)]
     pub custom_name: Option<String>,
+    /// Color name; read leniently so an unknown name cannot fail a restore.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
     pub layout: LayoutSnapshot,
     pub panes: HashMap<u32, PaneSnapshot>,
     pub zoomed: bool,
@@ -156,6 +159,7 @@ impl From<LegacyWorkspaceSnapshot> for WorkspaceSnapshot {
     fn from(snap: LegacyWorkspaceSnapshot) -> Self {
         let identity_cwd = legacy_identity_cwd(&snap);
         let tab = TabSnapshot {
+            color: None,
             custom_name: None,
             layout: snap.layout,
             panes: snap.panes,
@@ -393,6 +397,7 @@ fn capture_tab(
     }
     TabSnapshot {
         custom_name: tab.custom_name.clone(),
+        color: tab.color.map(|color| color.name().to_string()),
         layout: capture_node(tab.layout.root()),
         panes,
         zoomed: tab.zoomed,
@@ -733,6 +738,7 @@ mod tests {
                 public_tab_numbers: vec![1],
                 next_public_tab_number: 2,
                 tabs: vec![TabSnapshot {
+                    color: None,
                     custom_name: Some("api".to_string()),
                     layout: LayoutSnapshot::Split {
                         direction: DirectionSnapshot::Horizontal,
@@ -909,6 +915,34 @@ mod tests {
         assert_eq!(workspace.active_tab, second_tab);
         assert_eq!(workspace.tabs[0].custom_name.as_deref(), Some("main"));
         assert_eq!(workspace.tabs[1].custom_name.as_deref(), Some("logs"));
+    }
+
+    #[test]
+    fn tab_color_round_trips_and_unknown_names_restore_as_none() {
+        use crate::api::schema::TabColor;
+
+        let mut state = state_with_workspaces(&["one"]);
+        state.workspaces[0].tabs[0].color = Some(TabColor::Teal);
+        let snapshot = capture_from_state(&state);
+        assert_eq!(
+            snapshot.workspaces[0].tabs[0].color.as_deref(),
+            Some("teal")
+        );
+
+        let mut json = serde_json::to_value(&snapshot.workspaces[0].tabs[0]).unwrap();
+        let parsed: TabSnapshot = serde_json::from_value(json.clone()).unwrap();
+        assert_eq!(parsed.color.as_deref(), Some("teal"));
+        json["color"] = serde_json::json!("ultraviolet");
+        let future: TabSnapshot = serde_json::from_value(json).unwrap();
+        assert_eq!(future.color.as_deref().and_then(TabColor::from_name), None);
+
+        let uncolored = state_with_workspaces(&["two"]);
+        let json =
+            serde_json::to_value(&capture_from_state(&uncolored).workspaces[0].tabs[0]).unwrap();
+        assert!(
+            json.get("color").is_none(),
+            "uncolored tabs keep the old file shape"
+        );
     }
 
     #[test]
@@ -1434,6 +1468,7 @@ mod tests {
                 public_tab_numbers: Vec::new(),
                 next_public_tab_number: 0,
                 tabs: vec![TabSnapshot {
+                    color: None,
                     custom_name: None,
                     layout: LayoutSnapshot::Split {
                         direction: DirectionSnapshot::Horizontal,

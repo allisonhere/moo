@@ -1719,7 +1719,20 @@ impl ClientShellState {
             if mouse.kind != MouseEventKind::Down(MouseButton::Left) {
                 return;
             }
-            if super::contains(self.hits.overlay_primary, point) {
+            let picked_color = self
+                .hits
+                .rename_colors
+                .iter()
+                .find(|(rect, _)| super::contains(*rect, point))
+                .map(|(_, color)| *color);
+            if let Some(color) = picked_color {
+                if let Some(ClientShellOverlay::Rename(rename)) = self.overlay.as_mut() {
+                    if let Some(choice) = rename.tab_color.as_mut() {
+                        choice.selected = color;
+                        outcome.repaint = true;
+                    }
+                }
+            } else if super::contains(self.hits.overlay_primary, point) {
                 match self.overlay.as_ref() {
                     Some(ClientShellOverlay::Rename(_)) => self.save_rename_overlay(outcome),
                     Some(ClientShellOverlay::ConfirmClose(_)) => {

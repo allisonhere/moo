@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "protocol": 22,
+  "protocol": 23,
   "schema_version": 1,
   "schemas": {
     "error_response": {
@@ -1035,10 +1035,33 @@
           ],
           "type": "string"
         },
+        "TabColor": {
+          "description": "Theme-driven accent a tab can be marked with.",
+          "enum": [
+            "red",
+            "orange",
+            "yellow",
+            "green",
+            "teal",
+            "blue",
+            "purple"
+          ],
+          "type": "string"
+        },
         "TabInfo": {
           "properties": {
             "agent_status": {
               "$ref": "#/schemas/event/$defs/AgentStatus"
+            },
+            "color": {
+              "anyOf": [
+                {
+                  "$ref": "#/schemas/event/$defs/TabColor"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "focused": {
               "type": "boolean"
@@ -4296,6 +4319,19 @@
             }
           ]
         },
+        "TabColor": {
+          "description": "Theme-driven accent a tab can be marked with.",
+          "enum": [
+            "red",
+            "orange",
+            "yellow",
+            "green",
+            "teal",
+            "blue",
+            "purple"
+          ],
+          "type": "string"
+        },
         "TabCreateParams": {
           "properties": {
             "cwd": {
@@ -4369,6 +4405,28 @@
           "required": [
             "tab_id",
             "label"
+          ],
+          "type": "object"
+        },
+        "TabSetColorParams": {
+          "properties": {
+            "color": {
+              "anyOf": [
+                {
+                  "$ref": "#/schemas/request/$defs/TabColor"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Omit to clear the tab's color."
+            },
+            "tab_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "tab_id"
           ],
           "type": "object"
         },
@@ -6379,6 +6437,22 @@
             },
             "params": {
               "$ref": "#/schemas/request/$defs/AgentAttentionAckParams"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
+              "const": "tab.set_color",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/schemas/request/$defs/TabSetColorParams"
             }
           },
           "required": [
@@ -10686,10 +10760,33 @@
           ],
           "type": "string"
         },
+        "TabColor": {
+          "description": "Theme-driven accent a tab can be marked with.",
+          "enum": [
+            "red",
+            "orange",
+            "yellow",
+            "green",
+            "teal",
+            "blue",
+            "purple"
+          ],
+          "type": "string"
+        },
         "TabInfo": {
           "properties": {
             "agent_status": {
               "$ref": "#/schemas/success_response/$defs/AgentStatus"
+            },
+            "color": {
+              "anyOf": [
+                {
+                  "$ref": "#/schemas/success_response/$defs/TabColor"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "focused": {
               "type": "boolean"

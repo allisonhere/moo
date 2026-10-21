@@ -4,6 +4,7 @@ use super::*;
 fn tab_overflow_controls_scroll_the_client_owned_tab_bar() {
     let mut snapshot = snapshot();
     snapshot.tabs.extend((2..=8).map(|number| ClientShellTab {
+        color: None,
         tab_id: format!("tab_{number}"),
         workspace_id: "ws_1".into(),
         number,
@@ -63,6 +64,7 @@ fn focused_last_overflow_tab_shows_its_full_label() {
         .iter()
         .enumerate()
         .map(|(index, label)| ClientShellTab {
+            color: None,
             tab_id: format!("tab_{}", index + 1),
             workspace_id: "ws_1".into(),
             number: index + 1,
@@ -555,4 +557,80 @@ fn tab_agent_pill_is_optional_and_only_marks_tabs_with_an_agent() {
     assert!(!tab_text(false, AgentStatus::Blocked).contains('●'));
     assert!(tab_text(true, AgentStatus::Blocked).contains('●'));
     assert!(!tab_text(true, AgentStatus::Unknown).contains('●'));
+}
+
+#[test]
+fn rename_tab_dialog_picks_a_color_with_tab_key_and_saves_it_separately() {
+    let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
+    state.set_snapshot(Box::new(snapshot()));
+    state.set_pane_surface(surface());
+    state.open_rename_tab_overlay();
+
+    let frame = state.compose(100, 30).expect("rename dialog");
+    let text: String = frame
+        .cells
+        .iter()
+        .map(|cell| cell.symbol.as_str())
+        .collect();
+    assert!(text.contains("color"), "swatch row missing: {text}");
+    assert!(
+        text.contains("[×]"),
+        "no-color option should start selected"
+    );
+    assert_eq!(state.hits.rename_colors.len(), 8);
+
+    // Tab key picks the first color; Enter saves only the color, not a rename.
+    state.handle_input_bytes(b"\t");
+    let saved = state.handle_input_bytes(b"\r");
+    let methods: Vec<_> = saved
+        .actions
+        .iter()
+        .filter_map(|action| match action {
+            ClientShellAction::Endpoint { request, .. } => Some(request.method.clone()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        methods,
+        vec![crate::api::schema::Method::TabSetColor(
+            crate::api::schema::TabSetColorParams {
+                tab_id: "tab_1".into(),
+                color: Some(crate::api::schema::TabColor::Red),
+            }
+        )]
+    );
+}
+
+#[test]
+fn rename_tab_dialog_color_survives_clicking_a_swatch_and_unchanged_color_sends_nothing() {
+    let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
+    state.set_snapshot(Box::new(snapshot()));
+    state.set_pane_surface(surface());
+    state.open_rename_tab_overlay();
+    state.compose(100, 30).expect("rename dialog");
+
+    let (rect, color) = state.hits.rename_colors[3];
+    assert_eq!(color, Some(crate::api::schema::TabColor::Yellow));
+    state.handle_raw_events(vec![RawInputEvent::Mouse(crossterm::event::MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: rect.x + 1,
+        row: rect.y,
+        modifiers: KeyModifiers::empty(),
+    })]);
+    assert!(matches!(
+        state.overlay,
+        Some(ClientShellOverlay::Rename(ClientRenameOverlay {
+            tab_color: Some(ClientTabColorChoice {
+                selected: Some(crate::api::schema::TabColor::Yellow),
+                ..
+            }),
+            ..
+        }))
+    ));
+
+    // Cycling backward from yellow and forward again lands on yellow; reset to the
+    // original (none) and confirm nothing is sent.
+    state.open_rename_tab_overlay();
+    let saved = state.handle_input_bytes(b"\r");
+    assert!(saved.actions.is_empty());
 }

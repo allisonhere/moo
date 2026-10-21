@@ -37,6 +37,7 @@ enum SplitCommand<'a> {
 
 pub struct Tab {
     pub custom_name: Option<String>,
+    pub color: Option<crate::api::schema::TabColor>,
     pub number: usize,
     /// Identity source for this tab's pane tree.
     pub root_pane: PaneId,
@@ -181,6 +182,7 @@ impl Tab {
         Ok((
             Self {
                 custom_name: None,
+                color: None,
                 number,
                 root_pane: root_id,
                 layout,
@@ -444,6 +446,7 @@ impl Tab {
         panes.insert(pane_id, moved.pane_state);
         Self {
             custom_name,
+            color: None,
             number,
             root_pane: pane_id,
             layout: TileLayout::from_saved(Node::Pane(pane_id), pane_id),

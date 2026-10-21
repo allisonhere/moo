@@ -1182,6 +1182,7 @@ impl App {
             Method::TabCreate(params) => return self.handle_tab_create(request.id, params),
             Method::TabFocus(target) => return self.handle_tab_focus(request.id, target),
             Method::TabRename(params) => return self.handle_tab_rename(request.id, params),
+            Method::TabSetColor(params) => return self.handle_tab_set_color(request.id, params),
             Method::TabMove(params) => return self.handle_tab_move(request.id, params),
             Method::TabClose(target) => return self.handle_tab_close(request.id, target),
             Method::AgentList(_) => return self.handle_agent_list(request.id),
@@ -2703,5 +2704,42 @@ mod tests {
             method: Method::AgentAttentionAck(AgentAttentionAckParams::default()),
         });
         assert!(panes(&mut app).is_empty());
+    }
+
+    #[test]
+    fn tab_set_color_updates_the_tab_and_clears_it() {
+        use crate::api::schema::{Method, TabColor, TabSetColorParams};
+
+        let (_api_tx, api_rx) = tokio::sync::mpsc::unbounded_channel();
+        let mut app = App::new(
+            &crate::config::Config::default(),
+            crate::app::AppPolicy::TEST,
+            None,
+            api_rx,
+            crate::api::EventHub::default(),
+        );
+        app.state.workspaces = vec![crate::workspace::Workspace::test_new("colors")];
+        app.state.ensure_test_terminals();
+        let tab_id = app.public_tab_id(0, 0).unwrap();
+
+        let mut set = |color| {
+            let response = app.handle_api_request(crate::api::schema::Request {
+                id: "color".into(),
+                method: Method::TabSetColor(TabSetColorParams {
+                    tab_id: tab_id.clone(),
+                    color,
+                }),
+            });
+            let response: serde_json::Value = serde_json::from_str(&response).unwrap();
+            (
+                response["result"]["tab"]["color"].clone(),
+                app.state.workspaces[0].tabs[0].color,
+            )
+        };
+        assert_eq!(
+            set(Some(TabColor::Purple)),
+            (serde_json::json!("purple"), Some(TabColor::Purple))
+        );
+        assert_eq!(set(None), (serde_json::Value::Null, None));
     }
 }

@@ -169,6 +169,7 @@ mod tests {
             "tab.create",
             "tab.focus",
             "tab.rename",
+            "tab.set_color",
             "tab.move",
             "tab.close",
             "layout.apply",

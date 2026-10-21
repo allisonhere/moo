@@ -250,6 +250,7 @@ fn every_dialog_and_menu_occludes_its_panel_not_the_whole_screen() {
             preview: false,
         }),
         ClientShellOverlay::Rename(ClientRenameOverlay {
+            tab_color: None,
             title: "rename",
             input: "name".into(),
             target: ClientRenameTarget::Pane {

@@ -369,6 +369,7 @@ fn mobile_background_workspace_uses_its_own_active_tab_status() {
     let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
     let mut projected = snapshot();
     projected.tabs.push(ClientShellTab {
+        color: None,
         tab_id: "tab_7".into(),
         workspace_id: "ws_1".into(),
         number: 7,
@@ -394,6 +395,7 @@ fn mobile_background_workspace_uses_its_own_active_tab_status() {
     });
     for (number, tab_id, label) in [(1, "tab_2", "one"), (7, "tab_3", "two")] {
         projected.tabs.push(ClientShellTab {
+            color: None,
             tab_id: tab_id.into(),
             workspace_id: "ws_2".into(),
             number,

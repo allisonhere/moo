@@ -236,6 +236,23 @@ fn status_color(
     }
 }
 
+/// Theme color for a tab accent, so tab colors follow the active theme.
+fn tab_color_value(
+    color: crate::api::schema::TabColor,
+    palette: &Palette,
+) -> ratatui::style::Color {
+    use crate::api::schema::TabColor;
+    match color {
+        TabColor::Red => palette.red,
+        TabColor::Orange => palette.peach,
+        TabColor::Yellow => palette.yellow,
+        TabColor::Green => palette.green,
+        TabColor::Teal => palette.teal,
+        TabColor::Blue => palette.blue,
+        TabColor::Purple => palette.mauve,
+    }
+}
+
 fn panel_contrast_fg(palette: &Palette) -> ratatui::style::Color {
     match palette.panel_bg {
         ratatui::style::Color::Reset => palette.surface_dim,

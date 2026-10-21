@@ -36,6 +36,7 @@ fn modal_paste_target_requires_a_focused_editable_client_field() {
     assert!(!state.modal_paste_target_active());
 
     state.overlay = Some(ClientShellOverlay::Rename(ClientRenameOverlay {
+        tab_color: None,
         title: "rename pane",
         input: TextEditor::default(),
         target: ClientRenameTarget::Pane {

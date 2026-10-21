@@ -42,6 +42,7 @@ pub(super) fn snapshot() -> ClientShellSnapshot {
             agent_status: AgentStatus::Idle,
         }],
         tabs: vec![ClientShellTab {
+            color: None,
             tab_id: "tab_1".into(),
             workspace_id: "ws_1".into(),
             number: 1,

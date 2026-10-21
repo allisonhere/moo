@@ -132,6 +132,7 @@ pub(super) struct ShellHitMap {
     pub(super) help_max_scroll: usize,
     pub(super) settings_popup: Rect,
     pub(super) settings_tabs: Vec<(Rect, ClientSettingsSection)>,
+    pub(super) rename_colors: Vec<(Rect, Option<crate::api::schema::TabColor>)>,
     pub(super) settings_choices: Vec<(Rect, usize)>,
     pub(super) product_announcement_scrollbar: Rect,
     pub(super) product_announcement_scroll_metrics: Option<crate::pane::ScrollMetrics>,
@@ -326,6 +327,47 @@ pub(super) struct ClientRenameOverlay {
     pub(super) title: &'static str,
     pub(super) input: TextEditor,
     pub(super) target: ClientRenameTarget,
+    /// Present only when renaming a tab, which can also be given an accent color.
+    pub(super) tab_color: Option<ClientTabColorChoice>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct ClientTabColorChoice {
+    pub(super) original: Option<crate::api::schema::TabColor>,
+    pub(super) selected: Option<crate::api::schema::TabColor>,
+}
+
+impl ClientTabColorChoice {
+    pub(super) fn new(color: Option<crate::api::schema::TabColor>) -> Self {
+        Self {
+            original: color,
+            selected: color,
+        }
+    }
+
+    pub(super) fn for_tab(tab: &crate::protocol::ClientShellTab) -> Self {
+        Self::new(
+            tab.color
+                .as_deref()
+                .and_then(crate::api::schema::TabColor::from_name),
+        )
+    }
+
+    /// Cycle none -> each color -> none, forward or backward.
+    pub(super) fn cycle(&mut self, forward: bool) {
+        use crate::api::schema::TabColor;
+        let count = TabColor::ALL.len() + 1;
+        let current = self
+            .selected
+            .and_then(|color| TabColor::ALL.iter().position(|c| *c == color))
+            .map_or(0, |index| index + 1);
+        let next = if forward {
+            (current + 1) % count
+        } else {
+            (current + count - 1) % count
+        };
+        self.selected = next.checked_sub(1).map(|index| TabColor::ALL[index]);
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

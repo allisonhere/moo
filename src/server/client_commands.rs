@@ -254,6 +254,10 @@ mod tests {
             actual.remove("pane.link.resolve").as_deref(),
             Some("f5e4a3e01453ae7b188f127ce951c12c20e0bebcc17cc364eeb6d1a01fd5bf81")
         );
+        assert_eq!(
+            actual.remove("tab.set_color").as_deref(),
+            Some("a5b7b6a4648a52dc90c27a64eeee9ad9881b1bc3f7d8ea4a73a94400101975c8")
+        );
 
         assert_eq!(
             actual, expected,

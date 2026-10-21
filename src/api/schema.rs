@@ -148,6 +148,7 @@ operations::define_operations! {
     AgentHistory(AgentHistoryParams) => "agent.history", false, false;
     AgentAttentionList(EmptyParams) => "agent.attention.list", false, false;
     AgentAttentionAck(AgentAttentionAckParams) => "agent.attention.ack", false, false;
+    TabSetColor(TabSetColorParams) => "tab.set_color", true, true;
 }
 
 #[cfg(test)]

@@ -346,6 +346,7 @@ impl ClientShellState {
             .map(crate::workspace::derive_label_from_cwd)
             .unwrap_or_else(|| "workspace".to_owned());
         self.overlay = Some(ClientShellOverlay::Rename(ClientRenameOverlay {
+            tab_color: None,
             title: "new workspace",
             input: TextEditor::new(&suggested_name, true),
             target: ClientRenameTarget::NewWorkspace {
@@ -371,6 +372,7 @@ impl ClientShellState {
             return;
         };
         self.overlay = Some(ClientShellOverlay::Rename(ClientRenameOverlay {
+            tab_color: None,
             title: "rename workspace",
             input: TextEditor::new(&workspace.label, false),
             target: ClientRenameTarget::Workspace { workspace_id },
@@ -392,6 +394,7 @@ impl ClientShellState {
             + 1)
         .to_string();
         self.overlay = Some(ClientShellOverlay::Rename(ClientRenameOverlay {
+            tab_color: None,
             title: "new tab",
             input: TextEditor::new(&default_name, true),
             target: ClientRenameTarget::NewTab {
@@ -412,6 +415,7 @@ impl ClientShellState {
             return;
         };
         self.overlay = Some(ClientShellOverlay::Rename(ClientRenameOverlay {
+            tab_color: Some(ClientTabColorChoice::for_tab(tab)),
             title: "rename tab",
             input: TextEditor::new(&tab.label, false),
             target: ClientRenameTarget::Tab {
@@ -433,6 +437,7 @@ impl ClientShellState {
             return;
         };
         self.overlay = Some(ClientShellOverlay::Rename(ClientRenameOverlay {
+            tab_color: None,
             title: "rename pane",
             input: TextEditor::new(
                 pane.label.as_deref().unwrap_or_default(),
@@ -460,6 +465,7 @@ impl ClientShellState {
         };
         let current = agent.name.as_deref();
         self.overlay = Some(ClientShellOverlay::Rename(ClientRenameOverlay {
+            tab_color: None,
             title: "rename agent",
             input: TextEditor::new(current.unwrap_or_default(), current.is_none()),
             target: ClientRenameTarget::Agent {
@@ -944,6 +950,15 @@ impl ClientShellState {
             outcome.repaint = true;
             return;
         }
+        if matches!(key.code, KeyCode::Tab | KeyCode::BackTab) {
+            if let Some(choice) = rename.tab_color.as_mut() {
+                choice.cycle(
+                    key.code == KeyCode::Tab && !key.modifiers.contains(KeyModifiers::SHIFT),
+                );
+                outcome.repaint = true;
+            }
+            return;
+        }
         if key
             .generated_text
             .as_deref()
@@ -972,6 +987,19 @@ impl ClientShellState {
             return;
         };
         let trimmed = rename.input.trim();
+        let color_method = match (&rename.target, rename.tab_color) {
+            (ClientRenameTarget::Tab { tab_id, .. }, Some(choice))
+                if choice.selected != choice.original =>
+            {
+                Some(crate::api::schema::Method::TabSetColor(
+                    crate::api::schema::TabSetColorParams {
+                        tab_id: tab_id.clone(),
+                        color: choice.selected,
+                    },
+                ))
+            }
+            _ => None,
+        };
         let method = match rename.target {
             ClientRenameTarget::NewWorkspace {
                 source_workspace_id,
@@ -1032,6 +1060,9 @@ impl ClientShellState {
             )),
         };
         if let Some(method) = method {
+            self.push_endpoint_method(method, outcome);
+        }
+        if let Some(method) = color_method {
             self.push_endpoint_method(method, outcome);
         }
         outcome.repaint = true;

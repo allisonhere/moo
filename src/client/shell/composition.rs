@@ -689,6 +689,7 @@ impl ClientShellState {
                 self.hits.help_max_scroll = rendered.help_max_scroll;
                 self.hits.settings_popup = rendered.settings_popup;
                 self.hits.settings_tabs = rendered.settings_tabs;
+                self.hits.rename_colors = rendered.rename_colors;
                 self.hits.settings_choices = rendered.settings_choices;
                 self.hits.product_announcement_scrollbar = rendered.product_announcement_scrollbar;
                 self.hits.product_announcement_scroll_metrics =

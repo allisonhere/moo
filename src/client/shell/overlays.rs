@@ -23,6 +23,7 @@ pub(crate) struct OverlayRender {
     pub(crate) help_max_scroll: usize,
     pub(crate) settings_popup: Rect,
     pub(crate) settings_tabs: Vec<(Rect, ClientSettingsSection)>,
+    pub(crate) rename_colors: Vec<(Rect, Option<crate::api::schema::TabColor>)>,
     pub(crate) settings_choices: Vec<(Rect, usize)>,
     pub(crate) product_announcement_scrollbar: Rect,
     pub(crate) product_announcement_scroll_metrics: Option<crate::pane::ScrollMetrics>,
@@ -750,7 +751,7 @@ fn render_rename_overlay(
     v: &ClientRenameOverlay,
     p: &Palette,
 ) -> Option<OverlayRender> {
-    let q = popup(b.area, 56, 7)?;
+    let q = popup(b.area, 56, if v.tab_color.is_some() { 8 } else { 7 })?;
     let i = panel(b, q, p.accent, p.panel_bg)?;
     put_text(
         b,
@@ -771,7 +772,16 @@ fn render_rename_overlay(
         &v.input,
         Style::default().fg(p.text).bg(p.surface0),
     );
-    let rs = row(i, &[8, 10, 12], 2, 3);
+    let mut rename_colors = Vec::new();
+    if let Some(choice) = v.tab_color {
+        render_tab_color_row(b, i, i.y + 3, choice, p, &mut rename_colors);
+    }
+    let rs = row(
+        i,
+        &[8, 10, 12],
+        2,
+        if v.tab_color.is_some() { 4 } else { 3 },
+    );
     let [save, clear, cancel] = rs.as_slice() else {
         return None;
     };
@@ -800,9 +810,55 @@ fn render_rename_overlay(
         navigator_rows: Vec::new(),
         worktree_search: Rect::default(),
         worktree_rows: Vec::new(),
+        rename_colors,
         cursor,
         ..OverlayRender::default()
     })
+}
+
+/// One compact row: a "none" cell then a dot per tab color; the chosen cell is bracketed.
+fn render_tab_color_row(
+    b: &mut Buffer,
+    i: Rect,
+    y: u16,
+    choice: ClientTabColorChoice,
+    p: &Palette,
+    hits: &mut Vec<(Rect, Option<crate::api::schema::TabColor>)>,
+) {
+    use crate::api::schema::TabColor;
+
+    const CELL: u16 = 3;
+    const LABEL: &str = "color";
+    let label_style = Style::default().fg(p.overlay1).bg(p.panel_bg);
+    put_text(b, i.x + 1, y, i.width.saturating_sub(1), LABEL, label_style);
+    let mut x = i.x + 1 + LABEL.len() as u16 + 2;
+    let options = std::iter::once(None).chain(TabColor::ALL.into_iter().map(Some));
+    for option in options {
+        if x + CELL > i.right() {
+            break;
+        }
+        let selected = choice.selected == option;
+        let (glyph, fg) = match option {
+            Some(color) => ("●", tab_color_value(color, p)),
+            None => ("×", p.overlay1),
+        };
+        let text = if selected {
+            format!("[{glyph}]")
+        } else {
+            format!(" {glyph} ")
+        };
+        let mut style = Style::default().fg(fg).bg(p.panel_bg);
+        if selected {
+            style = style.add_modifier(Modifier::BOLD);
+        }
+        put_text(b, x, y, CELL, &text, style);
+        hits.push((Rect::new(x, y, CELL, 1), option));
+        x += CELL;
+    }
+    let hint = "  tab ⇥ cycles";
+    if x + (hint.chars().count() as u16) <= i.right() {
+        put_text(b, x, y, i.right() - x, hint, label_style);
+    }
 }
 
 fn render_navigator_overlay(
