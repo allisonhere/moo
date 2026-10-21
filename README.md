@@ -25,7 +25,7 @@ Everything else follows upstream Herdr, with `moo` in place of `herdr`.
 Requires a Rust toolchain and Zig 0.16.0 (for the vendored libghostty-vt).
 
 ```bash
-git clone https://github.com/allisonhere/herdr
+git clone https://github.com/allisonhere/moo
 cd herdr
 ./scripts/install-moo.sh
 ```
