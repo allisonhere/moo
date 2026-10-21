@@ -22,13 +22,13 @@ Everything else follows upstream Herdr, with `moo` in place of `herdr`.
 
 ## install
 
-Prebuilt binary for Linux and macOS (checksum-verified, installs to `~/.local/bin`; set `MOO_VERSION` to pin a release):
+Prebuilt binary for Linux (checksum-verified, installs to `~/.local/bin`; set `MOO_VERSION` to pin a release):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/allisonhere/moo/master/scripts/install.sh | sh
 ```
 
-To build from source instead, you need a Rust toolchain and Zig 0.16.0 (for the vendored libghostty-vt).
+On macOS, or to build from source, you need a Rust toolchain and Zig 0.16.0 (for the vendored libghostty-vt).
 
 ```bash
 git clone https://github.com/allisonhere/moo

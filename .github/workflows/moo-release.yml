@@ -79,12 +79,6 @@ jobs:
           - target: aarch64-unknown-linux-musl
             os: ubuntu-latest
             name: moo-linux-aarch64
-          - target: x86_64-apple-darwin
-            os: macos-latest
-            name: moo-macos-x86_64
-          - target: aarch64-apple-darwin
-            os: macos-latest
-            name: moo-macos-aarch64
           - target: x86_64-pc-windows-msvc
             os: windows-2022
             name: moo-windows-x86_64.zip

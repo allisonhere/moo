@@ -10,8 +10,6 @@ install_dir=${MOO_INSTALL_DIR:-"${HOME}/.local/bin"}
 case "$(uname -s)-$(uname -m)" in
     Linux-x86_64) asset=moo-linux-x86_64 ;;
     Linux-aarch64 | Linux-arm64) asset=moo-linux-aarch64 ;;
-    Darwin-x86_64) asset=moo-macos-x86_64 ;;
-    Darwin-arm64) asset=moo-macos-aarch64 ;;
     *)
         echo "error: no prebuilt moo for $(uname -s) $(uname -m); build from source with scripts/install-moo.sh" >&2
         exit 1
