@@ -718,6 +718,19 @@ impl App {
             .map(|pane| pane_agent_status(update.state, pane.seen))
             .unwrap_or_else(|| pane_agent_status(update.state, update.seen));
 
+        if previous_agent_status != agent_status {
+            self.record_agent_transition(crate::api::schema::AgentHistoryEntry {
+                at_ms: std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map_or(0, |elapsed| elapsed.as_millis() as u64),
+                pane_id: pane_id.clone(),
+                workspace_id: workspace_id.clone(),
+                agent: update.agent_label.clone(),
+                from: previous_agent_status,
+                to: agent_status,
+            });
+        }
+
         if previous_agent_status != agent_status
             || update.previous_presentation != update.presentation
         {
@@ -735,6 +748,31 @@ impl App {
                 },
             });
         }
+    }
+
+    fn record_agent_transition(&mut self, entry: crate::api::schema::AgentHistoryEntry) {
+        if self.agent_history.len() >= crate::persist::agent_history::CAPACITY {
+            self.agent_history.pop_front();
+        }
+        self.agent_history.push_back(entry);
+        self.state.mark_session_dirty();
+    }
+
+    fn handle_agent_history(
+        &self,
+        id: String,
+        params: crate::api::schema::AgentHistoryParams,
+    ) -> String {
+        let limit = params
+            .limit
+            .unwrap_or(100)
+            .clamp(1, crate::persist::agent_history::CAPACITY);
+        let skip = self.agent_history.len().saturating_sub(limit);
+        let entries = self.agent_history.iter().skip(skip).cloned().collect();
+        responses::encode_success(
+            id,
+            crate::api::schema::ResponseResult::AgentHistory { entries },
+        )
     }
 
     pub(crate) fn sync_toast_deadline(
@@ -1243,6 +1281,9 @@ impl App {
             }
             Method::PluginActionInvoke(params) => {
                 return self.handle_plugin_action_invoke(request.id, params);
+            }
+            Method::AgentHistory(params) => {
+                return self.handle_agent_history(request.id, params);
             }
             Method::PluginLogList(params) => {
                 return self.handle_plugin_log_list(request.id, params);
@@ -2508,5 +2549,52 @@ mod tests {
             app.state.toast.as_ref().map(|toast| toast.context.as_str()),
             Some("__herdr_original__ · 1")
         );
+    }
+    #[test]
+    fn agent_history_is_bounded_and_limit_returns_newest_entries() {
+        use crate::api::schema::{AgentHistoryEntry, AgentHistoryParams, AgentStatus, Method};
+
+        let (_api_tx, api_rx) = tokio::sync::mpsc::unbounded_channel();
+        let mut app = App::new(
+            &crate::config::Config::default(),
+            crate::app::AppPolicy::TEST,
+            None,
+            api_rx,
+            crate::api::EventHub::default(),
+        );
+        let total = crate::persist::agent_history::CAPACITY + 5;
+        for at_ms in 0..total as u64 {
+            app.record_agent_transition(AgentHistoryEntry {
+                at_ms,
+                pane_id: "w1:p1".into(),
+                workspace_id: "w1".into(),
+                agent: None,
+                from: AgentStatus::Working,
+                to: AgentStatus::Done,
+            });
+        }
+        assert!(app.state.session_dirty);
+
+        let response = app.handle_api_request(crate::api::schema::Request {
+            id: "history".into(),
+            method: Method::AgentHistory(AgentHistoryParams { limit: Some(3) }),
+        });
+        let response: serde_json::Value = serde_json::from_str(&response).unwrap();
+        assert_eq!(response["result"]["type"], "agent_history");
+        let at: Vec<_> = response["result"]["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|entry| entry["at_ms"].as_u64().unwrap())
+            .collect();
+        assert_eq!(
+            at,
+            vec![total as u64 - 3, total as u64 - 2, total as u64 - 1]
+        );
+        assert_eq!(
+            app.agent_history.len(),
+            crate::persist::agent_history::CAPACITY
+        );
+        assert_eq!(app.agent_history[0].at_ms, 5);
     }
 }

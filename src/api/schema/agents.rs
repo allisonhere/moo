@@ -258,3 +258,22 @@ pub struct AgentSessionInfo {
     pub kind: crate::agent_resume::AgentSessionRefKind,
     pub value: String,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct AgentHistoryEntry {
+    /// Unix time of the transition, in milliseconds.
+    pub at_ms: u64,
+    pub pane_id: String,
+    pub workspace_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent: Option<String>,
+    pub from: AgentStatus,
+    pub to: AgentStatus,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema, Default)]
+pub struct AgentHistoryParams {
+    /// Newest entries to return; defaults to 100, capped at the retained history.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limit: Option<usize>,
+}

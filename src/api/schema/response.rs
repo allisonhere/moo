@@ -278,6 +278,9 @@ pub enum ResponseResult {
         projection_revision: u64,
     },
     Ok {},
+    AgentHistory {
+        entries: Vec<super::agents::AgentHistoryEntry>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]

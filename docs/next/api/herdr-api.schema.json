@@ -1228,6 +1228,20 @@
     },
     "request": {
       "$defs": {
+        "AgentHistoryParams": {
+          "properties": {
+            "limit": {
+              "description": "Newest entries to return; defaults to 100, capped at the retained history.",
+              "format": "uint",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          "type": "object"
+        },
         "AgentPromptParams": {
           "properties": {
             "target": {
@@ -6312,6 +6326,22 @@
             "params"
           ],
           "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
+              "const": "agent.history",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/schemas/request/$defs/AgentHistoryParams"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
         }
       ],
       "properties": {
@@ -6540,6 +6570,42 @@
     },
     "success_response": {
       "$defs": {
+        "AgentHistoryEntry": {
+          "properties": {
+            "agent": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "at_ms": {
+              "description": "Unix time of the transition, in milliseconds.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "from": {
+              "$ref": "#/schemas/success_response/$defs/AgentStatus"
+            },
+            "pane_id": {
+              "type": "string"
+            },
+            "to": {
+              "$ref": "#/schemas/success_response/$defs/AgentStatus"
+            },
+            "workspace_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "at_ms",
+            "pane_id",
+            "workspace_id",
+            "from",
+            "to"
+          ],
+          "type": "object"
+        },
         "AgentInfo": {
           "properties": {
             "agent": {
@@ -10413,6 +10479,25 @@
               },
               "required": [
                 "type"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "entries": {
+                  "items": {
+                    "$ref": "#/schemas/success_response/$defs/AgentHistoryEntry"
+                  },
+                  "type": "array"
+                },
+                "type": {
+                  "const": "agent_history",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "entries"
               ],
               "type": "object"
             }

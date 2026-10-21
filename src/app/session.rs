@@ -37,8 +37,11 @@ impl App {
         }
     }
 
-    fn capture_session_save_job(&self) -> SessionSaveJob {
-        if self.state.workspaces.is_empty() {
+    fn capture_session_save_job(
+        &self,
+    ) -> (SessionSaveJob, Vec<crate::api::schema::AgentHistoryEntry>) {
+        let agent_history = self.agent_history.iter().cloned().collect();
+        let job = if self.state.workspaces.is_empty() {
             SessionSaveJob::Clear
         } else {
             let snapshot = crate::persist::capture(
@@ -56,7 +59,8 @@ impl App {
                 )
             });
             SessionSaveJob::Save { snapshot, history }
-        }
+        };
+        (job, agent_history)
     }
 
     pub(crate) fn start_background_session_save(&mut self) {
@@ -71,18 +75,21 @@ impl App {
             return;
         }
 
-        let job = self.capture_session_save_job();
+        let (job, agent_history) = self.capture_session_save_job();
         self.pane_exit_checkpoint_pending = false;
         self.session_save_deadline = None;
         let writer = self.session_writer.clone();
         match std::thread::Builder::new()
             .name("herdr-session-save".into())
-            .spawn(move || run_session_save_job(job, &writer))
+            .spawn(move || run_session_save_job(job, &agent_history, &writer))
         {
             Ok(thread) => self.session_save_thread = Some(thread),
             Err(err) => {
                 tracing::warn!(err = %err, "failed to spawn session save thread; saving inline");
-                run_session_save_job(self.capture_session_save_job(), &self.session_writer);
+                {
+                    let (job, agent_history) = self.capture_session_save_job();
+                    run_session_save_job(job, &agent_history, &self.session_writer);
+                }
             }
         }
     }
@@ -97,7 +104,10 @@ impl App {
             return;
         }
 
-        run_session_save_job(self.capture_session_save_job(), &self.session_writer);
+        {
+            let (job, agent_history) = self.capture_session_save_job();
+            run_session_save_job(job, &agent_history, &self.session_writer);
+        }
         self.pane_exit_checkpoint_pending = false;
         self.session_save_deadline = None;
     }
@@ -131,6 +141,7 @@ impl App {
 
 fn run_session_save_job(
     job: SessionSaveJob,
+    agent_history: &[crate::api::schema::AgentHistoryEntry],
     writer: &std::sync::Mutex<crate::persist::SessionWriter>,
 ) {
     let mut writer = match writer.lock() {
@@ -144,4 +155,5 @@ fn run_session_save_job(
         SessionSaveJob::Clear => writer.clear(),
         SessionSaveJob::Save { snapshot, history } => writer.save(&snapshot, history.as_ref()),
     }
+    crate::persist::agent_history::save(agent_history);
 }

@@ -110,6 +110,7 @@ pub struct App {
     pub(crate) event_rx: mpsc::Receiver<AppEvent>,
     pub(crate) api_rx: tokio::sync::mpsc::UnboundedReceiver<crate::api::ApiRequestMessage>,
     pub(crate) event_hub: crate::api::EventHub,
+    pub(crate) agent_history: std::collections::VecDeque<crate::api::schema::AgentHistoryEntry>,
     pub(crate) last_focus: Option<(usize, crate::layout::PaneId)>,
     pub(crate) policy: AppPolicy,
     pub(crate) config_diagnostic_deadline: Option<Instant>,
@@ -419,6 +420,11 @@ impl App {
                 false,
             );
         }
+        let agent_history = if policy.restore_session {
+            crate::persist::agent_history::load().into()
+        } else {
+            Default::default()
+        };
         let session_writer = Arc::new(std::sync::Mutex::new(crate::persist::SessionWriter::new(
             policy.restore_session && snapshot.is_none(),
         )));
@@ -658,6 +664,7 @@ impl App {
             session_save_deadline: None,
             session_save_thread: None,
             session_writer,
+            agent_history,
             pane_exit_checkpoint_pending: false,
             detached_process_children: Vec::new(),
             tab_bar_status_generation: 0,
