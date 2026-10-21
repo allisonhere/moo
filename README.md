@@ -46,7 +46,7 @@ moo
 
 ## releases
 
-From `master`, run `./deploy.sh` to open the release console. Choose the version bump, optionally enable dry-run mode, then run **Validate**, **Commit**, **Push**, and **Tag & release** in order. **Commit** includes tracked changes and the Cargo version bump; untracked local scratch files are displayed but ignored. The final step pushes an immutable tag that builds the GitHub release. Direct commands such as `./deploy.sh patch` and `./deploy.sh --dry-run patch` remain available for scripting.
+From `master`, run `./deploy.sh` to open the release console. It shows the four steps (Check, Commit, Push, Release) with their state read from git, a live output panel, and the version this run will publish. Use `←`/`→` to pick the bump and `d` for a dry run. `enter` runs the next unfinished step (Commit and Release ask for confirmation), `a` runs every remaining step, and `c` runs the checks alone. **Commit** includes tracked changes and the Cargo version bump; untracked scratch files are listed but ignored. Release pushes an immutable tag that builds the GitHub release. `./deploy.sh patch` and `./deploy.sh --dry-run patch` remain for scripting.
 
 ## docs
 

@@ -5,11 +5,9 @@ readonly REPO="allisonhere/moo"
 readonly BRANCH="master"
 readonly TOOLCHAIN="1.96.1"
 readonly SELF="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
-readonly STATUS_ROW=15
 
 bold=$'\033[1m'; cyan=$'\033[36m'; green=$'\033[32m'
 yellow=$'\033[33m'; red=$'\033[31m'; reset=$'\033[0m'
-activity="Ready."
 
 die() { printf 'error: %s\n' "$*" >&2; exit 1; }
 
@@ -65,7 +63,7 @@ preflight() {
     require_origin
     fetch_release_refs || return
     case "$action" in
-        validate|commit) [[ $(git rev-parse HEAD) == $(git rev-parse "origin/$BRANCH") ]] || die "start from the current origin/$BRANCH" ;;
+        validate|commit) git merge-base --is-ancestor "origin/$BRANCH" HEAD || die "$BRANCH is behind or has diverged from origin/$BRANCH; pull first" ;;
         push)
             [[ -z $(git status --porcelain --untracked-files=no) ]] || die "tracked files remain; run Commit first"
             git merge-base --is-ancestor "origin/$BRANCH" HEAD || die "$BRANCH has diverged from origin/$BRANCH"
@@ -126,78 +124,172 @@ run_internal() {
     esac
 }
 
-screen_leave() { printf '\033[?25h\033[?1049l'; }
-status_line() { printf '\033[%s;1H\033[2K  %b%s%b' "$STATUS_ROW" "${2:-$reset}" "$1" "$reset"; }
+# ── release console ──────────────────────────────────────────────────────────
+# One screen: a four-step pipeline whose state is read from git, a live output
+# panel, and a single "run the next step" key.
 
-draw_screen() {
-    local selected=$1 bump=$2 dry=$3 branch tracked untracked current next i marker
-    branch=$(git branch --show-current 2>/dev/null || printf '?')
-    tracked=$(git status --porcelain --untracked-files=no 2>/dev/null | wc -l)
-    untracked=$(git ls-files --others --exclude-standard 2>/dev/null | wc -l)
-    current=$(latest_tag); next=$(resolve_version "$current" "$bump" 2>/dev/null || printf '?')
-    printf '\033[?2026h\033[H'
-    printf '%b  ◆ MOO RELEASE%b\n' "$bold$cyan" "$reset"
-    printf '  %b%s%b  ·  %s  ·  %s tracked  ·  %s untracked ignored\n\n' "$bold" "$REPO" "$reset" "$branch" "$tracked" "$untracked"
-    printf '  Version  %b%s → v%s%b    bump: %b%s%b    dry run: %b%s%b\n\n' "$bold" "$current" "$next" "$reset" "$cyan" "$bump" "$reset" "$yellow" "$([[ "$dry" -eq 1 ]] && printf on || printf off)" "$reset"
-    printf '  Release steps\n\n'
-    local labels=("Validate" "Commit" "Push" "Tag & release" "Quit")
-    local details=("run release checks" "commit tracked files + version" "push master" "publish immutable tag" "leave console")
-    for i in "${!labels[@]}"; do
-        marker=' '; [[ "$selected" -eq "$i" ]] && marker="${cyan}›${reset}"
-        printf '  %b %-14s %s\n' "$marker" "${labels[$i]}" "${details[$i]}"
+readonly SPIN=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
+readonly BUMPS=(patch minor major)
+readonly STEPS=(check commit push release)
+readonly STEP_HINT=("run the release checks" "bump the version and commit" "push $BRANCH to origin" "tag and publish the release")
+readonly LOG_ROWS=7
+
+dim=$'\033[2m'
+ui_bump=0; ui_dry=0; ui_check=pending; ui_log=(); ui_note=""; ui_note_color=$dim; ui_spin=""
+
+screen_leave() { printf '\033[?25h\033[?1049l'; }
+
+cargo_version() { sed -n '/^\[package\]$/,/^\[/s/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -1; }
+
+# Version this run will publish: a version already committed past the latest tag
+# wins, otherwise the chosen bump of the latest tag.
+target_version() {
+    local latest committed
+    latest=$(latest_tag); committed=$(cargo_version)
+    if [[ $(printf '%s\n%s\n' "${latest#v}" "$committed" | sort -V | tail -1) == "$committed" && "$committed" != "${latest#v}" ]]; then
+        printf '%s\n' "$committed"
+    else
+        resolve_version "$latest" "${BUMPS[$ui_bump]}" 2>/dev/null || printf '?'
+    fi
+}
+
+step_state() {
+    local step=$1 target=$2
+    case "$step" in
+        check) printf '%s' "$ui_check" ;;
+        commit) [[ $(cargo_version) == "$target" ]] && printf ok || printf pending ;;
+        push)
+            [[ $(cargo_version) == "$target" && $(git rev-parse HEAD) == $(git rev-parse "origin/$BRANCH" 2>/dev/null) ]] && printf ok || printf pending ;;
+        release) git rev-parse --verify --quiet "refs/tags/v$target" >/dev/null && printf ok || printf pending ;;
+    esac
+}
+
+# First unfinished step of commit → push → release; empty when all are done.
+next_step() {
+    local step
+    for step in commit push release; do
+        [[ $(step_state "$step" "$1") == ok ]] || { printf '%s' "$step"; return; }
     done
-    printf '\n  Activity\n  %s\n\n' "$activity"
-    printf '  %b↑/↓%b move   %b←/→%b bump   %bd%b dry run   %benter%b select   %bq%b quit' "$bold" "$reset" "$bold" "$reset" "$bold" "$reset" "$bold" "$reset" "$bold" "$reset"
+}
+
+strip_ansi() { sed $'s/\033\\[[0-9;?]*[a-zA-Z]//g; s/\r//g'; }
+
+load_log() {
+    local width=$(($1 - 4)) line
+    ui_log=()
+    while IFS= read -r line; do ui_log+=("${line:0:$width}"); done < <(strip_ansi <"$2" | awk 'NF' | tail -n "$LOG_ROWS")
+}
+
+draw() {
+    local cols width rule target current branch changed ignored step state glyph color i b next
+    cols=$(tput cols 2>/dev/null || printf 80); width=$((cols < 72 ? cols - 2 : 70)); ((width < 40)) && width=40
+    printf -v rule '%*s' "$((width - 2))" ''; rule=${rule// /─}
+    current=$(latest_tag); target=$(target_version); next=$(next_step "$target")
+    branch=$(git branch --show-current 2>/dev/null || printf '?')
+    changed=$(git status --porcelain --untracked-files=no 2>/dev/null | wc -l)
+    ignored=$(git ls-files --others --exclude-standard 2>/dev/null | wc -l)
+
+    printf '\033[?2026h\033[H'
+    printf '\n  %b◆ MOO RELEASE%b' "$bold$cyan" "$reset"
+    ((ui_dry)) && printf '   %b dry run %b' $'\033[30;43m' "$reset"
+    printf '\033[K\n  %b%s · %s · %s changed, %s untracked ignored%b\033[K\n\n' "$dim" "$REPO" "$branch" "$changed" "$ignored" "$reset"
+
+    printf '  %b%s%b  →  %b%sv%s%b     ' "$dim" "$current" "$reset" "$bold$green" "" "$target" "$reset"
+    for i in "${!BUMPS[@]}"; do
+        b=${BUMPS[$i]}
+        if ((i == ui_bump)); then printf '%b %s %b ' $'\033[7m' "$b" "$reset"; else printf '%b%s%b  ' "$dim" "$b" "$reset"; fi
+    done
+    printf '\033[K\n\n'
+
+    for i in "${!STEPS[@]}"; do
+        step=${STEPS[$i]}; state=$(step_state "$step" "$target")
+        case "$state" in
+            ok) glyph='✓'; color=$green ;;
+            fail) glyph='✗'; color=$red ;;
+            *) glyph='○'; color=$dim ;;
+        esac
+        [[ "$step" == "$next" && "$state" != fail ]] && { glyph='›'; color=$cyan; }
+        printf '  %b%s%b %s  %b%-8s%b %b%s%b\033[K\n' "$color" "$glyph" "$reset" "$((i + 1))" "$bold" "${step^}" "$reset" "$dim" "${STEP_HINT[$i]}" "$reset"
+    done
+
+    printf '\n  %b%s%b\033[K\n' "$dim" "$rule" "$reset"
+    for ((i = 0; i < LOG_ROWS; i++)); do printf '  %b%s%b\033[K\n' "$dim" "${ui_log[$i]:-}" "$reset"; done
+    printf '  %b%s%b\033[K\n\n' "$dim" "$rule" "$reset"
+
+    printf '  %b%s%s%b\033[K\n\n' "$ui_note_color" "$ui_spin" "$ui_note" "$reset"
+    printf '  %benter%b %s   %ba%b all   %bc%b check   %b←/→%b bump   %bd%b dry run   %bq%b quit\033[K' \
+        "$bold" "$reset" "${next:-done}" "$bold" "$reset" "$bold" "$reset" "$bold" "$reset" "$bold" "$reset" "$bold" "$reset"
     printf '\033[J\033[?2026l'
 }
 
-run_with_progress() {
-    local action=$1 bump=$2 dry=$3 tmp pid frame=0 started result message
-    local spin=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
-    tmp=$(mktemp "${TMPDIR:-/tmp}/moo-release-XXXXXX")
-    "$SELF" --internal "$action" "$bump" "$dry" >"$tmp" 2>&1 & pid=$!; started=$SECONDS
+note() { ui_note=$1; ui_note_color=${2:-$dim}; ui_spin=""; }
+
+# Runs one action in a child process while animating the screen and tailing its output.
+run_step() {
+    local action=$1 tmp pid frame=0 started rc width
+    width=$(tput cols 2>/dev/null || printf 80)
+    tmp=$(mktemp "${TMPDIR:-/tmp}/moo-release-XXXXXX"); started=$SECONDS
+    "$SELF" --internal "$action" "${BUMPS[$ui_bump]}" "$ui_dry" >"$tmp" 2>&1 & pid=$!
     while kill -0 "$pid" 2>/dev/null; do
-        status_line "${spin[$frame]} ${action^}… $((SECONDS - started))s" "$cyan"
-        frame=$(((frame + 1) % ${#spin[@]})); sleep 0.2
+        load_log "$width" "$tmp"
+        ui_spin="${SPIN[$frame]} "; ui_note="${action^} · $((SECONDS - started))s"; ui_note_color=$cyan
+        draw; frame=$(((frame + 1) % ${#SPIN[@]})); sleep 0.15
     done
-    if wait "$pid"; then
-        activity="✓ ${action^} completed in $((SECONDS - started))s"
-        status_line "$activity" "$green"
-    else
-        result=$?; message=$(sed $'s/\033\[[0-9;]*m//g' "$tmp" | awk 'NF { line=$0 } END { print line }'); message=${message:-"exit $result"}
-        activity="✗ ${action^}: ${message:0:100}"
-        status_line "$activity" "$red"
-    fi
-    rm -f "$tmp"
+    wait "$pid"; rc=$?
+    load_log "$width" "$tmp"; rm -f "$tmp"
+    [[ "$action" == check ]] && { ((rc == 0)) && ui_check=ok || ui_check=fail; }
+    if ((rc == 0)); then note "✓ ${action^} finished in $((SECONDS - started))s" "$green"
+    else note "✗ ${action^} failed (exit $rc), see output above" "$red"; fi
+    return "$rc"
 }
 
-confirm_action() {
+# Returns 0 on enter, 1 on anything else.
+confirm() {
     local key
-    status_line "$1? y/N" "$yellow"; IFS= read -rsn1 key
-    [[ "$key" == y || "$key" == Y ]]
+    note "$1 — enter to confirm, any other key cancels" "$yellow"; draw
+    IFS= read -rsn1 key
+    if [[ -z "$key" ]]; then return 0; fi
+    note "cancelled" "$dim"; return 1
+}
+
+run_pipeline() {
+    local target step
+    target=$(target_version)
+    confirm "Run every remaining step for v$target$( ((ui_dry)) && printf ' (dry run)')" || return
+    for step in commit push release; do
+        if ((ui_dry == 0)) && [[ $(step_state "$step" "$target") == ok ]]; then continue; fi
+        run_step "$step" || return
+    done
+}
+
+run_next() {
+    local target step
+    target=$(target_version); step=$(next_step "$target")
+    [[ -n "$step" ]] || { note "v$target is already released — change the bump to start another" "$yellow"; return; }
+    case "$step" in
+        commit|release) confirm "${step^} v$target$( ((ui_dry)) && printf ' (dry run)')" || return ;;
+    esac
+    run_step "$step"
 }
 
 run_console() {
     [[ -t 0 && -t 1 ]] || die "a terminal is required; pass a version for direct mode"
-    local bumps=(patch minor major) bump_index=0 selected=0 dry=0 key rest
+    local key rest
     cd "$(repo_root)" || exit 1
+    fetch_release_refs 2>/dev/null
     printf '\033[?1049h\033[?25l'; trap screen_leave EXIT INT TERM
+    note "Ready." "$dim"
     while true; do
-        draw_screen "$selected" "${bumps[$bump_index]}" "$dry"; IFS= read -rsn1 key
+        draw; IFS= read -rsn1 key
         if [[ "$key" == $'\033' ]]; then IFS= read -rsn2 -t 0.05 rest || true; key+="$rest"; fi
         case "$key" in
-            $'\033[A'|k) selected=$(((selected + 4) % 5)) ;; $'\033[B'|j) selected=$(((selected + 1) % 5)) ;;
-            $'\033[D'|h) bump_index=$(((bump_index + 2) % 3)) ;; $'\033[C'|l) bump_index=$(((bump_index + 1) % 3)) ;;
-            d) dry=$((1 - dry)) ;; q|$'\033') break ;;
-            '')
-                case "$selected" in
-                    0) run_with_progress validate "${bumps[$bump_index]}" "$dry" ;;
-                    1) confirm_action Commit && run_with_progress commit "${bumps[$bump_index]}" "$dry" ;;
-                    2) run_with_progress push "${bumps[$bump_index]}" "$dry" ;;
-                    3) confirm_action Release && run_with_progress release "${bumps[$bump_index]}" "$dry" ;;
-                    4) break ;;
-                esac
-                ;;
+            $'\033[D'|h) ui_bump=$(((ui_bump + 2) % 3)) ;;
+            $'\033[C'|l) ui_bump=$(((ui_bump + 1) % 3)) ;;
+            d) ui_dry=$((1 - ui_dry)) ;;
+            c) run_step check ;;
+            a) run_pipeline ;;
+            '') run_next ;;
+            q|$'\033') break ;;
         esac
     done
 }
