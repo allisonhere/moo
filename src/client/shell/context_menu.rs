@@ -48,6 +48,7 @@ impl ClientContextMenuOverlay {
             ClientContextMenuTarget::Tab { .. } => vec![
                 item("New tab", Action::NewTab),
                 item("Rename", Action::Rename),
+                item("Color", Action::Color),
                 item("Close", Action::Close),
             ],
             ClientContextMenuTarget::Agent { has_name, .. } => {
@@ -365,7 +366,12 @@ impl ClientShellState {
                     );
                 }
             }
-            ClientContextMenuAction::Rename => {
+            ClientContextMenuAction::Rename | ClientContextMenuAction::Color => {
+                let title = if action == ClientContextMenuAction::Color {
+                    "tab color"
+                } else {
+                    "rename tab"
+                };
                 let tab = self
                     .snapshot
                     .as_deref()
@@ -373,7 +379,7 @@ impl ClientShellState {
                 if let Some(tab) = tab {
                     self.overlay = Some(ClientShellOverlay::Rename(ClientRenameOverlay {
                         tab_color: Some(ClientTabColorChoice::for_tab(tab)),
-                        title: "rename tab",
+                        title,
                         input: TextEditor::new(&tab.label, false),
                         target: ClientRenameTarget::Tab {
                             tab_id,

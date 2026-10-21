@@ -140,7 +140,12 @@ pub(crate) fn render_tab_bar(
                 1,
                 TAB_PILL,
                 Style::default()
-                    .fg(status_color(tab.agent_status, palette))
+                    .fg(match accent {
+                        // The focused tab is already filled with its color.
+                        Some(_) if tab.focused => panel_contrast_fg(palette),
+                        Some(color) => color,
+                        None => status_color(tab.agent_status, palette),
+                    })
                     .bg(style.bg.unwrap_or(palette.surface0)),
             );
         }
@@ -395,7 +400,7 @@ fn max_tab_scroll(widths: &[u16], available: u16) -> usize {
 const TAB_PILL: &str = "●";
 
 fn tab_shows_pill(tab: &ClientShellTab, enabled: bool) -> bool {
-    enabled && tab.agent_status != crate::api::schema::AgentStatus::Unknown
+    enabled && (tab.color.is_some() || tab.agent_status != crate::api::schema::AgentStatus::Unknown)
 }
 
 fn tab_label(tab: &ClientShellTab, pill: bool) -> String {

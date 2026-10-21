@@ -32,7 +32,7 @@ fn request_close(state: &mut ClientShellState, menu: bool) -> ClientShellInput {
     if menu {
         state.open_tab_context_menu("tab_1".into(), 30, 1);
         state.compose(106, 24).unwrap();
-        let close_row = state.hits.context_menu_rows[2].0;
+        let close_row = state.hits.context_menu_rows[3].0;
         click(state, close_row)
     } else {
         let mut outcome = ClientShellInput::default();
