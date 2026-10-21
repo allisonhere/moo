@@ -154,8 +154,8 @@ $legacyStableManifest | Out-File -LiteralPath $stableManifestPath -Encoding utf8
 $customPreviewManifest | ConvertTo-Json -Depth 5 | Out-File -LiteralPath $customPreviewManifestPath -Encoding utf8
 
 $server = $null
-$oldHerdrHome = $env:MOO_HOME
-$oldInstallerUrl = $env:MOO_INSTALLER_URL
+$oldHerdrHome = $env:HERDR_HOME
+$oldInstallerUrl = $env:HERDR_INSTALLER_URL
 $oldProcessPath = $env:Path
 $registryOptions = [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames
 $realUserEnvironmentKey = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey("Environment")
@@ -176,7 +176,7 @@ $realUserPathKind = if ($realUserPathExisted) {
 $realUserEnvironmentKey.Dispose()
 try {
     $server = Start-Process python -ArgumentList @("-m", "http.server", "$port", "--bind", "127.0.0.1", "--directory", $webRoot) -PassThru -WindowStyle Hidden
-    $env:MOO_HOME = Join-Path $root "unused\..\home"
+    $env:HERDR_HOME = Join-Path $root "unused\..\home"
     $previewManifestUrl = "http://127.0.0.1:$port/preview.json"
     $stableManifestUrl = "http://127.0.0.1:$port/latest.json"
     for ($attempt = 0; $attempt -lt 20; $attempt++) {
@@ -192,8 +192,8 @@ try {
     $freshStableHome = Join-Path $root "fresh-stable-home"
     $freshStableBin = Join-Path $root "fresh-stable-bin"
     $stableManifest | Out-File -LiteralPath $stableManifestPath -Encoding utf8
-    $env:MOO_HOME = $freshStableHome
-    $env:MOO_INSTALLER_URL = "http://127.0.0.1:$port/install.ps1"
+    $env:HERDR_HOME = $freshStableHome
+    $env:HERDR_INSTALLER_URL = "http://127.0.0.1:$port/install.ps1"
     $env:Path = $oldProcessPath
     & $bootstrapPath `
         -ManifestUrl $stableManifestUrl `
@@ -201,7 +201,7 @@ try {
     if ($LASTEXITCODE -ne 0) {
         throw "CMD bootstrap failed with exit code $LASTEXITCODE"
     }
-    $env:MOO_INSTALLER_URL = $oldInstallerUrl
+    $env:HERDR_INSTALLER_URL = $oldInstallerUrl
     $freshStableRelease = Get-ChildItem -LiteralPath (Join-Path $freshStableHome "packages\standalone\releases") -Directory |
         Where-Object { $_.Name.StartsWith("0.0.1-") } |
         Select-Object -First 1
@@ -210,7 +210,7 @@ try {
     }
 
     $legacyStableManifest | Out-File -LiteralPath $stableManifestPath -Encoding utf8
-    $env:MOO_HOME = Join-Path $root "unused\..\home"
+    $env:HERDR_HOME = Join-Path $root "unused\..\home"
     $env:Path = $oldProcessPath
     & $installerPath `
         -ManifestUrl $stableManifestUrl `
@@ -221,7 +221,7 @@ try {
     & $installerPath "preview" $previewManifestUrl $installDir "installer-test" 3
 
     $localInstallDir = Join-Path $root "local-bin"
-    $env:MOO_HOME = Join-Path $root "local-home"
+    $env:HERDR_HOME = Join-Path $root "local-home"
     $partialLocalModeRejected = $false
     try {
         & $installerPath `
@@ -266,7 +266,7 @@ try {
     if (-not (Test-Path -LiteralPath (Join-Path $localInstallDir "herdr.exe") -PathType Leaf)) {
         throw "installer did not activate the verified local package"
     }
-    $env:MOO_HOME = $herdrHome
+    $env:HERDR_HOME = $herdrHome
 
     $required = @(
         "herdr.exe",
@@ -584,7 +584,7 @@ exit /b 1
 
     $preserveHome = Join-Path $root "preserve-home"
     $preserveBin = Join-Path $root "preserve-bin"
-    $env:MOO_HOME = $preserveHome
+    $env:HERDR_HOME = $preserveHome
     $env:Path = "$fakeBin;$oldProcessPath"
     $unrecognizedCommandRejected = $false
     try {
@@ -619,8 +619,8 @@ exit /b 1
         throw "installer invoked an unrecognized command despite an explicit channel"
     }
 } finally {
-    $env:MOO_HOME = $oldHerdrHome
-    $env:MOO_INSTALLER_URL = $oldInstallerUrl
+    $env:HERDR_HOME = $oldHerdrHome
+    $env:HERDR_INSTALLER_URL = $oldInstallerUrl
     $env:Path = $oldProcessPath
     if ($null -ne $server -and -not $server.HasExited) {
         Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue
