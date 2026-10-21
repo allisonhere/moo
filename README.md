@@ -38,6 +38,10 @@ moo
 
 `ctrl+b q` detaches and `moo` reattaches. `moo update` does not download anything; rerun the install script to update.
 
+## releases
+
+From a clean, pushed `master`, run `./deploy.sh patch` (or `minor`, `major`, or an explicit version). The script checks the source, bumps the Cargo version, runs `just check`, and pushes an immutable tag that builds the GitHub release. Preview the operation without changing anything with `./deploy.sh --dry-run patch`.
+
 ## docs
 
 The fork guide is [`docs/next/website/src/content/docs/moo.mdx`](docs/next/website/src/content/docs/moo.mdx): requirements, identity paths, troubleshooting, removal, and current limitations. Upstream docs at [herdr.dev/docs](https://herdr.dev/docs/) apply to everything the fork has not changed.

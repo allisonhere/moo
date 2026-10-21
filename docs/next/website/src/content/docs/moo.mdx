@@ -6,7 +6,7 @@ description: Build, run, and use the downstream Moo development fork alongside u
 Moo is the temporary name for this downstream development fork. It keeps Herdr's terminal engine, agent detection, provider integrations, session format, and socket API, but runs as a separate application with its own binary, config, state, and sockets. It can sit next to upstream Herdr without either application attaching to the other's server.
 
 :::note
-Moo is a development build, not a published product. The name, install paths, and release process can change. Build it from a reviewed revision you trust.
+Moo is experimental. Tagged GitHub releases are available, but the name, install paths, and release process can still change. Install only revisions or releases you trust.
 :::
 
 ## Requirements
@@ -155,6 +155,18 @@ git pull
 ```
 
 `moo update` explains this instead of downloading an upstream binary.
+
+## Release process
+
+Maintainers release from a clean, pushed `master` checkout:
+
+```sh
+./deploy.sh patch
+```
+
+Use `minor`, `major`, or an explicit version such as `1.2.3` instead of `patch` when needed. `./deploy.sh --dry-run patch` validates the source and shows the selected version without changing files, commits, or tags.
+
+The script updates the Cargo package version, runs `just check`, commits the version files, and pushes an annotated tag. The Moo release workflow builds Linux, macOS, and Windows assets, includes the Windows ConPTY runtime, writes `SHA256SUMS`, and publishes the GitHub release.
 
 ## Remove
 
