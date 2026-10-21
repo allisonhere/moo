@@ -199,7 +199,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $exe = Join-Path $PWD "target\debug\herdr.exe"
+          $exe = Join-Path $PWD "target\debug\moo.exe"
           .\scripts\windows_smoke_conpty_path.ps1 -ExePath $exe -Session "ci-windows-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
 
       # Save before rust-cache's post-step removes incremental state.
@@ -289,7 +289,7 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           Remove-Item Env:HERDR_SOCKET_PATH, Env:HERDR_CLIENT_SOCKET_PATH -ErrorAction SilentlyContinue
-          $exe = Join-Path $PWD "target\x86_64-pc-windows-msvc\debug\herdr.exe"
+          $exe = Join-Path $PWD "target\x86_64-pc-windows-msvc\debug\moo.exe"
           $bundle = Join-Path (Split-Path -Parent $exe) "conpty"
           New-Item -ItemType Directory -Force -Path (Join-Path $bundle "x64"), (Join-Path $bundle "arm64") | Out-Null
           Set-Content -LiteralPath (Join-Path $bundle "herdr-conpty.json") -Value "{}" -Encoding ascii
@@ -329,7 +329,7 @@ jobs:
           $stage = Join-Path $env:RUNNER_TEMP "herdr-windows-x86_64"
           New-Item -ItemType Directory -Force -Path artifacts | Out-Null
           .\scripts\package_windows_conpty.ps1 `
-            -HerdrExe target\x86_64-pc-windows-msvc\debug\herdr.exe `
+            -HerdrExe target\x86_64-pc-windows-msvc\debug\moo.exe `
             -PackagePath $package `
             -StageDir $stage `
             -OutputPath artifacts\herdr-windows-x86_64.zip

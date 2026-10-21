@@ -7,6 +7,8 @@ const load = (name: string): any =>
   Bun.YAML.parse(readFileSync(new URL(`../.github/workflows/${name}.yml`, import.meta.url), "utf8"));
 const preview = load("preview");
 const release = load("release");
+const ci = load("ci");
+const distribution = load("distribution");
 const adminGate = release.jobs["validate-release-source"].steps[0];
 
 describe("official publishing workflow boundaries", () => {
@@ -14,6 +16,18 @@ describe("official publishing workflow boundaries", () => {
     expect(preview.on).toEqual({ push: { tags: ["preview-*"] } });
     expect(release.on).toEqual({ push: { tags: ["v*"] } });
     expect(load("ci").on.pull_request).toBeDefined();
+  });
+
+  test("fork CI uses the Moo binary while upstream distribution checks stay upstream", () => {
+    const windowsSteps = ci.jobs.check.steps.map((step: any) => step.run ?? "").join("\n");
+    const conptySteps = ci.jobs["windows-conpty-package"].steps
+      .map((step: any) => step.run ?? "")
+      .join("\n");
+
+    expect(windowsSteps).toContain("target\\debug\\moo.exe");
+    expect(conptySteps).toContain("target\\x86_64-pc-windows-msvc\\debug\\moo.exe");
+    expect(conptySteps).not.toContain("target\\x86_64-pc-windows-msvc\\debug\\herdr.exe");
+    expect(distribution.jobs.validate.if).toBe("github.repository == 'herdrdev/herdr'");
   });
 
   test("preview checks do not require a workstation Windows SDK", () => {
