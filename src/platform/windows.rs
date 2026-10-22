@@ -5439,7 +5439,7 @@ mod tests {
 
     #[test]
     fn process_environment_variable_parser_reads_case_insensitive_marker() {
-        let environment: Vec<u16> = "PATH=C:\\Windows\0herdr_pane_runtime_id=pane-a\0\0"
+        let environment: Vec<u16> = "PATH=C:\\Windows\0moo_pane_runtime_id=pane-a\0\0"
             .encode_utf16()
             .collect();
 
