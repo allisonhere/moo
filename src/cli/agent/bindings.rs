@@ -218,6 +218,22 @@ cli_projection! {
     }
 }
 
+pub(crate) struct Handoff {
+    pub(crate) from: String,
+    pub(crate) to: String,
+    pub(crate) lines: Option<u32>,
+    pub(crate) note: Option<String>,
+}
+
+cli_projection! {
+    HandoffProjection for Handoff {
+        from => Field::new(String::new()).input(text_position("from", "FROM", 0)),
+        to => Field::new(String::new()).input(text_position("to", "TO", 1)),
+        lines => Field::new(None).input(lines()),
+        note => Field::new(None).input(optional_text("note", "TEXT")),
+    }
+}
+
 pub(crate) struct Explain {
     pub(crate) target: Option<String>,
     pub(crate) file: Option<String>,
@@ -253,6 +269,7 @@ pub(crate) enum Operation {
     Prompt(AgentPromptParams),
     Start(AgentStartParams),
     Attach(Attach),
+    Handoff(Handoff),
     Explain(Explain),
 }
 
@@ -305,6 +322,11 @@ pub(crate) fn command() -> Command {
                 "{} agent attach <TARGET> [OPTIONS]",
                 crate::product_identity::BINARY_NAME
             )))
+        .subcommand(leaf("handoff", HandoffProjection::arguments(), "Send one agent's recent output to another agent as a prompt")
+            .override_usage(format!(
+                "{} agent handoff <FROM> <TO> [--lines N] [--note TEXT]",
+                crate::product_identity::BINARY_NAME
+            )))
         .subcommand(leaf("explain", ExplainProjection::arguments(), "Explain agent detection state")
             .group(ArgGroup::new("explain_source").args(["target", "file"]).required(true)))
 }
@@ -335,6 +357,7 @@ pub(crate) fn from_matches(matches: &ArgMatches) -> Result<Operation, ParseError
         }
         "start" => Operation::Start(AgentStartProjection::from_matches(matches)?),
         "attach" => Operation::Attach(AttachProjection::from_matches(matches)?),
+        "handoff" => Operation::Handoff(HandoffProjection::from_matches(matches)?),
         "explain" => Operation::Explain(ExplainProjection::from_matches(matches)?),
         _ => return Err(ParseError::Usage(format!("unknown agent command: {name}"))),
     })

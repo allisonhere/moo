@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 use crate::api::schema::{
     AgentHistoryParams, AgentPromptParams, AgentReadParams, AgentRenameParams, AgentSendKeysParams,
     AgentStartParams, AgentTarget, AgentWaitParams, EmptyParams, ErrorBody, ErrorResponse, Method,
-    PaneProcessInfoParams, PaneTarget, Request,
+    PaneProcessInfoParams, PaneTarget, ReadFormat, ReadSource, Request,
 };
 
 const AGENT_START_POLL_INTERVAL: Duration = Duration::from_millis(100);
@@ -61,6 +61,7 @@ pub(super) fn run_agent_command(args: &[String]) -> std::io::Result<i32> {
         Operation::Prompt(params) => agent_prompt(params),
         Operation::Start(params) => agent_start(params),
         Operation::Attach(params) => agent_attach(params),
+        Operation::Handoff(params) => agent_handoff(params),
         Operation::Explain(params) => agent_explain(params),
     }
 }
@@ -608,6 +609,51 @@ fn agent_prompt(params: AgentPromptParams) -> std::io::Result<i32> {
     super::print_response(&response)
 }
 
+const HANDOFF_DEFAULT_LINES: u32 = 40;
+
+/// Reads `from`'s recent output and submits it to `to` as a prompt, so the
+/// existing read and prompt paths keep owning idle checks and blocked rejection.
+fn agent_handoff(params: bindings::Handoff) -> std::io::Result<i32> {
+    let read = super::send_request(&Request {
+        id: "cli:agent:handoff:read".into(),
+        method: Method::AgentRead(AgentReadParams {
+            target: params.from.clone(),
+            lines: Some(params.lines.unwrap_or(HANDOFF_DEFAULT_LINES)),
+            source: ReadSource::Recent,
+            format: ReadFormat::Text,
+            strip_ansi: true,
+        }),
+    })?;
+    if read.get("error").is_some() {
+        eprintln!("{read}");
+        return Ok(1);
+    }
+    let output = read["result"]["read"]["text"].as_str().unwrap_or_default();
+    let Some(text) = handoff_prompt(&params.from, params.note.as_deref(), output) else {
+        eprintln!("{} has no output to hand off", params.from);
+        return Ok(1);
+    };
+    agent_prompt(AgentPromptParams {
+        target: params.to,
+        text,
+        wait: None,
+    })
+}
+
+fn handoff_prompt(from: &str, note: Option<&str>, output: &str) -> Option<String> {
+    let output = output.trim();
+    if output.is_empty() {
+        return None;
+    }
+    let mut text = String::new();
+    if let Some(note) = note {
+        text.push_str(note.trim());
+        text.push_str("\n\n");
+    }
+    text.push_str(&format!("Output from {from}:\n\n{output}"));
+    Some(text)
+}
+
 fn agent_send_keys(params: AgentSendKeysParams) -> std::io::Result<i32> {
     super::print_response(&super::send_request(&Request {
         id: "cli:agent:send-keys".into(),
@@ -621,4 +667,26 @@ fn agent_read(params: AgentReadParams) -> std::io::Result<i32> {
         method: Method::AgentRead(params),
     })?;
     super::print_read_response(&response)
+}
+
+#[cfg(test)]
+mod handoff_tests {
+    use super::handoff_prompt;
+
+    #[test]
+    fn prompt_frames_output_and_prepends_note() {
+        assert_eq!(
+            handoff_prompt("a", None, " done \n").as_deref(),
+            Some("Output from a:\n\ndone")
+        );
+        assert_eq!(
+            handoff_prompt("a", Some("review this"), "done").as_deref(),
+            Some("review this\n\nOutput from a:\n\ndone")
+        );
+    }
+
+    #[test]
+    fn empty_output_hands_off_nothing() {
+        assert_eq!(handoff_prompt("a", Some("note"), "  \n"), None);
+    }
 }
