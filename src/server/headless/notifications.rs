@@ -173,6 +173,37 @@ impl HeadlessServer {
         );
     }
 
+    /// Forwards deliveries that came due together, as one digest when two or
+    /// more would otherwise show separate client toasts.
+    pub(super) fn forward_agent_notification_batch(
+        &mut self,
+        deliveries: &[crate::app::state::AgentNotificationDelivery],
+    ) {
+        let delivery_mode = self.app.state.toast_config.delivery;
+        let Some((title, body)) = crate::server::notifications::agent_digest(deliveries)
+            .filter(|_| should_forward_toast_to_clients(delivery_mode))
+        else {
+            for delivery in deliveries {
+                self.forward_agent_notification_delivery(delivery);
+            }
+            return;
+        };
+        let mut sounds = Vec::new();
+        for sound in deliveries.iter().filter_map(|delivery| delivery.sound) {
+            if !sounds.contains(&sound) {
+                sounds.push(sound);
+                self.send_notify_to_foreground_client(
+                    protocol::NotifyKind::Sound,
+                    sound_notify_message(sound),
+                    None,
+                );
+            }
+        }
+        if let Some(kind) = toast_notify_kind(delivery_mode) {
+            self.send_notify_to_foreground_client(kind, title, non_empty_body(&body));
+        }
+    }
+
     pub(super) fn forward_agent_notification_delivery(
         &mut self,
         delivery: &crate::app::state::AgentNotificationDelivery,

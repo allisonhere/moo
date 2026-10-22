@@ -53,11 +53,92 @@ pub(crate) fn toast_message_from_state_change(
         })
 }
 
+/// Title and body for one notification covering a batch of agent deliveries
+/// that came due together. `None` when fewer than two would reach the client,
+/// so a lone event keeps its own toast.
+pub(crate) fn agent_digest(
+    deliveries: &[app::state::AgentNotificationDelivery],
+) -> Option<(String, String)> {
+    let toasts: Vec<_> = deliveries
+        .iter()
+        .filter_map(|delivery| delivery.client_notification.as_ref())
+        .collect();
+    if toasts.len() < 2 {
+        return None;
+    }
+    let count = |kind| toasts.iter().filter(|toast| toast.kind == kind).count();
+    let mut parts = Vec::new();
+    for (kind, text) in [
+        (app::state::ToastKind::NeedsAttention, "need attention"),
+        (app::state::ToastKind::Finished, "finished"),
+    ] {
+        match count(kind) {
+            0 => {}
+            n => parts.push(format!("{n} {text}")),
+        }
+    }
+    let labels: Vec<_> = deliveries
+        .iter()
+        .filter(|delivery| delivery.client_notification.is_some())
+        .map(|delivery| delivery.agent_label.as_str())
+        .collect();
+    Some((parts.join(" · "), labels.join(", ")))
+}
+
 fn toast_event_text(kind: app::state::ToastKind) -> &'static str {
     match kind {
         app::state::ToastKind::NeedsAttention => "needs attention",
         app::state::ToastKind::Finished => "finished",
         app::state::ToastKind::UpdateInstalled => "updated",
+    }
+}
+
+#[cfg(test)]
+mod digest_tests {
+    use super::*;
+    use crate::app::state::{AgentNotificationDelivery, ToastKind, ToastNotification};
+
+    fn delivery(label: &str, kind: ToastKind, notified: bool) -> AgentNotificationDelivery {
+        let toast = ToastNotification {
+            kind,
+            title: String::new(),
+            context: String::new(),
+            position: None,
+            target: None,
+        };
+        AgentNotificationDelivery {
+            pane_id: PaneId::from_raw(1),
+            workspace_id: "w".into(),
+            agent_label: label.into(),
+            known_agent: None,
+            kind,
+            toast: None,
+            client_notification: notified.then_some(toast),
+            sound: None,
+        }
+    }
+
+    #[test]
+    fn digest_counts_each_kind_and_names_agents() {
+        let batch = [
+            delivery("a", ToastKind::NeedsAttention, true),
+            delivery("b", ToastKind::Finished, true),
+            delivery("c", ToastKind::NeedsAttention, true),
+        ];
+        assert_eq!(
+            agent_digest(&batch),
+            Some(("2 need attention · 1 finished".into(), "a, b, c".into()))
+        );
+    }
+
+    #[test]
+    fn digest_ignores_deliveries_without_a_client_notification() {
+        let batch = [
+            delivery("a", ToastKind::Finished, true),
+            delivery("b", ToastKind::Finished, false),
+        ];
+        assert_eq!(agent_digest(&batch), None);
+        assert_eq!(agent_digest(&[]), None);
     }
 }
 

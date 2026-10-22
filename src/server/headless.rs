@@ -3313,9 +3313,7 @@ impl HeadlessServer {
                 self.app
                     .refresh_agent_notification_delivery_contexts(&mut deliveries);
                 self.app.sync_toast_deadline(previous_toast);
-                for delivery in &deliveries {
-                    self.forward_agent_notification_delivery(delivery);
-                }
+                self.forward_agent_notification_batch(&deliveries);
                 changed = true;
             }
         }
