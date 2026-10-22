@@ -70,19 +70,42 @@ pub(super) fn render_settings_overlay(
             .integrations
             .iter()
             .any(|integration| integration.state == crate::api::schema::IntegrationState::Outdated);
-    let mut tab_x = inner.x;
+    put_text(
+        buffer,
+        inner.x,
+        inner.y + 1,
+        inner.width,
+        &"─".repeat(inner.width as usize),
+        Style::default().fg(palette.surface0).bg(palette.panel_bg),
+    );
+
+    let sidebar_width = 18.min(inner.width.saturating_sub(20));
+    let sidebar = Rect::new(
+        inner.x,
+        inner.y + 3,
+        sidebar_width,
+        inner.height.saturating_sub(6),
+    );
     let mut tab_hits = Vec::new();
-    for section in ClientSettingsSection::ALL {
+    for (index, section) in ClientSettingsSection::ALL.iter().enumerate() {
+        let y = sidebar.y.saturating_add(index as u16 * 2);
+        if y >= sidebar.bottom() {
+            break;
+        }
         let badge = *section == ClientSettingsSection::Integrations && integration_badge;
         let label = if badge {
-            format!(" ● {} ", section.label())
+            format!("● {}", section.label())
         } else {
-            format!(" {} ", section.label())
+            section.label().to_owned()
         };
-        let width = display_width(&label).min(inner.right().saturating_sub(tab_x));
-        let rect = Rect::new(tab_x, inner.y + 1, width, 1);
+        let rect = Rect::new(sidebar.x, y, sidebar.width, 1);
         let active = *section == settings.section;
-        let style = if active {
+        let style = if active && settings.focus == ClientSettingsFocus::Choices {
+            Style::default()
+                .fg(palette.accent)
+                .bg(palette.panel_bg)
+                .add_modifier(Modifier::BOLD)
+        } else if active {
             Style::default()
                 .fg(contrast(palette))
                 .bg(palette.accent)
@@ -91,13 +114,21 @@ pub(super) fn render_settings_overlay(
             Style::default().fg(palette.overlay1).bg(palette.panel_bg)
         };
         buffer.set_style(rect, style);
-        put_text(buffer, rect.x, rect.y, rect.width, &label, style);
+        let marker = if active { "▸" } else { " " };
+        put_text(
+            buffer,
+            rect.x,
+            rect.y,
+            rect.width,
+            &format!(" {marker} {label}"),
+            style,
+        );
         if badge && !active {
             put_text(
                 buffer,
-                rect.x.saturating_add(1),
+                rect.x.saturating_add(3),
                 rect.y,
-                rect.width.saturating_sub(1).min(2),
+                rect.width.saturating_sub(3).min(2),
                 "● ",
                 Style::default()
                     .fg(palette.accent)
@@ -106,25 +137,24 @@ pub(super) fn render_settings_overlay(
             );
         }
         tab_hits.push((rect, *section));
-        tab_x = tab_x.saturating_add(width.saturating_add(1));
-        if tab_x >= inner.right() {
-            break;
-        }
     }
-    put_text(
-        buffer,
-        inner.x,
-        inner.y + 2,
-        inner.width,
-        &"─".repeat(inner.width as usize),
-        Style::default().fg(palette.surface0).bg(palette.panel_bg),
-    );
 
+    let separator_x = sidebar.right();
+    for y in sidebar.y..sidebar.bottom() {
+        put_text(
+            buffer,
+            separator_x,
+            y,
+            1,
+            "│",
+            Style::default().fg(palette.surface0).bg(palette.panel_bg),
+        );
+    }
     let content = Rect::new(
-        inner.x,
-        inner.y + 4,
-        inner.width,
-        inner.height.saturating_sub(7),
+        separator_x.saturating_add(2),
+        sidebar.y,
+        inner.right().saturating_sub(separator_x.saturating_add(2)),
+        sidebar.height,
     );
     let mut choice_hits = Vec::new();
     match settings.section {
@@ -251,7 +281,7 @@ pub(super) fn render_settings_overlay(
         inner.x,
         inner.bottom().saturating_sub(2),
         inner.width,
-        " ↑↓ select  tab section",
+        " ↑↓ select  ←→ section",
         Style::default().fg(palette.overlay1).bg(palette.panel_bg),
     );
 

@@ -39,6 +39,7 @@ impl ClientShellState {
     pub(super) fn open_settings_overlay(&mut self) {
         self.overlay = Some(ClientShellOverlay::Settings(ClientSettingsOverlay {
             section: ClientSettingsSection::Theme,
+            focus: ClientSettingsFocus::Sections,
             selected: theme_index(&self.config.theme_name),
             original_theme_name: self.config.theme_name.clone(),
             original_palette: self.config.palette.clone(),
@@ -100,6 +101,13 @@ impl ClientShellState {
         self.select_settings_section(ClientSettingsSection::ALL[next], outcome);
     }
 
+    fn set_settings_focus(&mut self, focus: ClientSettingsFocus, outcome: &mut ClientShellInput) {
+        if let Some(ClientShellOverlay::Settings(settings)) = self.overlay.as_mut() {
+            settings.focus = focus;
+            outcome.repaint = true;
+        }
+    }
+
     fn settings_choice_count(&self) -> usize {
         match self.overlay.as_ref() {
             Some(ClientShellOverlay::Settings(settings)) => match settings.section {
@@ -133,6 +141,7 @@ impl ClientShellState {
     pub(super) fn select_settings_choice(&mut self, index: usize) {
         let count = self.settings_choice_count();
         if let Some(ClientShellOverlay::Settings(settings)) = self.overlay.as_mut() {
+            settings.focus = ClientSettingsFocus::Choices;
             if count > 0 {
                 settings.selected = index.min(count - 1);
             }
@@ -389,31 +398,50 @@ impl ClientShellState {
             }
             return true;
         }
-        if matches!(code, KeyCode::Tab | KeyCode::Right | KeyCode::Char('l'))
-            && modifiers.is_empty()
-        {
+        let in_sections = matches!(
+            self.overlay,
+            Some(ClientShellOverlay::Settings(ClientSettingsOverlay {
+                focus: ClientSettingsFocus::Sections,
+                ..
+            }))
+        );
+        if matches!(code, KeyCode::Tab) && modifiers.is_empty() {
             self.move_settings_section(1, outcome);
             return true;
         }
-        if matches!(code, KeyCode::BackTab | KeyCode::Left | KeyCode::Char('h'))
-            && modifiers.difference(KeyModifiers::SHIFT).is_empty()
+        if matches!(code, KeyCode::BackTab) && modifiers.difference(KeyModifiers::SHIFT).is_empty()
         {
             self.move_settings_section(-1, outcome);
             return true;
         }
-        if matches!(code, KeyCode::Up | KeyCode::Char('k')) && modifiers.is_empty() {
-            self.move_settings_selection(-1);
-            outcome.repaint = true;
+        if !modifiers.is_empty() {
             return true;
         }
-        if matches!(code, KeyCode::Down | KeyCode::Char('j')) && modifiers.is_empty() {
-            self.move_settings_selection(1);
-            outcome.repaint = true;
-            return true;
-        }
-        if matches!(code, KeyCode::Enter | KeyCode::Char(' ')) && modifiers.is_empty() {
-            self.apply_settings_choice(outcome);
-            return true;
+        match code {
+            KeyCode::Up | KeyCode::Char('k') | KeyCode::Down | KeyCode::Char('j') => {
+                let delta = if matches!(code, KeyCode::Up | KeyCode::Char('k')) {
+                    -1
+                } else {
+                    1
+                };
+                if in_sections {
+                    self.move_settings_section(delta, outcome);
+                } else {
+                    self.move_settings_selection(delta);
+                    outcome.repaint = true;
+                }
+            }
+            KeyCode::Right | KeyCode::Char('l') if in_sections => {
+                self.set_settings_focus(ClientSettingsFocus::Choices, outcome);
+            }
+            KeyCode::Left | KeyCode::Char('h') if !in_sections => {
+                self.set_settings_focus(ClientSettingsFocus::Sections, outcome);
+            }
+            KeyCode::Enter | KeyCode::Char(' ') if in_sections => {
+                self.set_settings_focus(ClientSettingsFocus::Choices, outcome);
+            }
+            KeyCode::Enter | KeyCode::Char(' ') => self.apply_settings_choice(outcome),
+            _ => {}
         }
         true
     }

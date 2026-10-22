@@ -315,6 +315,7 @@ fn every_dialog_and_menu_occludes_its_panel_not_the_whole_screen() {
         }),
         ClientShellOverlay::Settings(ClientSettingsOverlay {
             section: ClientSettingsSection::Theme,
+            focus: ClientSettingsFocus::Sections,
             selected: 0,
             original_theme_name: String::new(),
             original_palette: palette,

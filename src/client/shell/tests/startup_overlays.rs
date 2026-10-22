@@ -1193,13 +1193,23 @@ fn outdated_integration_badges_launcher_settings_and_settings_tab() {
         .expect("integrations tab");
     let settings_buffer = settings.to_ratatui_buffer().expect("settings buffer");
     assert_eq!(
-        settings_buffer[(integrations_tab.x + 1, integrations_tab.y)].fg,
+        settings_buffer[(integrations_tab.x + 3, integrations_tab.y)].fg,
         state.config.palette.accent
     );
     assert_eq!(
-        settings_buffer[(integrations_tab.x + 3, integrations_tab.y)].fg,
+        settings_buffer[(integrations_tab.x + 5, integrations_tab.y)].fg,
         state.config.palette.overlay1
     );
+
+    let section_rows = state
+        .hits
+        .settings_tabs
+        .iter()
+        .map(|(rect, _)| (rect.x, rect.y))
+        .collect::<Vec<_>>();
+    assert!(section_rows
+        .windows(2)
+        .all(|rows| { rows[0].0 == rows[1].0 && rows[1].1 == rows[0].1.saturating_add(2) }));
 }
 
 #[test]
@@ -1285,6 +1295,7 @@ fn client_settings_preview_restore_and_endpoint_integrations_are_owned_by_overla
     ));
     let original_theme = state.config.theme_name.clone();
     let original_palette = state.config.palette.clone();
+    state.handle_input_bytes(b"l");
     state.handle_input_bytes(b"j");
     assert_ne!(state.config.theme_name, original_theme);
     assert_ne!(state.config.palette.accent, original_palette.accent);
@@ -1294,6 +1305,7 @@ fn client_settings_preview_restore_and_endpoint_integrations_are_owned_by_overla
     assert_eq!(state.config.palette.accent, original_palette.accent);
 
     state.open_settings_overlay();
+    state.handle_input_bytes(b"l");
     state.handle_input_bytes(b"j");
     state.handle_input_bytes(b"\t");
     state
@@ -1379,6 +1391,7 @@ fn client_settings_preview_restore_and_endpoint_integrations_are_owned_by_overla
         Some(ClientShellOverlay::Settings(_))
     ));
 
+    state.handle_input_bytes(b"l");
     let install = state.handle_input_bytes(b"\r");
     assert_eq!(install.actions.len(), 1);
     assert!(matches!(
@@ -1427,5 +1440,46 @@ fn client_settings_preview_restore_and_endpoint_integrations_are_owned_by_overla
             ref integration_messages,
             ..
         })) if integration_messages == &["installed codex"]
+    ));
+}
+
+#[test]
+fn settings_sections_move_with_vertical_and_vim_keys_before_choices_take_focus() {
+    let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
+    state.set_snapshot(Box::new(snapshot()));
+    state.set_pane_surface(surface());
+    state.open_settings_overlay();
+
+    state.handle_input_bytes(b"j");
+    state.handle_input_bytes(b"\x1b[B");
+    state.handle_input_bytes(b"k");
+    assert!(matches!(
+        state.overlay,
+        Some(ClientShellOverlay::Settings(ClientSettingsOverlay {
+            section: ClientSettingsSection::Indicators,
+            focus: ClientSettingsFocus::Sections,
+            ..
+        }))
+    ));
+
+    state.handle_input_bytes(b"l");
+    state.handle_input_bytes(b"j");
+    assert!(matches!(
+        state.overlay,
+        Some(ClientShellOverlay::Settings(ClientSettingsOverlay {
+            section: ClientSettingsSection::Indicators,
+            focus: ClientSettingsFocus::Choices,
+            selected: 1,
+            ..
+        }))
+    ));
+
+    state.handle_input_bytes(b"h");
+    assert!(matches!(
+        state.overlay,
+        Some(ClientShellOverlay::Settings(ClientSettingsOverlay {
+            focus: ClientSettingsFocus::Sections,
+            ..
+        }))
     ));
 }

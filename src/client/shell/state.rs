@@ -461,9 +461,16 @@ impl ClientSettingsSection {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum ClientSettingsFocus {
+    Sections,
+    Choices,
+}
+
 #[derive(Debug)]
 pub(super) struct ClientSettingsOverlay {
     pub(super) section: ClientSettingsSection,
+    pub(super) focus: ClientSettingsFocus,
     pub(super) selected: usize,
     pub(super) original_theme_name: String,
     pub(super) original_palette: Palette,
