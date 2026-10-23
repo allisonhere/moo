@@ -900,6 +900,121 @@ async fn client_shell_endpoint_request_uses_the_selected_connection() {
     shutdown_test_runtimes(&mut server);
 }
 
+/// Sends `method` through the client shell lane and returns the response body's error code, or
+/// `None` on success.
+async fn lane_error_code(
+    server: &mut HeadlessServer,
+    control_rx: &std::sync::mpsc::Receiver<Vec<u8>>,
+    client_id: u64,
+    request_id: &str,
+    method: api::schema::Method,
+) -> Option<String> {
+    let boot_id = server.client_shell_boot_id.clone();
+    server.handle_server_event(ServerEvent::ClientShellEndpointRequest {
+        client_id,
+        boot_id,
+        request: Box::new(api::schema::Request {
+            id: request_id.into(),
+            method,
+        }),
+    });
+    if server.clients[&client_id].shell_endpoint_command_in_flight {
+        let ready = server.server_event_rx.recv().await.expect("response ready");
+        server.handle_server_event(ready);
+    }
+    let ServerMessage::ClientShellEndpointResponseChunk { data, .. } =
+        read_server_message(control_rx.recv().expect("lane response"))
+    else {
+        panic!("expected a lane response");
+    };
+    serde_json::from_slice::<api::schema::ErrorResponse>(&data)
+        .ok()
+        .map(|response| response.error.code)
+}
+
+#[tokio::test]
+async fn client_shell_lane_runs_the_plugin_and_agent_methods_the_tui_uses() {
+    let mut server = test_headless_server();
+    server.app.state.workspaces = vec![crate::workspace::Workspace::test_new("endpoint")];
+    server.app.state.ensure_test_terminals();
+    server.app.state.active = Some(0);
+    let (writer, control_rx, _render_rx) = test_client_writer();
+    let client_id = 42;
+    server.handle_server_event(ServerEvent::ClientShellConnected {
+        surface_reuse: false,
+        surface_delta: false,
+        surface_scroll: false,
+        client_id,
+        surface_cols: 80,
+        surface_rows: 23,
+        cell_width_px: 0,
+        cell_height_px: 0,
+        pixel_mouse: false,
+        direct_graphics: false,
+        endpoint_keybindings: false,
+        mouse_capture: false,
+        surface_active: true,
+        writer,
+    });
+    let _initial_snapshot = client_shell_snapshot(&control_rx);
+
+    // Listing plugin actions succeeds even with no plugins linked.
+    assert_eq!(
+        lane_error_code(
+            &mut server,
+            &control_rx,
+            client_id,
+            "client-shell:list",
+            api::schema::Method::PluginActionList(api::schema::PluginActionListParams::default()),
+        )
+        .await,
+        None
+    );
+
+    // These target things that do not exist, so each reaches its handler and fails there, with
+    // an application error rather than the lane refusing the method or the async-prompt guard.
+    let methods = [
+        (
+            "client-shell:invoke",
+            api::schema::Method::PluginActionInvoke(api::schema::PluginActionInvokeParams {
+                action_id: "missing".into(),
+                plugin_id: Some("missing.plugin".into()),
+                context: None,
+            }),
+        ),
+        (
+            "client-shell:read",
+            api::schema::Method::AgentRead(api::schema::AgentReadParams {
+                target: "missing".into(),
+                source: api::schema::ReadSource::Recent,
+                lines: Some(10),
+                format: api::schema::ReadFormat::Text,
+                strip_ansi: true,
+            }),
+        ),
+        (
+            "client-shell:prompt",
+            api::schema::Method::AgentPrompt(api::schema::AgentPromptParams {
+                target: "missing".into(),
+                text: "hello".into(),
+                wait: None,
+            }),
+        ),
+    ];
+    for (request_id, method) in methods {
+        let code = lane_error_code(&mut server, &control_rx, client_id, request_id, method)
+            .await
+            .unwrap_or_default();
+        assert_ne!(code, "unsupported_endpoint_command", "{request_id}");
+        assert_ne!(
+            code, "invalid_request",
+            "{request_id} hit the async-prompt guard"
+        );
+        println!("{request_id} -> {code:?}");
+    }
+    shutdown_test_runtimes(&mut server);
+}
+
 #[test]
 fn terminal_client_endpoint_request_error_removes_client() {
     let mut server = test_headless_server();

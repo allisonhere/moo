@@ -251,6 +251,22 @@ mod tests {
             Some("9053d585d02b56f543c568d4264dfc14812a34c6cf825fe0fccfa5295a8f8bd4")
         );
         assert_eq!(
+            actual.remove("agent.read").as_deref(),
+            Some("4fb52fb594f649b00547abba7e8fbf14564578d4f0343f5918744fb4fe41fc67")
+        );
+        assert_eq!(
+            actual.remove("agent.prompt").as_deref(),
+            Some("0cb08afb7f2e5317370d8c8a6664a2109116532e21d29e94da8e92b86fd200f4")
+        );
+        assert_eq!(
+            actual.remove("plugin.action.list").as_deref(),
+            Some("cde2afc12cd3744e4859f8593bf2cea5919bb89fa120a44a56f7c495eb08b054")
+        );
+        assert_eq!(
+            actual.remove("plugin.action.invoke").as_deref(),
+            Some("c9d7a501da3edf6e53e723a825554ff318664b3a4d80a572f448d10629462ae0")
+        );
+        assert_eq!(
             actual.remove("agent.rename").as_deref(),
             Some("64ab3bd3539bf45342439e0ab4f20a1dcffbd3c5dc20cf8448131d998551a168")
         );

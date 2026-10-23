@@ -80,7 +80,7 @@ operations::define_operations! {
     TabClose(TabTarget) => "tab.close", true, true;
     AgentList(EmptyParams) => "agent.list", false, false;
     AgentGet(AgentTarget) => "agent.get", false, false;
-    AgentRead(AgentReadParams) => "agent.read", false, false;
+    AgentRead(AgentReadParams) => "agent.read", false, true;
     AgentExplain(AgentTarget) => "agent.explain", false, false;
     AgentSendKeys(AgentSendKeysParams) => "agent.send_keys", true, false;
     AgentRename(AgentRenameParams) => "agent.rename", true, true;
@@ -88,7 +88,7 @@ operations::define_operations! {
     AgentViewClear(AgentViewClearParams) => "agent.view.clear", true, false;
     AgentFocus(AgentTarget) => "agent.focus", true, false;
     AgentStart(AgentStartParams) => "agent.start", true, false;
-    AgentPrompt(AgentPromptParams) => "agent.prompt", true, false;
+    AgentPrompt(AgentPromptParams) => "agent.prompt", true, true;
     AgentWait(AgentWaitParams) => "agent.wait", false, false;
     PaneSplit(PaneSplitParams) => "pane.split", true, true;
     PaneSwap(PaneSwapParams) => "pane.swap", true, true;
@@ -139,8 +139,8 @@ operations::define_operations! {
     PluginUnlink(PluginUnlinkParams) => "plugin.unlink", true, false;
     PluginEnable(PluginSetEnabledParams) => "plugin.enable", false, false;
     PluginDisable(PluginSetEnabledParams) => "plugin.disable", true, false;
-    PluginActionList(PluginActionListParams) => "plugin.action.list", false, false;
-    PluginActionInvoke(PluginActionInvokeParams) => "plugin.action.invoke", true, false;
+    PluginActionList(PluginActionListParams) => "plugin.action.list", false, true;
+    PluginActionInvoke(PluginActionInvokeParams) => "plugin.action.invoke", true, true;
     PluginLogList(PluginLogListParams) => "plugin.log.list", false, false;
     PluginPaneOpen(PluginPaneOpenParams) => "plugin.pane.open", true, false;
     PluginPaneFocus(PluginPaneFocusParams) => "plugin.pane.focus", true, false;

@@ -1743,3 +1743,43 @@ fn settings_dialog_keeps_one_height_across_sections_when_there_is_room() {
         .expect("settings dialog on a short screen");
     assert!(state.hits.settings_popup.height <= 22);
 }
+
+#[test]
+fn tui_dialogs_only_use_methods_a_server_advertises_to_the_client_shell() {
+    use crate::api::schema::Method;
+
+    let advertised = || {
+        crate::server::client_commands::supported_client_shell_method_names()
+            .iter()
+            .map(|name| (*name).to_owned())
+            .collect::<Vec<_>>()
+    };
+    let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
+    let mut initial = snapshot();
+    initial.agents = vec![
+        handoff_agent("pane_1", "builder", true),
+        handoff_agent("pane_2", "reviewer", false),
+    ];
+    state.set_snapshot(Box::new(initial));
+    state.set_pane_surface(surface());
+    let endpoint_id = state.active_endpoint_id.clone();
+    // Unlike the fake endpoint most tests use, this one carries a real advertised-method list, so
+    // a method missing from it is refused with "does not support" instead of being sent.
+    state.set_endpoint_methods_for(&endpoint_id, Some(advertised()));
+
+    state.open_settings_overlay();
+    let mut outcome = ClientShellInput::default();
+    state.select_settings_section(ClientSettingsSection::Plugins, &mut outcome);
+    let [ClientShellAction::Endpoint { request, .. }] = &outcome.actions[..] else {
+        panic!("the plugins section should send plugin.action.list, not an unsupported notice");
+    };
+    assert!(matches!(request.method, Method::PluginActionList(_)));
+
+    state.overlay = None;
+    state.open_agent_handoff();
+    let read = state.handle_input_bytes(b"\r");
+    let [ClientShellAction::Endpoint { request, .. }] = &read.actions[..] else {
+        panic!("handoff should send agent.read, not an unsupported notice");
+    };
+    assert!(matches!(request.method, Method::AgentRead(_)));
+}
