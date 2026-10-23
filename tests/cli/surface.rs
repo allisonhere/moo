@@ -604,7 +604,7 @@ fn explicit_client_command_respects_nested_guard() {
     assert_eq!(output.status.code(), Some(1));
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        stderr.contains("nested herdr is disabled by default"),
+        stderr.contains("nested moo is disabled by default"),
         "client should fail at the nested guard before connecting: {stderr}"
     );
 }
@@ -624,7 +624,7 @@ fn removed_show_changelog_flag_fails_before_nested_guard() {
         "stderr: {stderr}"
     );
     assert!(
-        !stderr.contains("nested herdr"),
+        !stderr.contains("nested moo"),
         "unknown flag should be rejected before nested guard: {stderr}"
     );
 }

@@ -1409,7 +1409,7 @@ fn prompt_to_stop_old_server_after_failed_handoff(
     eprintln!("  server: v{}", version_label(status.version.as_deref()));
     eprintln!("  installed: {}", release.label());
     eprintln!(
-        "you can keep using the old server, or stop it now so the next `herdr` start uses {}.",
+        "you can keep using the old server, or stop it now so the next `moo` start uses {}.",
         release.label()
     );
     eprintln!("stopping the old server will exit its pane processes.");
