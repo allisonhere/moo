@@ -15,10 +15,11 @@ A fork of [Herdr](https://github.com/herdrdev/herdr), the terminal runtime for c
 - **agent names in the sidebar** — rename an agent from the sidebar or with `moo agent rename <target> <name>`; `--clear` resets it.
 - **attention queue** — agents that need an answer are queued, and you can acknowledge them.
 - **durable status history** — agent status changes are recorded and exposed through the API as `agent.history`.
-- **agent handoff** — `moo agent handoff <from> <to> [--lines N] [--note TEXT]` sends one agent's recent output to another as a prompt.
+- **agent handoff** — `moo agent handoff <from> <to> [--lines N] [--note TEXT]` sends one agent's recent output to another as a prompt; the command palette's **agent handoff** does the same with a picker.
 - **settings keys** — the Settings dialog's section list answers to `↑`/`↓` and `j`/`k`; `→`/`l`/`Enter` enters a section's choices and `←`/`h` goes back.
+- **plugin actions in settings** — **Settings → plugins** lists the linked plugins' actions (start or stop a plugin, toggle its options) and runs the one you select.
 - **plugin action platform support** — `plugin.action.list` reports an optional `supported` flag so clients can hide actions the server's host can't run.
-- **web UI** — the [Ovis](https://github.com/devswha/ovis) browser and phone client runs as a moo plugin (use the [`moo` branch of the fork](https://github.com/allisonhere/ovis/tree/moo)); see the [wiki](https://github.com/allisonhere/moo/wiki/Web-UI-with-Ovis).
+- **web UI** — the [Ovis](https://github.com/devswha/ovis) browser and phone client runs as a moo plugin with a **Network access** setting (this PC only, or the local network only) (use the [`moo` branch of the fork](https://github.com/allisonhere/ovis/tree/moo)); see the [wiki](https://github.com/allisonhere/moo/wiki/Web-UI-with-Ovis).
 - **tab colors** — right-click a tab and choose **Color** to give it a theme color. Its tab dot and the bar beside its agents in the sidebar use that color.
 - **fork-only remotes** — remote attach and saved SSH machines look for `moo` on the remote host and never fetch upstream `herdr`. Automated Windows install is refused for now.
 
