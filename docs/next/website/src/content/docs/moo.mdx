@@ -76,7 +76,7 @@ moo workspace list
 
 ## Separate identity
 
-Moo keeps upstream's environment variable names, session file format, and socket protocol. Only the application identity and filesystem paths change:
+Moo keeps upstream's session file format and socket protocol. It changes the application identity, the filesystem paths, and the environment variable prefix (`MOO_*` where upstream uses `HERDR_*`):
 
 | | Upstream Herdr | Moo release | Moo debug |
 | --- | --- | --- | --- |
@@ -85,7 +85,7 @@ Moo keeps upstream's environment variable names, session file format, and socket
 | State and logs | `~/.local/state/herdr` | `~/.local/state/moo` | `~/.local/state/moo-dev` |
 | Default sockets | under the config directory | under the config directory | under the config directory |
 
-The socket file names remain `moo.sock` and `moo-client.sock` inside the fork's own config directory. The `MOO_*` environment names are unchanged so agents, plugins, and integrations continue to work.
+The socket file names are `moo.sock` and `moo-client.sock` inside the fork's own config directory. Agents, plugins, and integrations that moo launches receive the `MOO_*` variables.
 
 Moo tags panes it launches with `MOO_PRODUCT_ID=moo`. If it inherits a socket from a managed pane belonging to another product, it refuses to reuse that socket instead of attaching to an incompatible server.
 
