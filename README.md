@@ -15,6 +15,10 @@ A fork of [Herdr](https://github.com/herdrdev/herdr), the terminal runtime for c
 - **agent names in the sidebar** — rename an agent from the sidebar or with `moo agent rename <target> <name>`; `--clear` resets it.
 - **attention queue** — agents that need an answer are queued, and you can acknowledge them.
 - **durable status history** — agent status changes are recorded and exposed through the API as `agent.history`.
+- **agent handoff** — `moo agent handoff <from> <to> [--lines N] [--note TEXT]` sends one agent's recent output to another as a prompt.
+- **settings keys** — the Settings dialog's section list answers to `↑`/`↓` and `j`/`k`; `→`/`l`/`Enter` enters a section's choices and `←`/`h` goes back.
+- **plugin action platform support** — `plugin.action.list` reports an optional `supported` flag so clients can hide actions the server's host can't run.
+- **web UI** — the [Ovis](https://github.com/devswha/ovis) browser and phone client runs as a moo plugin; see the [wiki](https://github.com/allisonhere/moo/wiki/Web-UI-with-Ovis).
 - **tab colors** — right-click a tab and choose **Color** to give it a theme color. Its tab dot and the bar beside its agents in the sidebar use that color.
 - **fork-only remotes** — remote attach and saved SSH machines look for `moo` on the remote host and never fetch upstream `herdr`. Automated Windows install is refused for now.
 
@@ -49,6 +53,8 @@ moo
 From `master`, run `./deploy.sh` to open the release console. It shows the four steps (Check, Commit, Push, Release) with their state read from git, a live output panel, and the version this run will publish. Use `←`/`→` to pick the bump and `d` for a dry run. `enter` runs the next unfinished step (Commit and Release ask for confirmation), `a` runs every remaining step, and `c` runs the checks alone. **Commit** includes tracked changes and the Cargo version bump; untracked scratch files are listed but ignored. Release pushes an immutable tag that builds the GitHub release. `./deploy.sh patch` and `./deploy.sh --dry-run patch` remain for scripting.
 
 ## docs
+
+The [wiki](https://github.com/allisonhere/moo/wiki) covers what moo adds: agent handoff, settings keys, restart behaviour and the web UI.
 
 The fork guide is [`docs/next/website/src/content/docs/moo.mdx`](docs/next/website/src/content/docs/moo.mdx): requirements, identity paths, troubleshooting, removal, and current limitations. Upstream docs at [herdr.dev/docs](https://herdr.dev/docs/) apply to everything the fork has not changed.
 

@@ -3,6 +3,10 @@ title: Moo
 description: Build, run, and use the downstream Moo development fork alongside upstream Herdr.
 ---
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/allisonhere/moo/master/assets/moo-logo.png" alt="Moo logo" width="140" />
+</p>
+
 Moo is the temporary name for this downstream development fork. It keeps Herdr's terminal engine, agent detection, provider integrations, session format, and socket API, but runs as a separate application with its own binary, config, state, and sockets. It can sit next to upstream Herdr without either application attaching to the other's server.
 
 :::note
@@ -123,6 +127,10 @@ Moo reads the source's last 40 lines and submits them to the target as a prompt,
 Open **Settings** and choose **plugins** to list the actions of every linked plugin that the server's host can run, for example `Start Ovis`, `Stop Ovis` and `Turn Ovis autostart off`. Select an action and press Enter (or click **run**) to invoke it, the same as `moo plugin action invoke`. The status line shows that the action started; it does not show the action's output, so use `moo plugin log list` for that.
 
 The left pane moves between sections with Up/Down or `j/k`. Press Right, `l` or Enter to move into a section's choices, and Left or `h` to return. Tab and Shift-Tab cycle sections from either pane.
+
+### Web UI through the Ovis plugin
+
+The [Ovis](https://github.com/devswha/ovis) browser and phone client runs as a moo plugin: a chat view of each agent's transcript, approval cards, a live terminal and push alerts, served on `127.0.0.1:7317`. It needs a moo-compatible build, because stock Ovis expects herdr's names. Link it with `moo plugin link <checkout>` and start it with `moo plugin action invoke devswha.ovis.start`; moo's startup hook then starts it with each server. Turn that off with `moo plugin action invoke devswha.ovis.autostart-off`. Anonymous usage counts are off unless you set `OVIS_TELEMETRY=1`. Setup, safety notes and known issues are on the [wiki](https://github.com/allisonhere/moo/wiki/Web-UI-with-Ovis).
 
 ### Remote machines
 
