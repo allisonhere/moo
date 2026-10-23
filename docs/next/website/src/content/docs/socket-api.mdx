@@ -546,7 +546,9 @@ Actions are resolved from the linked manifest. `plugin.action.list` returns all 
 ```
 
 `plugin.action.list` returns each action's effective `platforms` after applying
-plugin-level inheritance.
+plugin-level inheritance. Each action also carries an optional `supported` boolean: whether the
+host running the server can invoke it. A server that omits the field is treated as supporting the
+action, so clients that list actions should hide only those with `supported: false`.
 
 Invoke an action by its qualified id or bare action id:
 

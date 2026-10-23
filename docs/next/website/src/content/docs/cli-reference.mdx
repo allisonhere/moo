@@ -345,6 +345,7 @@ herdr agent send-keys <target> <key> [key ...]
 herdr agent prompt <target> <text> [--wait] [--until STATUS]... [--timeout MS]
 herdr agent rename <target> <name>|--clear
 herdr agent history [--pane ID] [--limit N]
+herdr agent handoff <from> <to> [--lines N] [--note TEXT]
 herdr agent focus <target>
 herdr agent wait <target> [--until STATUS]... [--timeout MS]
 herdr agent attach <target> [--takeover]
@@ -364,6 +365,8 @@ A successful start returns only after the expected agent owns the same terminal 
 `idle` and `done` both mean ready for input. The CLI/API uses the server's seen state: `done` is idle but not yet marked seen, explicit `pane focus` / `agent focus` commands mark the target seen, and reads do not. Each TUI client tracks viewed completions independently, so its Done badge can differ from the CLI or another client. `blocked` means Herdr recognized an approval or question UI. `unknown` means an agent is present but Herdr cannot classify it confidently, not that its work succeeded.
 
 `agent history` prints recorded agent status changes (newest last, default 100, at most 500 retained across restarts). `--pane` limits it to one pane. The TUI's command palette has a **session replay** entry that shows the same timeline for the focused pane.
+
+`agent handoff` reads the last `--lines` lines (default 40) of `<from>`'s recent output and submits them to `<to>` as a prompt, preceded by `--note` when given. It is two ordinary requests, `agent read` then `agent prompt`, so the usual checks apply: a blocked target returns `agent_blocked`, and a source with no output hands off nothing and exits 1. It copies what is on screen at that moment, not the agent's final answer. The TUI's command palette has an **agent handoff** entry that does the same with a picker.
 
 `agent send-keys` sends logical terminal keys such as `enter`, `up`, `esc`, or `ctrl+c`. Herdr validates every key before writing any bytes. `agent read` reads the resolved terminal stream, and `agent rename` names an already detected agent.
 

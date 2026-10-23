@@ -117,6 +117,13 @@ herdr agent read reviewer --source recent-unwrapped --lines 80
 herdr agent send-keys reviewer esc
 ```
 
+Hand one agent's recent output to another as a prompt:
+
+```bash
+herdr agent wait builder --until idle --timeout 120000
+herdr agent handoff builder reviewer --lines 80 --note "Review this change"
+```
+
 Run an ordinary process and wait for its output without treating it as an agent:
 
 ```bash

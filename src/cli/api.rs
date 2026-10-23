@@ -98,9 +98,10 @@ fn schema_summary_text() -> std::io::Result<String> {
 }
 
 fn print_api_help() {
-    eprintln!("{} api commands:", crate::product_identity::BINARY_NAME);
-    eprintln!("  herdr api snapshot");
-    eprintln!("  herdr api schema [--json | --output PATH]");
+    let binary = crate::product_identity::BINARY_NAME;
+    eprintln!("{binary} api commands:");
+    eprintln!("  {binary} api snapshot");
+    eprintln!("  {binary} api schema [--json | --output PATH]");
 }
 
 fn print_api_schema_help() {
