@@ -126,6 +126,8 @@ pub(super) struct ShellHitMap {
     pub(super) navigator_scroll_metrics: Option<crate::pane::ScrollMetrics>,
     pub(super) worktree_search: Rect,
     pub(super) worktree_rows: Vec<(Rect, usize)>,
+    pub(super) handoff_popup: Rect,
+    pub(super) handoff_rows: Vec<(Rect, ClientHandoffColumn, String)>,
     pub(super) help_popup: Rect,
     pub(super) help_scrollbar: Rect,
     pub(super) help_scroll_metrics: Option<crate::pane::ScrollMetrics>,
@@ -287,6 +289,7 @@ pub(super) enum ClientShellOverlayKind {
     ConfirmClose,
     Help,
     SessionReplay,
+    AgentHandoff,
     Navigator,
     WorktreeCreate,
     WorktreeOpen,
@@ -437,6 +440,7 @@ pub(super) enum ClientSettingsSection {
     Sound,
     Toast,
     Integrations,
+    Plugins,
 }
 
 impl ClientSettingsSection {
@@ -447,6 +451,7 @@ impl ClientSettingsSection {
         Self::Sound,
         Self::Toast,
         Self::Integrations,
+        Self::Plugins,
     ];
 
     pub(super) fn label(self) -> &'static str {
@@ -457,6 +462,7 @@ impl ClientSettingsSection {
             Self::Sound => "sound",
             Self::Toast => "toasts",
             Self::Integrations => "integrations",
+            Self::Plugins => "plugins",
         }
     }
 }
@@ -478,6 +484,10 @@ pub(super) struct ClientSettingsOverlay {
     pub(super) integration_messages: Vec<String>,
     pub(super) loading_integrations: bool,
     pub(super) installing_integrations: bool,
+    /// Actions of the linked plugins that the server's host can run, fetched when the section opens.
+    pub(super) plugin_actions: Vec<crate::api::schema::PluginActionInfo>,
+    pub(super) loading_plugins: bool,
+    pub(super) plugin_notice: Option<String>,
 }
 
 #[derive(Debug)]
@@ -654,6 +664,22 @@ pub(super) struct ClientSessionReplayOverlay {
     pub(super) back: usize,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum ClientHandoffColumn {
+    From,
+    To,
+}
+
+/// Picks a source and a target agent by pane id; `sending` blocks a second submit while the
+/// read-then-prompt chain is in flight.
+#[derive(Debug)]
+pub(super) struct ClientAgentHandoffOverlay {
+    pub(super) from: String,
+    pub(super) to: String,
+    pub(super) column: ClientHandoffColumn,
+    pub(super) sending: bool,
+}
+
 #[derive(Debug)]
 pub(super) enum ClientShellOverlay {
     Onboarding,
@@ -663,6 +689,7 @@ pub(super) enum ClientShellOverlay {
     ConfirmClose(ClientConfirmCloseOverlay),
     Help(ClientHelpOverlay),
     SessionReplay(ClientSessionReplayOverlay),
+    AgentHandoff(ClientAgentHandoffOverlay),
     Navigator(ClientNavigatorOverlay),
     WorktreeCreate(ClientWorktreeCreateOverlay),
     WorktreeOpen(ClientWorktreeOpenOverlay),
@@ -682,6 +709,7 @@ impl ClientShellOverlay {
             Self::ConfirmClose(_) => ClientShellOverlayKind::ConfirmClose,
             Self::Help(_) => ClientShellOverlayKind::Help,
             Self::SessionReplay(_) => ClientShellOverlayKind::SessionReplay,
+            Self::AgentHandoff(_) => ClientShellOverlayKind::AgentHandoff,
             Self::Navigator(_) => ClientShellOverlayKind::Navigator,
             Self::WorktreeCreate(_) => ClientShellOverlayKind::WorktreeCreate,
             Self::WorktreeOpen(_) => ClientShellOverlayKind::WorktreeOpen,
@@ -706,6 +734,15 @@ pub(super) enum PendingEndpointKind {
     IntegrationList,
     IntegrationInstall,
     AgentHistory,
+    HandoffRead {
+        from_label: String,
+        to: String,
+    },
+    HandoffPrompt,
+    PluginActionList,
+    PluginActionInvoke {
+        title: String,
+    },
     PrepareWorktreeCreate {
         workspace_id: String,
     },

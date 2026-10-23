@@ -1725,6 +1725,23 @@ impl ClientShellState {
             outcome.repaint = true;
             return;
         }
+        if matches!(self.overlay, Some(ClientShellOverlay::AgentHandoff(_))) {
+            if mouse.kind == MouseEventKind::Down(MouseButton::Left) {
+                let row = self
+                    .hits
+                    .handoff_rows
+                    .iter()
+                    .find(|(rect, ..)| super::contains(*rect, point))
+                    .map(|(_, column, pane_id)| (*column, pane_id.clone()));
+                if let Some((column, pane_id)) = row {
+                    self.select_handoff_agent(column, pane_id);
+                } else if !super::contains(self.hits.handoff_popup, point) {
+                    self.overlay = None;
+                }
+                outcome.repaint = true;
+            }
+            return;
+        }
         if self.overlay.is_some() {
             if mouse.kind != MouseEventKind::Down(MouseButton::Left) {
                 return;

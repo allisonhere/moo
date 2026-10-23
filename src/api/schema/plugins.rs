@@ -424,6 +424,10 @@ pub struct PluginActionInfo {
     pub command: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub platforms: Option<Vec<PluginPlatform>>,
+    /// Whether the host running the server can invoke this action. Absent from servers that do
+    /// not say, which clients treat as supported.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub supported: Option<bool>,
 }
 
 impl PluginActionInfo {

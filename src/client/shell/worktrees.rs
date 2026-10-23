@@ -534,6 +534,10 @@ impl ClientShellState {
                 | PendingEndpointKind::IntegrationList
                 | PendingEndpointKind::IntegrationInstall
                 | PendingEndpointKind::AgentHistory
+                | PendingEndpointKind::HandoffRead { .. }
+                | PendingEndpointKind::HandoffPrompt
+                | PendingEndpointKind::PluginActionList
+                | PendingEndpointKind::PluginActionInvoke { .. }
                 | PendingEndpointKind::SelectionCopy
                 | PendingEndpointKind::PaneScroll { .. }
                 | PendingEndpointKind::WordSelection { .. }

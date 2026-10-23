@@ -778,6 +778,7 @@ fn manifest_action_info(
     plugin_platforms: &Option<Vec<crate::api::schema::PluginPlatform>>,
     action: &PluginManifestAction,
 ) -> PluginActionInfo {
+    let platforms = effective_platforms(&action.platforms, plugin_platforms).clone();
     PluginActionInfo {
         plugin_id: plugin_id.to_string(),
         action_id: action.id.clone(),
@@ -785,7 +786,8 @@ fn manifest_action_info(
         description: action.description.clone(),
         contexts: action.contexts.clone(),
         command: action.command.clone(),
-        platforms: effective_platforms(&action.platforms, plugin_platforms).clone(),
+        supported: Some(ensure_platform_supported(&platforms, "").is_ok()),
+        platforms,
     }
 }
 
@@ -801,6 +803,46 @@ fn manifest_actions(
                 .iter()
                 .map(|action| manifest_action_info(&plugin.plugin_id, &plugin.platforms, action))
         })
+}
+
+#[cfg(test)]
+mod supported_tests {
+    use super::*;
+    use crate::api::schema::PluginPlatform;
+
+    fn action(platforms: Option<Vec<PluginPlatform>>) -> PluginManifestAction {
+        PluginManifestAction {
+            id: "start".into(),
+            title: "Start".into(),
+            description: None,
+            contexts: Vec::new(),
+            platforms,
+            command: vec!["run".into()],
+        }
+    }
+
+    #[test]
+    fn action_info_reports_whether_this_host_can_run_it() {
+        let other = if cfg!(target_os = "linux") {
+            PluginPlatform::Windows
+        } else {
+            PluginPlatform::Linux
+        };
+        let host = if cfg!(target_os = "linux") {
+            PluginPlatform::Linux
+        } else if cfg!(target_os = "macos") {
+            PluginPlatform::Macos
+        } else {
+            PluginPlatform::Windows
+        };
+        let supported = |action, plugin| manifest_action_info("p", plugin, &action).supported;
+
+        assert_eq!(supported(action(None), &None), Some(true));
+        assert_eq!(supported(action(Some(vec![host])), &None), Some(true));
+        assert_eq!(supported(action(Some(vec![other])), &None), Some(false));
+        // An action without its own platforms inherits the plugin's.
+        assert_eq!(supported(action(None), &Some(vec![other])), Some(false));
+    }
 }
 
 #[cfg(test)]

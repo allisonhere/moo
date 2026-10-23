@@ -110,6 +110,20 @@ Targets accept a unique live agent name or the pane ID that currently hosts the 
 
 A user-assigned name takes precedence over integration-provided display labels, and it is used on the pane border as well. Clearing the name falls back to the integration label or the detected agent kind.
 
+### Agent handoff
+
+Open the command palette and choose **agent handoff** to forward one agent's recent output to another. The entry appears when at least two agents exist.
+
+Pick the source in the **from** column and the target in the **to** column. Use Up/Down or `j/k` to move, Tab or Left/Right to switch columns, Enter to send, and Esc to close. Clicking a row selects it.
+
+Moo reads the source's last 40 lines and submits them to the target as a prompt, exactly like `moo agent handoff <from> <to>`. The server's normal checks still apply, so a blocked or busy target rejects the prompt and the modal stays open to retry.
+
+### Plugin actions in Settings
+
+Open **Settings** and choose **plugins** to list the actions of every linked plugin that the server's host can run, for example `Start Ovis`, `Stop Ovis` and `Turn Ovis autostart off`. Select an action and press Enter (or click **run**) to invoke it, the same as `moo plugin action invoke`. The status line shows that the action started; it does not show the action's output, so use `moo plugin log list` for that.
+
+The left pane moves between sections with Up/Down or `j/k`. Press Right, `l` or Enter to move into a section's choices, and Left or `h` to return. Tab and Shift-Tab cycle sections from either pane.
+
 ### Remote machines
 
 Remote attach and saved SSH machines discover the fork's own `moo` binary on the remote host; they never discover or download upstream `herdr`.

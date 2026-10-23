@@ -847,11 +847,17 @@ impl ClientShellState {
                 };
                 return (repaint, Vec::new());
             }
+            kind @ (PendingEndpointKind::HandoffRead { .. }
+            | PendingEndpointKind::HandoffPrompt) => {
+                return self.handle_agent_handoff_result(kind, result);
+            }
             PendingEndpointKind::AgentHistory => {
                 return (self.handle_session_replay_result(result), Vec::new());
             }
             kind @ (PendingEndpointKind::IntegrationList
-            | PendingEndpointKind::IntegrationInstall) => {
+            | PendingEndpointKind::IntegrationInstall
+            | PendingEndpointKind::PluginActionList
+            | PendingEndpointKind::PluginActionInvoke { .. }) => {
                 return self.handle_settings_endpoint_result(kind, result);
             }
             kind => {

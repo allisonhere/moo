@@ -47,6 +47,9 @@ impl ClientShellState {
             integration_messages: Vec::new(),
             loading_integrations: false,
             installing_integrations: false,
+            plugin_actions: Vec::new(),
+            loading_plugins: false,
+            plugin_notice: None,
         }));
     }
 
@@ -59,7 +62,7 @@ impl ClientShellState {
             ClientSettingsSection::Toast => {
                 toast_index(self.config.toast_delivery, self.config.sound_enabled)
             }
-            ClientSettingsSection::Integrations => 0,
+            ClientSettingsSection::Integrations | ClientSettingsSection::Plugins => 0,
         }
     }
 
@@ -84,6 +87,9 @@ impl ClientShellState {
         }
         if request_integrations {
             self.queue_integration_list(outcome, true);
+        }
+        if section == ClientSettingsSection::Plugins {
+            self.queue_plugin_action_list(outcome);
         }
         outcome.repaint = true;
     }
@@ -117,6 +123,7 @@ impl ClientShellState {
                 | ClientSettingsSection::Sound => 2,
                 ClientSettingsSection::Toast => 5,
                 ClientSettingsSection::Integrations => settings.integrations.len(),
+                ClientSettingsSection::Plugins => settings.plugin_actions.len(),
             },
             _ => 0,
         }
@@ -252,6 +259,7 @@ impl ClientShellState {
                 );
             }
             ClientSettingsSection::Integrations => self.install_recommended_integrations(outcome),
+            ClientSettingsSection::Plugins => self.run_selected_plugin_action(outcome),
         }
     }
 
@@ -371,6 +379,10 @@ impl ClientShellState {
                     Vec::new()
                 };
                 (true, actions)
+            }
+            PendingEndpointKind::PluginActionList
+            | PendingEndpointKind::PluginActionInvoke { .. } => {
+                (self.handle_settings_plugin_result(kind, result), Vec::new())
             }
             _ => (false, Vec::new()),
         }

@@ -8823,6 +8823,13 @@
             "plugin_id": {
               "type": "string"
             },
+            "supported": {
+              "description": "Whether the host running the server can invoke this action. Absent from servers that do\nnot say, which clients treat as supported.",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
             "title": {
               "type": "string"
             }

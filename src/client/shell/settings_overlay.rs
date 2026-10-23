@@ -239,6 +239,9 @@ pub(super) fn render_settings_overlay(
         ClientSettingsSection::Integrations => {
             render_integrations(buffer, content, settings, palette);
         }
+        ClientSettingsSection::Plugins => {
+            render_plugins(buffer, content, settings, palette, &mut choice_hits);
+        }
     }
 
     let installable = settings
@@ -253,10 +256,10 @@ pub(super) fn render_settings_overlay(
         button(
             buffer,
             primary,
-            if settings.section == ClientSettingsSection::Integrations {
-                " ↵ install "
-            } else {
-                " ↵ apply "
+            match settings.section {
+                ClientSettingsSection::Integrations => " ↵ install ",
+                ClientSettingsSection::Plugins => " ↵ run ",
+                _ => " ↵ apply ",
             },
             Style::default()
                 .fg(contrast(palette))
@@ -281,7 +284,11 @@ pub(super) fn render_settings_overlay(
         inner.x,
         inner.bottom().saturating_sub(2),
         inner.width,
-        " ↑↓ select  ←→ section",
+        if settings.focus == ClientSettingsFocus::Choices {
+            " ↑↓ select  ← sections  tab next section"
+        } else {
+            " ↑↓ section  → choices  tab next section"
+        },
         Style::default().fg(palette.overlay1).bg(palette.panel_bg),
     );
 
@@ -334,6 +341,70 @@ fn render_choice_section(
         let rect = Rect::new(area.x, y, area.width, 1);
         draw_choice(buffer, rect, choice, index == selected, false, palette);
         hits.push((rect, index));
+    }
+}
+
+fn render_plugins(
+    buffer: &mut Buffer,
+    area: Rect,
+    settings: &ClientSettingsOverlay,
+    palette: &Palette,
+    hits: &mut Vec<(Rect, usize)>,
+) {
+    put_text(
+        buffer,
+        area.x,
+        area.y,
+        area.width,
+        "plugin actions",
+        Style::default()
+            .fg(palette.text)
+            .bg(palette.panel_bg)
+            .add_modifier(Modifier::BOLD),
+    );
+    let dim = Style::default().fg(palette.overlay1).bg(palette.panel_bg);
+    if settings.loading_plugins {
+        put_text(buffer, area.x, area.y + 2, area.width, "loading…", dim);
+    } else if settings.plugin_actions.is_empty() {
+        put_text(
+            buffer,
+            area.x,
+            area.y + 2,
+            area.width,
+            "no plugin actions; link a plugin with `moo plugin link`",
+            dim,
+        );
+    }
+    let visible = usize::from(area.height.saturating_sub(4));
+    let scroll = settings.selected.saturating_sub(visible.saturating_sub(1));
+    for (offset, (index, action)) in settings
+        .plugin_actions
+        .iter()
+        .enumerate()
+        .skip(scroll)
+        .take(visible)
+        .enumerate()
+    {
+        let rect = Rect::new(area.x, area.y + 2 + offset as u16, area.width, 1);
+        draw_choice(
+            buffer,
+            rect,
+            &format!("{}  ({})", action.title, action.plugin_id),
+            index == settings.selected,
+            false,
+            palette,
+        );
+        hits.push((rect, index));
+    }
+    if let Some(notice) = settings.plugin_notice.as_deref() {
+        put_text(
+            buffer,
+            area.x,
+            area.bottom().saturating_sub(1),
+            area.width,
+            notice,
+            Style::default().fg(palette.accent).bg(palette.panel_bg),
+        );
     }
 }
 

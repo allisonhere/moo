@@ -1,4 +1,5 @@
 use super::*;
+use crate::protocol::ClientShellAgent;
 
 mod settings_overlay;
 mod worktree_overlays;
@@ -17,6 +18,8 @@ pub(crate) struct OverlayRender {
     pub(crate) navigator_scroll_metrics: Option<crate::pane::ScrollMetrics>,
     pub(crate) worktree_search: Rect,
     pub(crate) worktree_rows: Vec<(Rect, usize)>,
+    pub(crate) handoff_popup: Rect,
+    pub(crate) handoff_rows: Vec<(Rect, ClientHandoffColumn, String)>,
     pub(crate) help_popup: Rect,
     pub(crate) help_scrollbar: Rect,
     pub(crate) help_scroll_metrics: Option<crate::pane::ScrollMetrics>,
@@ -66,6 +69,7 @@ pub(crate) fn render_client_overlay(
         ClientShellOverlay::ConfirmClose(v) => render_confirm_close_overlay(b, v, p),
         ClientShellOverlay::Help(v) => render_help_overlay(b, v, k, p),
         ClientShellOverlay::SessionReplay(v) => render_session_replay_overlay(b, v, p),
+        ClientShellOverlay::AgentHandoff(v) => render_agent_handoff_overlay(b, v, &s.agents, p),
         ClientShellOverlay::Navigator(v) => {
             render_navigator_overlay(b, v, endpoints, active_endpoint_id, p)
         }
@@ -1589,6 +1593,112 @@ fn render_session_replay_overlay(
     }
     Some(OverlayRender {
         area: q,
+        ..OverlayRender::default()
+    })
+}
+
+fn render_agent_handoff_overlay(
+    b: &mut Buffer,
+    handoff: &ClientAgentHandoffOverlay,
+    agents: &[ClientShellAgent],
+    p: &Palette,
+) -> Option<OverlayRender> {
+    let q = popup(b.area, 72, 20)?;
+    let i = panel(b, q, p.accent, p.panel_bg)?;
+    let bg = p.panel_bg;
+    put_text(
+        b,
+        i.x,
+        i.y,
+        i.width,
+        " agent handoff",
+        Style::default()
+            .fg(p.accent)
+            .bg(bg)
+            .add_modifier(Modifier::BOLD),
+    );
+    let column_width = i.width.saturating_sub(1) / 2;
+    let list_height = usize::from(i.height.saturating_sub(4));
+    let mut rows = Vec::new();
+    for (column, title, selected, x) in [
+        (ClientHandoffColumn::From, " from", &handoff.from, i.x),
+        (
+            ClientHandoffColumn::To,
+            " to",
+            &handoff.to,
+            i.x + column_width + 1,
+        ),
+    ] {
+        let active = handoff.column == column;
+        put_text(
+            b,
+            x,
+            i.y + 2,
+            column_width,
+            title,
+            Style::default()
+                .fg(if active { p.accent } else { p.overlay0 })
+                .bg(bg)
+                .add_modifier(Modifier::BOLD),
+        );
+        let top = agents
+            .iter()
+            .position(|agent| &agent.pane_id == selected)
+            .map_or(0, |index| {
+                index.saturating_sub(list_height.saturating_sub(1))
+            });
+        for (offset, agent) in agents.iter().skip(top).take(list_height).enumerate() {
+            let rect = Rect::new(x, i.y + 3 + offset as u16, column_width, 1);
+            let chosen = &agent.pane_id == selected;
+            let style = if chosen && active {
+                Style::default()
+                    .fg(contrast(p))
+                    .bg(p.accent)
+                    .add_modifier(Modifier::BOLD)
+            } else if chosen {
+                Style::default()
+                    .fg(p.accent)
+                    .bg(bg)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default()
+                    .fg(replay_status_color(agent.agent_status, p))
+                    .bg(bg)
+            };
+            b.set_style(rect, style);
+            let marker = if chosen { "▸" } else { " " };
+            put_text(
+                b,
+                rect.x,
+                rect.y,
+                rect.width,
+                &format!(
+                    " {marker} {} · {}",
+                    super::agent_handoff::agent_label(agent),
+                    replay_status_label(agent.agent_status)
+                ),
+                style,
+            );
+            rows.push((rect, column, agent.pane_id.clone()));
+        }
+    }
+    let hint = if handoff.sending {
+        " sending…"
+    } else {
+        " ↑↓ move · tab switch · enter send · esc close"
+    };
+    put_text(
+        b,
+        i.x,
+        i.bottom().saturating_sub(1),
+        i.width,
+        hint,
+        Style::default().fg(p.overlay0).bg(bg),
+    );
+    Some(OverlayRender {
+        area: q,
+        handoff_popup: q,
+        handoff_rows: rows,
         ..OverlayRender::default()
     })
 }

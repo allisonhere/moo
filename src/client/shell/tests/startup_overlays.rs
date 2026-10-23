@@ -1483,3 +1483,236 @@ fn settings_sections_move_with_vertical_and_vim_keys_before_choices_take_focus()
         }))
     ));
 }
+
+fn handoff_agent(pane_id: &str, name: &str, focused: bool) -> ClientShellAgent {
+    ClientShellAgent {
+        pane_id: pane_id.into(),
+        workspace_id: "ws_1".into(),
+        tab_id: "tab_1".into(),
+        name: Some(name.into()),
+        display_agent: None,
+        agent: None,
+        title: None,
+        terminal_title: None,
+        terminal_title_stripped: None,
+        agent_status: crate::api::schema::AgentStatus::Idle,
+        state_change_seq: 1,
+        state_labels: Vec::new(),
+        tokens: Vec::new(),
+        focused,
+    }
+}
+
+#[test]
+fn agent_handoff_reads_the_source_then_prompts_the_target_and_closes() {
+    use crate::api::schema::{Method, PaneReadResult, ReadFormat, ReadSource, ResponseResult};
+
+    let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
+    let mut initial = snapshot();
+    initial.agents = vec![
+        handoff_agent("pane_1", "builder", true),
+        handoff_agent("pane_2", "reviewer", false),
+    ];
+    state.set_snapshot(Box::new(initial));
+    state.set_pane_surface(surface());
+    state.open_agent_handoff();
+
+    // The defaults are the focused agent and the next one; Enter starts the read.
+    let read = state.handle_input_bytes(b"\r");
+    let [ClientShellAction::Endpoint { request, .. }] = &read.actions[..] else {
+        panic!("handoff should request the source agent's output");
+    };
+    assert!(matches!(
+        &request.method,
+        Method::AgentRead(params) if params.target == "pane_1"
+    ));
+    assert!(matches!(
+        state.overlay,
+        Some(ClientShellOverlay::AgentHandoff(
+            ClientAgentHandoffOverlay { sending: true, .. }
+        ))
+    ));
+    // A second Enter while the chain is in flight must not issue another read.
+    assert!(state.handle_input_bytes(b"\r").actions.is_empty());
+
+    let request_id = request.id.clone();
+    let (_, actions) = state.handle_endpoint_result(
+        "boot-1",
+        &request_id,
+        Ok(ResponseResult::PaneRead {
+            read: PaneReadResult {
+                pane_id: "pane_1".into(),
+                workspace_id: "ws_1".into(),
+                tab_id: "tab_1".into(),
+                source: ReadSource::Recent,
+                format: ReadFormat::Text,
+                text: "done\n".into(),
+                revision: 1,
+                truncated: false,
+            },
+        }),
+    );
+    let [ClientShellAction::Endpoint { request, .. }] = &actions[..] else {
+        panic!("handoff should prompt the target agent");
+    };
+    assert!(matches!(
+        &request.method,
+        Method::AgentPrompt(params)
+            if params.target == "pane_2" && params.text == "Output from builder:\n\ndone"
+    ));
+
+    let request_id = request.id.clone();
+    let agent = serde_json::from_value(serde_json::json!({
+        "terminal_id": "t1",
+        "agent_status": "idle",
+        "workspace_id": "ws_1",
+        "tab_id": "tab_1",
+        "pane_id": "pane_2",
+        "focused": false,
+        "revision": 1,
+    }))
+    .expect("agent info");
+    state.handle_endpoint_result(
+        "boot-1",
+        &request_id,
+        Ok(ResponseResult::AgentPrompted { agent }),
+    );
+    assert!(state.overlay.is_none());
+}
+
+#[test]
+fn agent_handoff_navigation_moves_each_column_and_refuses_the_same_agent() {
+    let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
+    let mut initial = snapshot();
+    initial.agents = vec![
+        handoff_agent("pane_1", "builder", true),
+        handoff_agent("pane_2", "reviewer", false),
+    ];
+    state.set_snapshot(Box::new(initial));
+    state.set_pane_surface(surface());
+    state.open_agent_handoff();
+
+    // Move the source down onto the target's agent: sending must be refused, not issued.
+    state.handle_input_bytes(b"j");
+    assert!(state.handle_input_bytes(b"\r").actions.is_empty());
+    assert!(state.endpoint_error.is_some());
+
+    // Switch to the target column and move it back up: the pair differs again.
+    state.handle_input_bytes(b"\t");
+    state.handle_input_bytes(b"k");
+    assert!(matches!(
+        state.overlay,
+        Some(ClientShellOverlay::AgentHandoff(ClientAgentHandoffOverlay {
+            ref from,
+            ref to,
+            column: ClientHandoffColumn::To,
+            ..
+        })) if from == "pane_2" && to == "pane_1"
+    ));
+    state.handle_input_bytes(b"\x1b");
+    assert!(state.overlay.is_none());
+}
+
+fn plugin_action(
+    action_id: &str,
+    title: &str,
+    supported: Option<bool>,
+) -> crate::api::schema::PluginActionInfo {
+    serde_json::from_value(serde_json::json!({
+        "plugin_id": "devswha.ovis",
+        "action_id": action_id,
+        "title": title,
+        "command": ["run"],
+        "supported": supported,
+    }))
+    .expect("plugin action")
+}
+
+#[test]
+fn settings_plugins_section_lists_supported_actions_and_runs_the_selected_one() {
+    use crate::api::schema::{Method, ResponseResult};
+
+    let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
+    state.set_snapshot(Box::new(snapshot()));
+    state.set_pane_surface(surface());
+    state.open_settings_overlay();
+
+    let mut outcome = ClientShellInput::default();
+    state.select_settings_section(ClientSettingsSection::Plugins, &mut outcome);
+    let [ClientShellAction::Endpoint { request, .. }] = &outcome.actions[..] else {
+        panic!("opening the section should request the plugin actions");
+    };
+    assert!(matches!(request.method, Method::PluginActionList(_)));
+    let request_id = request.id.clone();
+
+    // The server's host cannot run `start-windows`; a server that says nothing is trusted.
+    state.handle_endpoint_result(
+        "boot-1",
+        &request_id,
+        Ok(ResponseResult::PluginActionList {
+            actions: vec![
+                plugin_action("start", "Start Ovis", Some(true)),
+                plugin_action("start-windows", "Start Ovis", Some(false)),
+                plugin_action("stop", "Stop Ovis", None),
+            ],
+        }),
+    );
+    let Some(ClientShellOverlay::Settings(settings)) = state.overlay.as_ref() else {
+        panic!("settings should stay open");
+    };
+    assert_eq!(
+        settings
+            .plugin_actions
+            .iter()
+            .map(|action| action.action_id.as_str())
+            .collect::<Vec<_>>(),
+        ["start", "stop"]
+    );
+
+    let frame = state.compose(106, 30).expect("plugins section");
+    let text = frame
+        .cells
+        .chunks(frame.width as usize)
+        .map(|row| {
+            row.iter()
+                .map(|cell| cell.symbol.as_str())
+                .collect::<String>()
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(text.contains("plugin actions"));
+    assert!(text.contains("Stop Ovis  (devswha.ovis)"));
+    assert!(text.contains("↵ run"));
+
+    // Enter the choices, pick the second action and run it.
+    state.handle_input_bytes(b"l");
+    state.handle_input_bytes(b"j");
+    let run = state.handle_input_bytes(b"\r");
+    let [ClientShellAction::Endpoint { request, .. }] = &run.actions[..] else {
+        panic!("Enter should invoke the selected action");
+    };
+    assert!(matches!(
+        &request.method,
+        Method::PluginActionInvoke(params)
+            if params.action_id == "stop" && params.plugin_id.as_deref() == Some("devswha.ovis")
+    ));
+    let request_id = request.id.clone();
+    let invoked = serde_json::from_value(serde_json::json!({
+        "type": "plugin_action_invoked",
+        "action": plugin_action("stop", "Stop Ovis", Some(true)),
+        "context": {},
+        "log": {
+            "log_id": "log_1", "plugin_id": "devswha.ovis", "command": ["run"],
+            "status": "running", "started_unix_ms": 1,
+        },
+    }))
+    .expect("invoked result");
+    state.handle_endpoint_result("boot-1", &request_id, Ok(invoked));
+    let Some(ClientShellOverlay::Settings(settings)) = state.overlay.as_ref() else {
+        panic!("settings should stay open after running an action");
+    };
+    assert_eq!(
+        settings.plugin_notice.as_deref(),
+        Some("Stop Ovis: started")
+    );
+}

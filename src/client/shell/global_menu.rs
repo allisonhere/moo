@@ -9,6 +9,7 @@ pub(super) enum ClientGlobalMenuAction {
     },
     WhatsNew,
     SessionReplay,
+    AgentHandoff,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -67,6 +68,13 @@ pub(super) fn global_menu_items(
             label: "session replay".to_owned(),
             shortcut: None,
             action: ClientGlobalMenuAction::SessionReplay,
+        });
+    }
+    if snapshot.agents.len() > 1 {
+        items.push(ClientGlobalMenuItem {
+            label: "agent handoff".to_owned(),
+            shortcut: None,
+            action: ClientGlobalMenuAction::AgentHandoff,
         });
     }
     items.extend(snapshot.commands.iter().filter_map(|command| {
@@ -266,6 +274,7 @@ impl ClientShellState {
             }
             ClientGlobalMenuAction::WhatsNew => self.open_release_notes(),
             ClientGlobalMenuAction::SessionReplay => self.open_session_replay(outcome),
+            ClientGlobalMenuAction::AgentHandoff => self.open_agent_handoff(),
         }
         outcome.repaint = true;
     }
