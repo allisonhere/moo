@@ -18,7 +18,7 @@ A fork of [Herdr](https://github.com/herdrdev/herdr), the terminal runtime for c
 - **agent handoff** — `moo agent handoff <from> <to> [--lines N] [--note TEXT]` sends one agent's recent output to another as a prompt.
 - **settings keys** — the Settings dialog's section list answers to `↑`/`↓` and `j`/`k`; `→`/`l`/`Enter` enters a section's choices and `←`/`h` goes back.
 - **plugin action platform support** — `plugin.action.list` reports an optional `supported` flag so clients can hide actions the server's host can't run.
-- **web UI** — the [Ovis](https://github.com/devswha/ovis) browser and phone client runs as a moo plugin; see the [wiki](https://github.com/allisonhere/moo/wiki/Web-UI-with-Ovis).
+- **web UI** — the [Ovis](https://github.com/devswha/ovis) browser and phone client runs as a moo plugin (use the [`moo` branch of the fork](https://github.com/allisonhere/ovis/tree/moo)); see the [wiki](https://github.com/allisonhere/moo/wiki/Web-UI-with-Ovis).
 - **tab colors** — right-click a tab and choose **Color** to give it a theme color. Its tab dot and the bar beside its agents in the sidebar use that color.
 - **fork-only remotes** — remote attach and saved SSH machines look for `moo` on the remote host and never fetch upstream `herdr`. Automated Windows install is refused for now.
 
