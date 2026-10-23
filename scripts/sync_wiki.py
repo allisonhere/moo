@@ -12,8 +12,11 @@ The upstream text is Herdr's (Apache-2.0), so each page says so and says what ch
 """
 
 import argparse
+import os
 import re
+import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -29,9 +32,49 @@ SKIP = {"index"}
 OWN = {"moo": "Fork-guide"}
 FENCE = re.compile(r"^\s*(```|~~~)")
 
+# The name moo gives the things upstream calls herdr. Only code (fences and inline code) is rewritten,
+# and only where the thing is a command or a path moo really uses; prose, URLs, package names
+# (`brew install herdr`), the plugin manifest name and the `ui.toast.herdr` config key stay as upstream wrote them.
+PATHS = [
+    ("~/.config/herdr", "~/.config/moo"),
+    ("~/.local/state/herdr", "~/.local/state/moo"),
+    ("%APPDATA%\\herdr", "%APPDATA%\\moo"),
+    ("~/.local/bin/herdr", "~/.local/bin/moo"),
+    ("/.zfunc/_herdr", "/.zfunc/_moo"),
+    ("herdr.exe", "moo.exe"),
+    ("herdr-client.sock", "moo-client.sock"),
+    ("herdr.sock", "moo.sock"),
+]
+# `herdr` where it starts a command: a line, a span, or after `$(`, `(`, `|`, `;`, `&&`, `||` or a `$ ` prompt.
+COMMAND = re.compile(r"(^\s*(?:\$\s+)?|\$\(\s*|\(\s*|[|;]\s*|&&\s*|\|\|\s*)herdr((?:\s+[a-z][a-z0-9-]*){0,3})(?=\s|\)|$)")
+# Code that starts with `herdr` but is not a moo command, found with --verify, so it stays as written:
+# upstream commands moo lacks, and quoted messages (`herdr not found in mise tool registry`).
+UPSTREAM_ONLY: set[tuple[str, ...]] = {("not",)}
+URL = re.compile(r"(https?://\S+)")
+
 
 def page_name(slug: str) -> str:
     return OWN.get(slug) or f"Docs-{slug}"
+
+
+def _is_upstream_only(words: list[str]) -> bool:
+    return any(words[: len(prefix)] == list(prefix) for prefix in UPSTREAM_ONLY)
+
+
+def _command(match: re.Match) -> str:
+    words = match.group(2).split()
+    return match.group(1) + ("herdr" if _is_upstream_only(words) else "moo") + match.group(2)
+
+
+def rewrite_code(text: str) -> str:
+    """`herdr` becomes `moo` in the commands and paths of one line of code; URLs are left alone."""
+    parts = URL.split(text)
+    for index in range(0, len(parts), 2):
+        part = parts[index]
+        for old, new in PATHS:
+            part = part.replace(old, new)
+        parts[index] = COMMAND.sub(_command, part)
+    return "".join(parts)
 
 
 def split_frontmatter(text: str) -> tuple[dict[str, str], str]:
@@ -87,7 +130,8 @@ def _prose(text: str, slug: str, slugs: set[str]) -> str:
 
     text = re.sub(r"\]\(/docs/([a-z0-9-]+)/?(#[^)\s]*)?\)", docs_link, text)
     text = re.sub(r"\]\(/docs/?\)", "](Documentation)", text)
-    return re.sub(r"\]\((/(?!/)[^)\s]*)\)", rf"]({UPSTREAM}\1)", text)
+    text = re.sub(r"\]\((/(?!/)[^)\s]*)\)", rf"]({UPSTREAM}\1)", text)
+    return re.sub(r"`([^`\n]+)`", lambda m: f"`{rewrite_code(m.group(1))}`", text)
 
 
 def convert(body: str, slug: str, slugs: set[str]) -> str:
@@ -101,7 +145,7 @@ def convert(body: str, slug: str, slugs: set[str]) -> str:
             in_fence = not in_fence
             out.append(line)
         elif in_fence:
-            out.append(line)
+            out.append(rewrite_code(line))
         else:
             prose.append(line)
     if prose:
@@ -120,10 +164,20 @@ def _banner(slug: str) -> str:
     return (
         f"> **Adapted from [Herdr's documentation]({UPSTREAM}/docs/{slug}/)** "
         f"(Apache-2.0, © the Herdr authors; see the [LICENSE]({REPO}/blob/master/LICENSE)). "
-        "Changed from the original: converted to wiki markdown, links rewritten, and moo's "
-        "additions included. moo uses `moo` where this page says `herdr`, `MOO_*` for `HERDR_*` "
-        "and `~/.config/moo` for `~/.config/herdr`; to install moo see [Install](Install)."
+        "Changed from the original: converted to wiki markdown, links rewritten, commands and "
+        "config paths changed from `herdr` to `moo` where moo has the same command (checked against "
+        "the moo CLI), and moo's additions included. Anything still saying `herdr` is upstream-only "
+        "or names upstream itself; to install moo see [Install](Install)."
     )
+
+
+# Pages whose subject differs between upstream and moo, so a reader needs more than the usual note.
+SLUG_NOTES = {
+    "install": (
+        "> **This page installs upstream Herdr** (herdr.dev, Homebrew, mise, Nix) and describes its "
+        "update channels. moo has its own installers and `moo update` downloads nothing: see [Install](Install)."
+    ),
+}
 
 
 def render_page(slug: str, meta: dict[str, str], body: str, slugs: set[str]) -> str:
@@ -131,6 +185,8 @@ def render_page(slug: str, meta: dict[str, str], body: str, slugs: set[str]) -> 
     parts = [MARKER, "", _chrome(), ""]
     if slug not in OWN:
         parts += [_banner(slug), ""]
+    if slug in SLUG_NOTES:
+        parts += [SLUG_NOTES[slug], ""]
     parts += [f"# {title}", ""]
     if meta.get("description"):
         parts += [f"_{meta['description']}_", ""]
@@ -210,12 +266,85 @@ def sync(docs: Path, wiki: Path, check: bool = False) -> list[str]:
     return changes
 
 
+_WORD = re.compile(r"^[a-z][a-z0-9-]*$")
+
+
+def moo_commands(text: str) -> set[tuple[str, ...]]:
+    """The command words (`agent history`, `plugin action invoke`) of every `moo ...` in the code of `text`."""
+    found = set()
+    spans = []
+    in_fence = False
+    for line in text.split("\n"):
+        if FENCE.match(line):
+            in_fence = not in_fence
+        elif in_fence:
+            spans.append(line)
+    spans += re.findall(r"`([^`\n]+)`", text)
+    for span in spans:
+        for match in re.finditer(r"(?:^\s*(?:\$\s+)?|\$\(\s*|\(\s*|[|;]\s*|&&\s*|\|\|\s*)moo((?:\s+\S+){0,4})", span):
+            words = []
+            for token in match.group(1).split():
+                if not _WORD.match(token):
+                    break
+                words.append(token)
+            found.add(tuple(words))
+    return found
+
+
+def verify(binary: str, wiki: Path) -> list[str]:
+    """List the `moo ...` commands the generated pages show that moo does not have.
+
+    Each command is walked word by word with `--help`: a word that is not a subcommand of a command
+    that has subcommands is wrong, while the words after a leaf command are its arguments.
+    """
+    commands = set()
+    for page in wiki.glob("Docs-*.md"):
+        commands |= moo_commands(page.read_text())
+    helps: dict[tuple[str, ...], str | None] = {}
+    bad: set[str] = set()
+    with tempfile.TemporaryDirectory() as home:
+        env = {"PATH": os.environ.get("PATH", ""), "HOME": home}
+
+        def help_of(words: tuple[str, ...]) -> str | None:
+            if words not in helps:
+                try:
+                    result = subprocess.run(
+                        [binary, *words, "--help"], capture_output=True, text=True, timeout=10, env=env, stdin=subprocess.DEVNULL
+                    )
+                    text = result.stdout + result.stderr
+                    helps[words] = text if result.returncode == 0 and "sage" in text else None
+                except (subprocess.TimeoutExpired, OSError):
+                    helps[words] = None
+            return helps[words]
+
+        for words in sorted(commands):
+            prefix: tuple[str, ...] = ()
+            for word in words:
+                found = help_of(prefix + (word,))
+                # moo answers an unknown first word with its general help, so that is not a command
+                if found is not None and not (prefix == () and found == help_of(())):
+                    prefix += (word,)
+                    continue
+                parent = help_of(prefix)
+                if prefix == () or (parent is not None and "Commands:" in parent):
+                    bad.add("moo " + " ".join(prefix + (word,)))
+                break
+    return sorted(bad)
+
+
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--wiki", required=True, type=Path, help="path to a checkout of the wiki")
     parser.add_argument("--docs", type=Path, default=DOCS)
     parser.add_argument("--check", action="store_true", help="exit 1 if the wiki is out of date")
+    parser.add_argument("--verify", metavar="MOO", help="run every moo command the generated pages show through MOO --help; exit 1 if any fails")
     args = parser.parse_args(argv)
+    if args.verify:
+        bad = verify(args.verify, args.wiki)
+        for command in bad:
+            print(f"not a moo command: {command}")
+        print(f"{len(bad)} commands moo does not have" if bad else "every command shown exists in moo")
+        return 1 if bad else 0
     changes = sync(args.docs, args.wiki, args.check)
     for change in changes:
         print(("would change " if args.check else "wrote ") + change)

@@ -213,7 +213,7 @@ Install Zig 0.16.0 and put it on `PATH`, or point the build at it:
 ZIG=/path/to/zig cargo build --release --locked --bin moo
 ```
 
-### `refusing to use a Herdr socket inherited from another product`
+### `refusing to use a Moo socket inherited from another product`
 
 You launched Moo inside a managed pane belonging to another product, such as upstream Herdr. Start it from a normal terminal instead. If you intentionally want to bypass the inherited socket, clear the relevant variables:
 
@@ -223,9 +223,9 @@ env -u MOO_ENV -u MOO_PRODUCT_ID \
     moo
 ```
 
-### Nested Herdr is blocked
+### Nested moo is blocked
 
-Run outside the other Herdr session, or opt in explicitly in the fork config:
+Starting moo inside another moo session prints `nested moo is disabled by default`. Run outside the other session, or opt in explicitly in the fork config:
 
 ```toml
 [experimental]

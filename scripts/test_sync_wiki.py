@@ -40,7 +40,94 @@ class ConvertTests(unittest.TestCase):
         self.assertIn("herdr.dev/docs/page/", out)
 
     def test_placeholders_in_prose_are_not_treated_as_components(self):
-        self.assertEqual(self.convert("Run `herdr pane read <pane>`."), "Run `herdr pane read <pane>`.")
+        self.assertEqual(self.convert("Run `herdr pane read <pane>`."), "Run `moo pane read <pane>`.")
+
+
+class RewriteTests(unittest.TestCase):
+    def test_a_command_that_starts_with_herdr_becomes_moo(self):
+        for before, after in [
+            ("herdr agent list", "moo agent list"),
+            ("herdr", "moo"),
+            ("$ herdr update", "$ moo update"),
+            ("split=$(herdr pane split --current)", "split=$(moo pane split --current)"),
+            ("herdr a && herdr b | herdr c", "moo a && moo b | moo c"),
+            ("herdr --remote box", "moo --remote box"),
+        ]:
+            self.assertEqual(sw.rewrite_code(before), after, before)
+
+    def test_package_names_urls_and_manifest_names_stay_as_upstream_wrote_them(self):
+        for unchanged in [
+            "brew install herdr",
+            "mise use -g herdr",
+            "npx skills add herdrdev/herdr --skill herdr -g",
+            "curl -fsSL https://herdr.dev/install.sh | sh",
+            "herdr-plugin.toml",
+            "ui.toast.herdr.position",
+            "herdr not found in mise tool registry",
+        ]:
+            self.assertEqual(sw.rewrite_code(unchanged), unchanged, unchanged)
+
+    def test_paths_use_moo_names_but_not_inside_urls(self):
+        self.assertEqual(sw.rewrite_code("~/.config/herdr/config.toml"), "~/.config/moo/config.toml")
+        self.assertEqual(sw.rewrite_code("~/.local/state/herdr/x"), "~/.local/state/moo/x")
+        self.assertEqual(sw.rewrite_code("herdr.sock and herdr-client.sock"), "moo.sock and moo-client.sock")
+        self.assertEqual(sw.rewrite_code(r"%APPDATA%\herdr\config.toml"), r"%APPDATA%\moo\config.toml")
+        self.assertEqual(sw.rewrite_code("C:\\bin\\herdr.exe"), "C:\\bin\\moo.exe")
+        self.assertEqual(sw.rewrite_code("see https://example.com/.config/herdr/x"), "see https://example.com/.config/herdr/x")
+
+    def test_only_code_is_rewritten_never_prose(self):
+        text = "Herdr runs `herdr status` and herdr stays herdr.\n\n```sh\nherdr agent list\n```\n"
+        self.assertEqual(
+            sw.convert(text, "page", SLUGS),
+            "Herdr runs `moo status` and herdr stays herdr.\n\n```sh\nmoo agent list\n```\n",
+        )
+
+    def test_upstream_only_commands_keep_their_name(self):
+        sw.UPSTREAM_ONLY.add(("legacy", "thing"))
+        self.addCleanup(sw.UPSTREAM_ONLY.discard, ("legacy", "thing"))
+        self.assertEqual(sw.rewrite_code("herdr legacy thing --x"), "herdr legacy thing --x")
+        self.assertEqual(sw.rewrite_code("herdr legacy other"), "moo legacy other")
+
+
+FAKE_MOO = """#!/bin/sh
+# a stand-in CLI: `agent` has subcommands (list), `status` is a leaf; anything else shows the general help
+args=$(printf '%s ' "$@" | sed 's/ *--help *$//')
+case "$args" in
+  "agent") printf 'Usage: moo agent\nCommands:\n  list\n' ;;
+  "agent list") printf 'Usage: moo agent list\n' ;;
+  "status") printf 'Usage: moo status [server]\n' ;;
+  "agent "*|"status "*) printf 'error: unexpected argument\n' >&2; exit 2 ;;
+  *) printf 'Usage: moo [options]\nCommands:\n  agent\n' ;;
+esac
+"""
+
+
+class VerifyTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.binary = self.root / "moo"
+        self.binary.write_text(FAKE_MOO)
+        self.binary.chmod(0o755)
+        self.wiki = self.root / "wiki"
+        self.wiki.mkdir()
+
+    def verify(self, page):
+        (self.wiki / "Docs-x.md").write_text(page)
+        return sw.verify(str(self.binary), self.wiki)
+
+    def test_commands_that_exist_pass_and_the_words_after_a_leaf_are_arguments(self):
+        page = "```sh\nmoo agent list\nmoo status server --json\nmoo status whatever\nmoo --remote box\n```\nUse `moo agent list`.\n"
+        self.assertEqual(self.verify(page), [])
+
+    def test_a_missing_subcommand_or_command_is_reported(self):
+        page = "```sh\nmoo agent nope\nmoo bogus\n```\n"
+        self.assertEqual(self.verify(page), ["moo agent nope", "moo bogus"])
+
+    def test_moo_commands_reads_fences_and_inline_code_but_not_prose(self):
+        text = "moo outside prose\n```sh\nmoo agent list --x\n```\nand `moo status`\n"
+        self.assertEqual(sw.moo_commands(text), {("agent", "list"), ("status",)})
 
 
 class FrontmatterTests(unittest.TestCase):
