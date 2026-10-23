@@ -1716,3 +1716,30 @@ fn settings_plugins_section_lists_supported_actions_and_runs_the_selected_one() 
         Some("Stop Ovis: started")
     );
 }
+
+#[test]
+fn settings_dialog_keeps_one_height_across_sections_when_there_is_room() {
+    let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
+    state.set_snapshot(Box::new(snapshot()));
+    state.set_pane_surface(surface());
+    state.open_settings_overlay();
+
+    let mut heights = Vec::new();
+    for section in ClientSettingsSection::ALL {
+        state.select_settings_section(*section, &mut ClientShellInput::default());
+        state.compose(106, 60).expect("settings dialog");
+        heights.push(state.hits.settings_popup.height);
+    }
+    assert!(
+        heights.iter().all(|height| *height == heights[0]),
+        "{heights:?}"
+    );
+    // Tall enough for the Integrations list's seventeen targets, not the old fixed 22.
+    assert!(heights[0] > 22, "{heights:?}");
+
+    // A short terminal clamps the dialog instead of overflowing it.
+    state
+        .compose(106, 24)
+        .expect("settings dialog on a short screen");
+    assert!(state.hits.settings_popup.height <= 22);
+}

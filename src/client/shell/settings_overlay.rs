@@ -33,21 +33,50 @@ fn draw_choice(
     );
 }
 
+/// Rows the dialog spends outside a section's content: border, title, header gap, buttons, hint.
+const SETTINGS_CHROME_ROWS: u16 = 8;
+const SETTINGS_MIN_HEIGHT: u16 = 22;
+
+/// Content rows a section can need. Integrations reserves a row for every target before the list
+/// arrives, so loading it does not resize the dialog.
+fn settings_content_rows(section: ClientSettingsSection, settings: &ClientSettingsOverlay) -> u16 {
+    let rows = match section {
+        ClientSettingsSection::Theme => crate::config::THEME_NAMES.len(),
+        ClientSettingsSection::Indicators
+        | ClientSettingsSection::TabPill
+        | ClientSettingsSection::Sound => 5,
+        ClientSettingsSection::Toast => 12,
+        ClientSettingsSection::Integrations => {
+            6 + settings
+                .integrations
+                .len()
+                .max(crate::api::schema::IntegrationTarget::ALL.len())
+                + settings.integration_messages.len().min(6)
+        }
+        ClientSettingsSection::Plugins => 3 + settings.plugin_actions.len(),
+    };
+    u16::try_from(rows).unwrap_or(u16::MAX)
+}
+
+/// As tall as the tallest section, so switching sections never moves the dialog's edges. The
+/// popup is clamped to the screen, so a short terminal still gets the smaller, scrolling dialog.
+fn settings_dialog_height(settings: &ClientSettingsOverlay) -> u16 {
+    ClientSettingsSection::ALL
+        .iter()
+        .map(|section| settings_content_rows(*section, settings))
+        .max()
+        .unwrap_or(0)
+        .saturating_add(SETTINGS_CHROME_ROWS)
+        .max(SETTINGS_MIN_HEIGHT)
+}
+
 pub(super) fn render_settings_overlay(
     buffer: &mut Buffer,
     settings: &ClientSettingsOverlay,
     integration_updates_available: bool,
     palette: &Palette,
 ) -> Option<OverlayRender> {
-    let integration_height = 14u16
-        .saturating_add(settings.integrations.len().max(1) as u16)
-        .saturating_add(settings.integration_messages.len().min(6) as u16);
-    let height = if settings.section == ClientSettingsSection::Integrations {
-        integration_height.max(22)
-    } else {
-        22
-    };
-    let popup = popup(buffer.area, 76, height)?;
+    let popup = popup(buffer.area, 76, settings_dialog_height(settings))?;
     let inner = panel(buffer, popup, palette.accent, palette.panel_bg)?;
     if inner.width < 20 || inner.height < 8 {
         return None;
