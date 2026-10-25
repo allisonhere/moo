@@ -1,7 +1,7 @@
 use crate::api::schema::{
     InstalledPluginInfo, PluginManifestAction, PluginManifestBuild, PluginManifestEventHook,
-    PluginManifestLinkHandler, PluginManifestPane, PluginManifestStartup, PluginPanePlacement,
-    PluginPlatform, PluginSourceInfo, PluginSourceKind,
+    PluginManifestLinkHandler, PluginManifestPane, PluginManifestSetting, PluginManifestStartup,
+    PluginPanePlacement, PluginPlatform, PluginSettingOption, PluginSourceInfo, PluginSourceKind,
 };
 use crate::popup_size::PopupSize;
 
@@ -31,6 +31,25 @@ struct RawPluginManifest {
     panes: Vec<RawPluginManifestPane>,
     #[serde(default)]
     link_handlers: Vec<RawPluginManifestLinkHandler>,
+    #[serde(default)]
+    settings: Vec<RawPluginManifestSetting>,
+}
+
+#[derive(serde::Deserialize)]
+struct RawPluginManifestSetting {
+    id: String,
+    title: String,
+    #[serde(default)]
+    description: Option<String>,
+    #[serde(default)]
+    options: Vec<RawPluginSettingOption>,
+}
+
+#[derive(serde::Deserialize)]
+struct RawPluginSettingOption {
+    value: String,
+    label: String,
+    action: String,
 }
 
 #[derive(serde::Deserialize)]
@@ -197,6 +216,12 @@ pub(crate) fn load_plugin_manifest(
         .collect::<Result<Vec<_>, _>>()?;
     reject_duplicate_link_handler_ids(&link_handlers)?;
     validate_link_handler_actions(&link_handlers, &actions)?;
+    let settings = raw
+        .settings
+        .into_iter()
+        .map(|setting| normalize_manifest_setting(setting, &actions))
+        .collect::<Result<Vec<_>, _>>()?;
+    reject_duplicate_setting_ids(&settings)?;
 
     let mut warnings = validate_event_names(&events);
     if platforms.is_none() {
@@ -219,6 +244,8 @@ pub(crate) fn load_plugin_manifest(
         events,
         panes,
         link_handlers,
+        settings,
+        status: Default::default(),
         source: Default::default(),
         warnings,
     })
@@ -363,6 +390,103 @@ fn reject_duplicate_link_handler_ids(
             return Err((
                 "duplicate_plugin_link_handler_id",
                 format!("duplicate link handler id '{}'", handler.id),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn normalize_manifest_setting(
+    setting: RawPluginManifestSetting,
+    actions: &[PluginManifestAction],
+) -> Result<PluginManifestSetting, (&'static str, String)> {
+    let id = normalize_local_identifier(&setting.id, crate::plugin_status::MAX_KEY_CHARS)
+        .ok_or_else(|| {
+            (
+                "invalid_plugin_setting_id",
+                format!(
+                    "setting id must be a valid identifier of at most {} characters",
+                    crate::plugin_status::MAX_KEY_CHARS
+                ),
+            )
+        })?;
+    let title = non_empty_trimmed(
+        &setting.title,
+        "invalid_plugin_setting_title",
+        "setting title is required",
+    )?;
+    if setting.options.len() < 2 {
+        return Err((
+            "invalid_plugin_setting_options",
+            format!("setting '{id}' needs at least two options"),
+        ));
+    }
+    let mut options: Vec<PluginSettingOption> = Vec::new();
+    for option in setting.options {
+        let value = non_empty_trimmed(
+            &option.value,
+            "invalid_plugin_setting_option",
+            "setting option value is required",
+        )?;
+        if value.chars().count() > crate::plugin_status::MAX_VALUE_CHARS {
+            return Err((
+                "invalid_plugin_setting_option",
+                format!(
+                    "setting '{id}' option value must be at most {} characters",
+                    crate::plugin_status::MAX_VALUE_CHARS
+                ),
+            ));
+        }
+        let label = non_empty_trimmed(
+            &option.label,
+            "invalid_plugin_setting_option",
+            "setting option label is required",
+        )?;
+        let action = normalize_action_id(&option.action).ok_or_else(|| {
+            (
+                "invalid_plugin_setting_action",
+                format!("setting '{id}' option '{value}' has an invalid action id"),
+            )
+        })?;
+        if !actions.iter().any(|candidate| candidate.id == action) {
+            return Err((
+                "invalid_plugin_setting_action",
+                format!("setting '{id}' option '{value}' references unknown action '{action}'"),
+            ));
+        }
+        if options.iter().any(|existing| existing.value == value) {
+            return Err((
+                "invalid_plugin_setting_option",
+                format!("setting '{id}' repeats option '{value}'"),
+            ));
+        }
+        options.push(PluginSettingOption {
+            value,
+            label,
+            action,
+        });
+    }
+    let description = setting
+        .description
+        .map(|description| description.trim().to_string())
+        .filter(|description| !description.is_empty());
+    Ok(PluginManifestSetting {
+        id,
+        title,
+        description,
+        options,
+    })
+}
+
+fn reject_duplicate_setting_ids(
+    settings: &[PluginManifestSetting],
+) -> Result<(), (&'static str, String)> {
+    let mut seen = std::collections::HashSet::new();
+    for setting in settings {
+        if !seen.insert(setting.id.as_str()) {
+            return Err((
+                "invalid_plugin_setting_id",
+                format!("duplicate setting id '{}'", setting.id),
             ));
         }
     }
@@ -614,4 +738,96 @@ fn normalize_local_identifier(value: &str, max_chars: usize) -> Option<String> {
             .bytes()
             .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b':' | b'_' | b'-')))
     .then(|| value.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn normalize_setting(
+        id: &str,
+        value: &str,
+    ) -> Result<PluginManifestSetting, (&'static str, String)> {
+        let actions = vec![PluginManifestAction {
+            id: "run".into(),
+            title: "Run".into(),
+            description: None,
+            contexts: vec![],
+            platforms: None,
+            command: vec!["true".into()],
+        }];
+        normalize_manifest_setting(
+            RawPluginManifestSetting {
+                id: id.into(),
+                title: "Mode".into(),
+                description: None,
+                options: vec![
+                    RawPluginSettingOption {
+                        value: value.into(),
+                        label: "First".into(),
+                        action: "run".into(),
+                    },
+                    RawPluginSettingOption {
+                        value: "other".into(),
+                        label: "Other".into(),
+                        action: "run".into(),
+                    },
+                ],
+            },
+            &actions,
+        )
+    }
+
+    #[test]
+    fn setting_id_limit_matches_reportable_status_keys() {
+        let id = "x".repeat(64);
+        let setting = normalize_setting(&id, "on").unwrap();
+        let bytes = serde_json::to_vec(&std::collections::BTreeMap::from([(
+            setting.id.clone(),
+            "on",
+        )]))
+        .unwrap();
+        let status = crate::plugin_status::parse_status(&bytes);
+        assert_eq!(status.get(&setting.id).map(String::as_str), Some("on"));
+        assert_eq!(
+            normalize_setting(&"x".repeat(65), "on").unwrap_err().0,
+            "invalid_plugin_setting_id"
+        );
+    }
+
+    #[test]
+    fn setting_option_limit_preserves_exact_status_values() {
+        let value = "界".repeat(256);
+        let setting = normalize_setting("mode", &value).unwrap();
+        let bytes = serde_json::to_vec(&serde_json::json!({"mode": value})).unwrap();
+        let status = crate::plugin_status::parse_status(&bytes);
+        assert_eq!(status.get("mode"), Some(&setting.options[0].value));
+        assert_eq!(status.get("mode").map(String::as_str), Some(value.as_str()));
+        assert_eq!(
+            normalize_setting("mode", &format!("{value}y"))
+                .unwrap_err()
+                .0,
+            "invalid_plugin_setting_option"
+        );
+    }
+    #[test]
+    fn all_setting_values_survive_additional_status_metadata() {
+        let settings = (0..33)
+            .map(|i| normalize_setting(&format!("mode{i:02}"), "on").unwrap())
+            .collect::<Vec<_>>();
+        reject_duplicate_setting_ids(&settings).unwrap();
+        let mut values = settings
+            .iter()
+            .map(|setting| (setting.id.clone(), "on"))
+            .collect::<std::collections::BTreeMap<_, _>>();
+        for index in 0..32 {
+            values.insert(format!("extra{index:02}"), "metadata");
+        }
+        let bytes = serde_json::to_vec(&values).unwrap();
+        let status = crate::plugin_status::parse_status(&bytes);
+        assert_eq!(status.len(), 65);
+        assert_eq!(status.get("mode00").map(String::as_str), Some("on"));
+        assert_eq!(status.get("mode32").map(String::as_str), Some("on"));
+        assert_eq!(status.get("extra31").map(String::as_str), Some("metadata"));
+    }
 }

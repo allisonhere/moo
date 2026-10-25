@@ -71,6 +71,13 @@ pub struct InstalledPluginInfo {
     pub panes: Vec<PluginManifestPane>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub link_handlers: Vec<PluginManifestLinkHandler>,
+    /// Settings the plugin offers, each a set of options that run one of its actions.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub settings: Vec<PluginManifestSetting>,
+    /// What the plugin last reported about itself in its `status.json`, by key (a setting's id gives
+    /// that setting's current option value). Filled in by plugin.list; empty when it reports nothing.
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub status: std::collections::BTreeMap<String, String>,
     #[serde(default)]
     pub source: PluginSourceInfo,
     /// Warnings collected at link time or on registry load (e.g. unknown event names,
@@ -288,6 +295,26 @@ pub struct PluginManifestPane {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub height: Option<PopupSize>,
     pub command: Vec<String>,
+}
+
+/// One choice of a plugin setting: selecting it runs `action`, and the plugin reports `value` in
+/// its status once that is the current choice.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct PluginSettingOption {
+    pub value: String,
+    pub label: String,
+    pub action: String,
+}
+
+/// A setting a plugin offers for clients to show and change: a titled set of options, none of which
+/// takes effect except by running its action.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct PluginManifestSetting {
+    pub id: String,
+    pub title: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    pub options: Vec<PluginSettingOption>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]

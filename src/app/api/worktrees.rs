@@ -712,6 +712,8 @@ mod tests {
                 }],
                 panes: Vec::new(),
                 link_handlers: Vec::new(),
+                settings: Vec::new(),
+                status: Default::default(),
                 source: crate::api::schema::PluginSourceInfo::default(),
                 warnings: Vec::new(),
             },

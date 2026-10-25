@@ -1032,6 +1032,8 @@ fn plugin_link_list_unlink_round_trip() {
             action: "bootstrap".into(),
             platforms: None,
         }],
+        settings: vec![],
+        status: Default::default(),
         source: Default::default(),
         warnings: vec![],
     };

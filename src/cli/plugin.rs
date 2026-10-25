@@ -869,6 +869,9 @@ fn offline_plugin_list_response(params: &PluginListParams) -> std::io::Result<se
         })
         .collect::<Vec<_>>();
     plugins.sort_by(|a, b| a.plugin_id.cmp(&b.plugin_id));
+    for plugin in &mut plugins {
+        plugin.status = crate::plugin_status::read_plugin_status(&plugin.plugin_id);
+    }
     serde_json::to_value(SuccessResponse {
         id: "cli:plugin".into(),
         result: ResponseResult::PluginList { plugins },
@@ -1407,6 +1410,8 @@ mod tests {
             events: vec![],
             panes: vec![],
             link_handlers: vec![],
+            settings: Vec::new(),
+            status: Default::default(),
             source: PluginSourceInfo {
                 kind: PluginSourceKind::Github,
                 owner: Some(owner.to_string()),
@@ -1631,5 +1636,49 @@ mod tests {
         let _ = std::fs::remove_dir_all(config_dir);
         let _ = std::fs::remove_dir_all(state_dir);
         let _ = std::fs::remove_dir_all(legacy_dir);
+    }
+    #[test]
+    fn offline_plugin_list_reads_existing_status_file() {
+        let _guard = crate::config::test_config_env_lock().lock().unwrap();
+        let base = std::env::temp_dir().join(unique_plugin_id("offline-status"));
+        std::fs::create_dir_all(&base).unwrap();
+        let previous_config = std::env::var_os("XDG_CONFIG_HOME");
+        let previous_state = std::env::var_os("XDG_STATE_HOME");
+        std::env::set_var("XDG_CONFIG_HOME", base.join("config"));
+        std::env::set_var("XDG_STATE_HOME", base.join("state"));
+        let manifest = base.join("herdr-plugin.toml");
+        std::fs::write(&manifest, "id = 'example.status'\nname = 'Status'\nversion = '0.1.0'\nmin_herdr_version = '0.6.10'\n").unwrap();
+        let plugin = crate::app::load_plugin_manifest(manifest.to_str().unwrap(), true).unwrap();
+        crate::plugin_paths::ensure_plugin_user_dirs(&plugin.plugin_id).unwrap();
+        let status_path =
+            crate::plugin_paths::plugin_state_dir(&plugin.plugin_id).join("status.json");
+        std::fs::write(&status_path, br#"{"network":"lan"}"#).unwrap();
+        crate::persist::plugin_registry::save_to_path(
+            &crate::config::config_dir().join("plugins.json"),
+            &[plugin],
+        )
+        .unwrap();
+        let response = offline_plugin_list_response(&PluginListParams::default()).unwrap();
+        match previous_config {
+            Some(v) => std::env::set_var("XDG_CONFIG_HOME", v),
+            None => std::env::remove_var("XDG_CONFIG_HOME"),
+        }
+        match previous_state {
+            Some(v) => std::env::set_var("XDG_STATE_HOME", v),
+            None => std::env::remove_var("XDG_STATE_HOME"),
+        }
+        assert_eq!(
+            std::fs::read_to_string(status_path).unwrap(),
+            r#"{"network":"lan"}"#
+        );
+        assert_eq!(
+            response["result"]["plugins"][0]["plugin_id"],
+            "example.status"
+        );
+        assert_eq!(
+            response["result"]["plugins"][0]["status"],
+            serde_json::json!({"network": "lan"})
+        );
+        std::fs::remove_dir_all(base).unwrap();
     }
 }
