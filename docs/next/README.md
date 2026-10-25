@@ -1,85 +1,75 @@
-# herdr
-
-
-<p align="center">
-  <img src="assets/logo.png" alt="herdr" width="100" />
-</p>
+# Moo — Multiple Operators Orchestrated
 
 <p align="center">
-  <a href="https://herdr.dev">herdr.dev</a> · <a href="#install">install</a> · <a href="https://herdr.dev/docs/quick-start/">quick start</a> · <a href="https://herdr.dev/docs/">docs</a>
+  <img src="assets/moo-logo.png" alt="Moo logo" width="180" />
 </p>
 
-<p align="center">
-  English · <a href="README.zh-CN.md">简体中文</a>
-</p>
+Moo is a terminal workspace for coding agents, with detachable sessions, agent teams, handoffs, and a web client. Run agents across projects, see which ones need attention, and coordinate their work from your terminal.
 
-<p align="center">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-666666?labelColor=333333" alt="Apache 2.0 license" /></a>
-  <a href="https://github.com/herdrdev/herdr/releases"><img src="https://img.shields.io/github/downloads/herdrdev/herdr/total?labelColor=333333&color=666666" alt="total GitHub release downloads" /></a>
-  <a href="https://github.com/herdrdev/herdr/stargazers"><img src="https://img.shields.io/github/stars/herdrdev/herdr?labelColor=333333&color=666666&logo=github" alt="GitHub stars" /></a>
-  <a href="https://github.com/herdrdev/herdr/releases/latest"><img src="https://img.shields.io/github/v/release/herdrdev/herdr?label=release&labelColor=333333&color=666666" alt="latest stable release" /></a>
-  <a href="https://formulae.brew.sh/formula/herdr"><img src="https://img.shields.io/homebrew/v/herdr?label=homebrew&labelColor=333333&color=666666" alt="Homebrew version" /></a>
-  <a href="https://x.com/herdrdev"><img src="https://img.shields.io/badge/follow-%40herdrdev-000000?logo=x&logoColor=white" alt="follow @herdrdev on X" /></a>
-</p>
+> **Status:** experimental. The full Rust test suite passes on Moo; the interactive UI has been checked in a terminal only for the features listed below.
 
----
+## features
 
-https://github.com/user-attachments/assets/043ec09f-4bdd-41d5-aee0-8fda6b83e267
+- **separate identity** — the binary is `moo`. Config, state, logs, and sockets live under `moo` paths, so separate installations keep their own data. Debug builds use `moo-dev`.
+- **agent-aware command palette** — open it with `prefix+space` (default prefix `ctrl+b`) and search actions by name.
+- **agent names in the sidebar** — rename an agent from the sidebar or with `moo agent rename <target> <name>`; `--clear` resets it.
+- **attention queue** — agents that need an answer are queued, and you can acknowledge them.
+- **durable status history** — agent status changes are recorded and exposed through the API as `agent.history`.
+- **agent handoff** — `moo agent handoff <from> <to> [--lines N] [--note TEXT]` sends one agent's recent output to another as a prompt; the command palette's **agent handoff** does the same with a picker.
+- **settings keys** — the Settings dialog's section list answers to `↑`/`↓` and `j`/`k`; `→`/`l`/`Enter` enters a section's choices and `←`/`h` goes back.
+- **plugin actions in settings** — **Settings → plugins** lists the linked plugins' actions (start or stop a plugin, toggle its options) and runs the one you select.
+- **plugin action platform support** — `plugin.action.list` reports an optional `supported` flag so clients can hide actions the server's host can't run.
+- **web UI** — the [Ovis](https://github.com/devswha/ovis) browser and phone client runs as a moo plugin with a **Network access** setting (this PC only, or the local network only) (use the [Moo-compatible branch](https://github.com/allisonhere/ovis/tree/moo)); see the [wiki](https://github.com/allisonhere/moo/wiki/Web-UI-with-Ovis).
+- **teams** — optional, Linux and macOS. **teams: open screen** in the command palette (or `moo teams ui`) opens a keyboard-first screen for running a Lead, Developer and QA agent as a team: goal-to-plan drafts you review and edit, declared providers and models, owner approvals for risky actions, bounded disagreements, selective memory for agents, metered-vs-estimated usage with hard limits, and a versioned local JSON API with replayable events. Moo works as a plain multiplexer until you open it. See the [Teams guide](https://github.com/allisonhere/moo/wiki/Docs-teams) and the [Teams API](https://github.com/allisonhere/moo/wiki/Docs-teams-api).
+- **tab colors** — right-click a tab and choose **Color** to give it a theme color. Its tab dot and the bar beside its agents in the sidebar use that color.
+- **remote connections** — remote attach and saved SSH machines look for `moo` on the remote host with explicit binary selection when needed. Automated Windows install is refused for now.
 
-**the runtime your coding agents live on.**
-
-- **detach without stopping work** — herdr keeps terminals running in a background server when you close the client or lose your SSH connection. after a server or machine restart, herdr restores the saved layout and can resume supported agent sessions; the original processes do not survive. [session state →](https://herdr.dev/docs/session-state/)
-- **several machines, one window** — keep local work and saved ssh machines together, with a combined agent list and independent reconnects. [remote machines →](https://herdr.dev/docs/connecting-machines/)
-- **never hunt for the stuck one** — every pane is marked working, blocked, or idle. when an agent stops and needs an answer, herdr says so.
-- **agent-native** — agents drive herdr through the cli and socket api: they can spawn panes, prompt each other, and wait until another agent is genuinely blocked. [agent skill →](https://herdr.dev/docs/agent-skill/)
-- **runs what you already run** — claude code, codex, cursor, opencode, grok and the rest. herdr doesn't wrap or replace them; it owns their terminals. building an agent? [add herdr support →](https://herdr.dev/docs/add-herdr-support/)
-- **keyboard and mouse, both first-class** — tmux-style prefix keys *and* click, drag, split. pick per moment, not per tool.
-- **plugins** — extend panes and workflows. [browse the marketplace →](https://herdr.dev/plugins/)
-- **one rust binary, no electron** — runs in whatever terminal you already use.
-
----
+Use the [documentation](https://github.com/allisonhere/moo/wiki/Documentation) for configuration, commands, plugins, and remote connections.
 
 ## install
 
-```bash
-curl -fsSL https://herdr.dev/install.sh | sh
-```
-
-or `brew install herdr` · `mise use -g herdr` · windows: `powershell -ExecutionPolicy Bypass -c "irm https://herdr.dev/install.ps1 | iex"` · [endpoint-protected Windows](https://herdr.dev/docs/windows-beta/) · [binaries](https://github.com/herdrdev/herdr/releases)
-
-then start it where the work lives:
+Prebuilt binary for Linux (checksum-verified, installs to `~/.local/bin`; set `MOO_VERSION` to pin a release):
 
 ```bash
-herdr
+curl -fsSL https://raw.githubusercontent.com/allisonhere/moo/master/scripts/install.sh | sh
 ```
 
-run your agents, split panes, walk away. `ctrl+b q` detaches, `herdr` reattaches. [quick start →](https://herdr.dev/docs/quick-start/)
+On macOS, or to build from source, you need a Rust toolchain and Zig 0.16.0 (for the vendored libghostty-vt).
+
+```bash
+git clone https://github.com/allisonhere/moo
+cd moo
+./scripts/install-moo.sh
+```
+
+This builds the locked release binary and installs it to `~/.local/bin`; set `MOO_INSTALL_DIR` to change that. Then run:
+
+```bash
+moo
+```
+
+`ctrl+b q` detaches and `moo` reattaches. `moo update` does not download anything; rerun the install command to update.
+
+## releases
+
+From `master`, run `./deploy.sh` to open the release console. It shows the four steps (Check, Commit, Push, Release) with their state read from git, a live output panel, and the version this run will publish. Use `←`/`→` to pick the bump and `d` for a dry run. `enter` runs the next unfinished step (Commit and Release ask for confirmation), `a` runs every remaining step, and `c` runs the checks alone. **Commit** includes tracked changes and the Cargo version bump; untracked scratch files are listed but ignored. Release pushes an immutable tag that builds the GitHub release. `./deploy.sh patch` and `./deploy.sh --dry-run patch` remain for scripting.
 
 ## docs
 
-everything lives at [herdr.dev/docs](https://herdr.dev/docs/): [quick start](https://herdr.dev/docs/quick-start/) · [concepts](https://herdr.dev/docs/concepts/) · [supported agents](https://herdr.dev/docs/agents/) · [keyboard](https://herdr.dev/docs/keyboard/) · [configuration](https://herdr.dev/docs/configuration/) · [session state](https://herdr.dev/docs/session-state/) · [connecting machines](https://herdr.dev/docs/connecting-machines/) · [remote](https://herdr.dev/docs/persistence-remote/) · [integrations](https://herdr.dev/docs/integrations/) · [add herdr support to your agent](https://herdr.dev/docs/add-herdr-support/) · [plugins](https://herdr.dev/docs/plugins/) · [socket api](https://herdr.dev/docs/socket-api/)
+The [wiki](https://github.com/allisonhere/moo/wiki) covers agent handoff, settings keys, restart behaviour and the web UI.
 
-## thanks
-
-every past sponsor and backer is listed in [SPONSORS.md](./SPONSORS.md) — thank you 🐑
-
-enterprise / partnership: hey@herdr.dev
-
-## agent instructions
-
-if you are an ai agent helping with this repository, read [`AGENTS.md`](./AGENTS.md) before making changes and read [`CONTRIBUTING.md`](./CONTRIBUTING.md) before opening issues or PRs.
+The Moo guide is [`docs/next/website/src/content/docs/moo.mdx`](docs/next/website/src/content/docs/moo.mdx): requirements, identity paths, troubleshooting, removal, and current limitations. The wiki includes the full command and configuration guides.
 
 ## development
 
 ```bash
-git clone https://github.com/herdrdev/herdr
-cd herdr
-cargo build --release
-
+cargo build --release --locked --bin moo
 just test        # unit tests
 just check       # formatting, tests, and maintenance checks
 ```
 
+Read [`AGENTS.md`](./AGENTS.md) and [`CLAUDE.md`](./CLAUDE.md) before making changes.
+
 ## license
 
-Herdr is licensed under the [Apache License 2.0](LICENSE).
+Moo builds on [Herdr](https://github.com/herdrdev/herdr) and is distributed under [Apache License 2.0](LICENSE). See [credits](https://github.com/allisonhere/moo/wiki/Docs-credits) for attribution and documentation changes.

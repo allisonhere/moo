@@ -1,11 +1,11 @@
 ---
 name: herdr-pre-release-audit
-description: Audit herdr release readiness by comparing commits since the base release against next-release changelog and docs. Use when asked to run or apply the repo's pre-release audit, validate docs/next before release, inspect issue refs that release CI will close, or finalize release docs for herdr.
+description: Audit Moo release readiness by comparing commits since the base release against next-release changelog and docs. Use when asked to run or apply the repo's pre-release audit, validate docs/next before release, inspect issue refs that release CI will close, or finalize release docs for Moo.
 ---
 
-# Herdr Pre-release Audit
+# Moo pre-release Audit
 
-Use this skill only inside the herdr repository.
+Use this skill only inside the Moo repository.
 
 Read `references/pre-release-audit.md` and follow its workflow. Treat it as the source of truth for:
 
@@ -13,7 +13,7 @@ Read `references/pre-release-audit.md` and follow its workflow. Treat it as the 
 - inspecting first-parent history and merged PRs
 - auditing `docs/next/CHANGELOG.md`
 - auditing `docs/next/README.md` and staged website docs
-- checking `skills/herdr/SKILL.md` against shipped CLI and agent-control behavior
+- checking `skills/moo/SKILL.md` against shipped CLI and agent-control behavior; keep the inherited stable `skills/herdr/SKILL.md` frozen outside upstream release preparation
 - checking issue reference lines
 - deciding when to run `just pre-release-check` or its component checks
 - running and assessing `just bench-render-scale`

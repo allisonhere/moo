@@ -1,20 +1,22 @@
 ---
 title: 插件市场
-description: 在 GitHub 上发现社区 Herdr 插件,并让你自己的插件被收录。
+description: 在 GitHub 上发现社区 Moo 插件,并让你自己的插件被收录。
 ---
+此目录是由 Herdr 运营的外部服务，不代表 Moo 已审核或担保其中的插件。
 
-Herdr 插件市场是一个可供发现的社区插件索引。
-访问 [herdr.dev/plugins](/plugins/) 浏览。它是公开 GitHub 仓库的自动索引,
+
+Moo 插件市场是一个可供发现的社区插件索引。
+访问 [herdr.dev/plugins](https://herdr.dev/plugins/) 浏览。它是公开 GitHub 仓库的自动索引,
 而不是经过审核的目录。
 
 ## 浏览插件
 
-[插件市场](/plugins/)会列出带有 GitHub 主题标签 `herdr-plugin`,并且默认分支中
+[插件市场](https://herdr.dev/plugins/)会列出带有 GitHub 主题标签 `herdr-plugin`,并且默认分支中
 至少包含一个必需元数据可解析的 `herdr-plugin.toml` 的公开仓库。你可以搜索仓库和
 插件元数据,并按热度、最近活跃度或最新排序仓库卡片。每张卡片链接到源码仓库,
 并列出其中发现的所有插件。
 
-收录是自动且未经审核的。被列出只说明仓库给自己打了标签,并不代表 Herdr
+收录是自动且未经审核的。被列出只说明仓库给自己打了标签,并不代表 Moo
 审查过它,所以在安装任何插件之前,请先阅读[信任指南](/zh-cn/docs/plugins/#信任与安全)。
 
 ## 安装插件
@@ -23,7 +25,7 @@ Herdr 插件市场是一个可供发现的社区插件索引。
 GitHub 安装:
 
 ```bash
-herdr plugin install owner/repo[/subdir...]
+moo plugin install owner/repo[/subdir...]
 ```
 
 发布一个普通的公开 GitHub 仓库,在根目录或子目录放一个 `herdr-plugin.toml`
@@ -42,3 +44,5 @@ herdr plugin install owner/repo[/subdir...]
 插件行展示每份清单的 `name` 和 `version`,并链接到精确的源码目录。索引还会记录
 清单路径、`id`、`name`、`version`、`platforms`、`min_herdr_version`,以及默认分支的
 精确提交。Fork、已归档仓库、没有有效插件清单的仓库以及无效清单元数据都会被排除。
+
+[致谢与文档修改](/docs/credits/).

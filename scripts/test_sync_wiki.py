@@ -12,14 +12,14 @@ class ConvertTests(unittest.TestCase):
     def convert(self, text):
         return sw.convert(text, "page", SLUGS)
 
-    def test_docs_links_become_wiki_links_and_unknown_ones_point_at_the_site(self):
+    def test_docs_links_become_wiki_links_and_unknown_ones_point_at_source(self):
         out = self.convert("See [i](/docs/install/) and [c](/docs/configuration/#keys) and [x](/docs/other/).")
         self.assertIn("[i](Docs-install)", out)
         self.assertIn("[c](Docs-configuration#keys)", out)
-        self.assertIn("[x](https://herdr.dev/docs/other/)", out)
+        self.assertIn("[x](https://github.com/allisonhere/moo/blob/master/docs/next/website/src/content/docs/other.mdx)", out)
 
     def test_site_paths_are_made_absolute(self):
-        self.assertIn("(https://herdr.dev/install.sh)", self.convert("[s](/install.sh)"))
+        self.assertIn("(https://github.com/allisonhere/moo/blob/master/docs/next/website/public/a.png)", self.convert("[s](/a.png)"))
 
     def test_code_fences_are_left_exactly_as_written(self):
         text = "```bash\nimport x\n[a](/docs/install/)\n:::note\n```"
@@ -38,56 +38,25 @@ class ConvertTests(unittest.TestCase):
         self.assertNotIn("import", out)
         self.assertNotIn("<ConfigReference", out)
         self.assertNotIn("<img", out)
-        self.assertIn("herdr.dev/docs/page/", out)
+        self.assertIn("Run `moo --default-config`", out)
+        self.assertIn("[Configuration](Docs-configuration)", out)
+        self.assertIn("allisonhere/moo/blob/master/", out)
 
     def test_placeholders_in_prose_are_not_treated_as_components(self):
-        self.assertEqual(self.convert("Run `herdr pane read <pane>`."), "Run `moo pane read <pane>`.")
+        self.assertEqual(self.convert("Run `moo pane read <pane>`."), "Run `moo pane read <pane>`.")
 
 
-class RewriteTests(unittest.TestCase):
-    def test_a_command_that_starts_with_herdr_becomes_moo(self):
-        for before, after in [
-            ("herdr agent list", "moo agent list"),
-            ("herdr", "moo"),
-            ("$ herdr update", "$ moo update"),
-            ("split=$(herdr pane split --current)", "split=$(moo pane split --current)"),
-            ("herdr a && herdr b | herdr c", "moo a && moo b | moo c"),
-            ("herdr --remote box", "moo --remote box"),
-        ]:
-            self.assertEqual(sw.rewrite_code(before), after, before)
+class SourceIdentityTests(unittest.TestCase):
+    def test_product_prose_and_compatibility_names_are_preserved(self):
+        source = ('Moo uses `herdr-plugin.toml` and `min_herdr_version`.\n'
+                  'Reports retain `herdr:codex`.\n\n'
+                  '```toml\n[ui.toast.herdr]\nposition = "top_right"\n```\n'
+                  '```sh\nmoo agent list\n```\n')
+        self.assertEqual(sw.convert(source, "page", SLUGS), source)
 
-    def test_package_names_urls_and_manifest_names_stay_as_upstream_wrote_them(self):
-        for unchanged in [
-            "brew install herdr",
-            "mise use -g herdr",
-            "npx skills add herdrdev/herdr --skill herdr -g",
-            "curl -fsSL https://herdr.dev/install.sh | sh",
-            "herdr-plugin.toml",
-            "ui.toast.herdr.position",
-            "herdr not found in mise tool registry",
-        ]:
-            self.assertEqual(sw.rewrite_code(unchanged), unchanged, unchanged)
-
-    def test_paths_use_moo_names_but_not_inside_urls(self):
-        self.assertEqual(sw.rewrite_code("~/.config/herdr/config.toml"), "~/.config/moo/config.toml")
-        self.assertEqual(sw.rewrite_code("~/.local/state/herdr/x"), "~/.local/state/moo/x")
-        self.assertEqual(sw.rewrite_code("herdr.sock and herdr-client.sock"), "moo.sock and moo-client.sock")
-        self.assertEqual(sw.rewrite_code(r"%APPDATA%\herdr\config.toml"), r"%APPDATA%\moo\config.toml")
-        self.assertEqual(sw.rewrite_code("C:\\bin\\herdr.exe"), "C:\\bin\\moo.exe")
-        self.assertEqual(sw.rewrite_code("see https://example.com/.config/herdr/x"), "see https://example.com/.config/herdr/x")
-
-    def test_only_code_is_rewritten_never_prose(self):
-        text = "Herdr runs `herdr status` and herdr stays herdr.\n\n```sh\nherdr agent list\n```\n"
-        self.assertEqual(
-            sw.convert(text, "page", SLUGS),
-            "Herdr runs `moo status` and herdr stays herdr.\n\n```sh\nmoo agent list\n```\n",
-        )
-
-    def test_upstream_only_commands_keep_their_name(self):
-        sw.UPSTREAM_ONLY.add(("legacy", "thing"))
-        self.addCleanup(sw.UPSTREAM_ONLY.discard, ("legacy", "thing"))
-        self.assertEqual(sw.rewrite_code("herdr legacy thing --x"), "herdr legacy thing --x")
-        self.assertEqual(sw.rewrite_code("herdr legacy other"), "moo legacy other")
+    def test_source_is_authoritative_even_for_third_party_commands(self):
+        source = 'Moo can coexist with Herdr.\n```sh\nherdr --version\n```\n'
+        self.assertEqual(sw.convert(source, "page", SLUGS), source)
 
 
 FAKE_MOO = """#!/bin/sh
@@ -149,25 +118,35 @@ class SyncTests(unittest.TestCase):
         self.docs, self.wiki = root / "docs", root / "wiki"
         self.docs.mkdir()
         self.wiki.mkdir()
-        (self.docs / "install.mdx").write_text("---\ntitle: Install Herdr\ndescription: How.\n---\nHi\n")
+        (self.docs / "install.mdx").write_text("---\ntitle: Install Moo\ndescription: How.\n---\nHi\n")
         (self.docs / "moo.mdx").write_text("---\ntitle: Moo\n---\nOurs\n")
         (self.docs / "index.mdx").write_text("---\ntitle: Home\n---\nlanding\n")
 
-    def test_pages_are_generated_with_attribution_only_for_upstream_ones(self):
+    def test_pages_lead_with_moo_and_credit_changes_in_a_footer(self):
+        (self.docs / "install.mdx").write_text(
+            "---\ntitle: Install Moo\ndescription: How.\n---\n"
+            "Install Moo.\n\n[Credits and documentation changes](/docs/credits/).\n"
+        )
+        (self.docs / "credits.mdx").write_text(
+            "---\ntitle: Credits\n---\nMoo builds on Herdr under Apache-2.0.\n"
+        )
         sw.sync(self.docs, self.wiki)
-        upstream = (self.wiki / "Docs-install.md").read_text()
-        self.assertIn(sw.MARKER, upstream)
-        self.assertIn("Adapted from [Herdr's documentation]", upstream)
-        self.assertIn("Apache-2.0", upstream)
-        self.assertNotIn("Adapted from", (self.wiki / "Fork-guide.md").read_text())
+        page = (self.wiki / "Docs-install.md").read_text()
+        self.assertIn(sw.MARKER, page)
+        self.assertIn("# Install Moo", page)
+        self.assertIn("[Credits and documentation changes](Docs-credits)", page)
+        self.assertNotIn("Adapted from", page)
+        self.assertNotIn("upstream Herdr", page)
+        self.assertIn("Moo builds on Herdr under Apache-2.0", (self.wiki / "Docs-credits.md").read_text())
+        self.assertTrue((self.wiki / "Fork-guide.md").exists())
         self.assertFalse((self.wiki / "Docs-index.md").exists())
-        self.assertIn("[Install Herdr](Docs-install)", (self.wiki / "Documentation.md").read_text())
+        self.assertIn("[Install Moo](Docs-install)", (self.wiki / "Documentation.md").read_text())
 
     def test_a_second_run_changes_nothing_and_check_reports_pending_work(self):
         self.assertTrue(sw.sync(self.docs, self.wiki, check=True))
         sw.sync(self.docs, self.wiki)
         self.assertEqual(sw.sync(self.docs, self.wiki), [])
-        (self.docs / "install.mdx").write_text("---\ntitle: Install Herdr\n---\nChanged\n")
+        (self.docs / "install.mdx").write_text("---\ntitle: Install Moo\n---\nChanged\n")
         self.assertEqual(sw.sync(self.docs, self.wiki, check=True), ["Docs-install.md", "Documentation.md"])
 
     def test_a_hand_written_page_is_never_overwritten(self):
@@ -190,7 +169,7 @@ class SyncTests(unittest.TestCase):
         sw.sync(self.docs, self.wiki)
         sidebar = (self.wiki / "_Sidebar.md").read_text()
         self.assertIn("[Agent handoff](Agent-handoff)", sidebar)
-        self.assertIn("[Install Herdr](Docs-install)", sidebar)
+        self.assertIn("[Install Moo](Docs-install)", sidebar)
         self.assertNotIn("(Home)](Home)", sidebar.split("**Documentation**")[0].split("\n", 3)[3])
 
 

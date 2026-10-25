@@ -1,9 +1,6 @@
-# Past sponsors
+# Historical upstream sponsors
 
-herdr's sponsorship program is closed to new sponsors.
-This file permanently lists everyone who backed herdr.
-
-→ Enterprise / partnership: hey@herdr.dev
+This inherited record credits people and organizations who supported Herdr. It does not describe a Moo sponsorship program.
 
 ## Gold
 
@@ -64,4 +61,4 @@ This file permanently lists everyone who backed herdr.
 
 ---
 
-Thank you to everyone who supported herdr. 🐑
+These acknowledgments are retained from the upstream project.

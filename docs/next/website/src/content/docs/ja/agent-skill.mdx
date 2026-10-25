@@ -1,17 +1,17 @@
 ---
 title: エージェントスキルファイル
-description: Claude Code などのコーディングエージェントに Herdr の使い方をインストールします。
+description: Claude Code などのコーディングエージェントに Moo の使い方をインストールします。
 ---
 
-Herdr は再利用可能なエージェントスキルファイルを [`skills/herdr/SKILL.md`](https://github.com/herdrdev/herdr/blob/master/skills/herdr/SKILL.md) として提供しています。
+Moo は再利用可能なエージェントスキルファイルを [`skills/moo/SKILL.md`](https://github.com/allisonhere/moo/blob/master/skills/moo/SKILL.md) として提供しています。
 
-このファイルを、再利用可能なスキルやカスタム指示に対応した任意のコーディングエージェントにインストールしてください。このスキルは、Herdr のペイン内から Herdr を制御する方法をエージェントに教えます。
+このファイルを、再利用可能なスキルやカスタム指示に対応した任意のコーディングエージェントにインストールしてください。このスキルは、Moo のペイン内から Moo を制御する方法をエージェントに教えます。
 
-Herdr は別の用途向けに [`herdr.dev/agent-guide.md`](https://herdr.dev/agent-guide.md) というガイドも提供しています。こちらは、人間が Herdr を学習・セットアップ・トラブルシューティングするのをエージェントが手伝うためのものです。スキルは Herdr を操作するエージェントのため、ガイドは人間に教えるエージェントのためのものです。
+Moo は別の用途向けに [`https://raw.githubusercontent.com/allisonhere/moo/master/distribution/agent-guide.md`](https://raw.githubusercontent.com/allisonhere/moo/master/distribution/agent-guide.md) というガイドも提供しています。こちらは、人間が Moo を学習・セットアップ・トラブルシューティングするのをエージェントが手伝うためのものです。スキルは Moo を操作するエージェントのため、ガイドは人間に教えるエージェントのためのものです。
 
 ## スキルがすること
 
-このスキルは、`HERDR_ENV=1` が設定されているときに `herdr` CLI を使うようエージェントに指示します。これは、エージェントが Herdr 管理下のペイン内で動作しており、ローカルの Herdr ソケットと安全に通信できることを意味します。
+このスキルは、`MOO_ENV=1` が設定されているときに `moo` CLI を使うようエージェントに指示します。これは、エージェントが Moo 管理下のペイン内で動作しており、ローカルの Moo ソケットと安全に通信できることを意味します。
 
 スキルをインストールすると、エージェントは次のことができます:
 
@@ -21,14 +21,14 @@ Herdr は別の用途向けに [`herdr.dev/agent-guide.md`](https://herdr.dev/ag
 - サーバー、テスト、別のエージェントの完了を待つ
 - 隣のペインでヘルパーエージェントを起動する
 
-このスキルは独立したアプリやサービスではありません。エージェント向けの markdown 指示ファイルです。Herdr がすでにインストールされている場合は、`herdr --skill` を実行すると、そのバイナリのリリースと一致する同梱コピーを表示できます。
+Moo のスキルは下記のリポジトリからインストールしてください。現在の `moo --skill` は継承したスキルを出力するため、Moo 向けには `skills/moo/SKILL.md` を使用してください。
 
 ## インストールする
 
 `npx skills` でスキルをインストールします:
 
 ```bash
-npx skills add herdrdev/herdr --skill herdr -g
+npx skills add allisonhere/moo --skill moo -g
 ```
 
 スキルがリポジトリのルートにあったときにインストールした場合は、`skills update` ではなく、この add コマンドを一度再実行してください。大きすぎる既存のコピーが置き換えられ、新しい場所が記録されます。
@@ -38,25 +38,25 @@ npx skills add herdrdev/herdr --skill herdr -g
 手動でのフォールバックおよび信頼できるソースとしては、リポジトリのコピーを使ってください:
 
 ```text
-https://github.com/herdrdev/herdr/blob/master/skills/herdr/SKILL.md
+https://github.com/allisonhere/moo/blob/master/skills/moo/SKILL.md
 ```
 
-スキルシステムを持つエージェントには、このファイルを `herdr` という名前のスキルとしてインストールしてください。スキルシステムを持たないエージェントには、ファイルの内容をプロジェクト指示またはユーザー指示に貼り付けてください。
+スキルシステムを持つエージェントには、このファイルを `moo` という名前のスキルとしてインストールしてください。スキルシステムを持たないエージェントには、ファイルの内容をプロジェクト指示またはユーザー指示に貼り付けてください。
 
-インストール後、Herdr の中でエージェントを起動します:
+インストール後、Moo の中でエージェントを起動します:
 
 ```bash
-herdr
+moo
 claude
 ```
 
-他のコーディングエージェントを Herdr のペインで使っても構いません。重要なのは、エージェントのプロセスが Herdr 内で動作していて `HERDR_ENV=1` が利用できることです。
+他のコーディングエージェントを Moo のペインで使っても構いません。重要なのは、エージェントのプロセスが Moo 内で動作していて `MOO_ENV=1` が利用できることです。
 
 ## 安全ルール
 
-このスキルはひとつのガードレールから始まります: `HERDR_ENV=1` が設定されていない場合、エージェントは停止して、Herdr 管理下のペイン内で動作していないと伝えるべきです。
+このスキルはひとつのガードレールから始まります: `MOO_ENV=1` が設定されていない場合、エージェントは停止して、Moo 管理下のペイン内で動作していないと伝えるべきです。
 
-これにより、Herdr の外にいるエージェントが自分のものではないセッションを制御しようとするのを防ぎます。
+これにより、Moo の外にいるエージェントが自分のものではないセッションを制御しようとするのを防ぎます。
 
 ## エージェント向けリファレンス
 
@@ -64,4 +64,6 @@ claude
 
 ソースファイルはこちら:
 
-[GitHub で `SKILL.md` を開く →](https://github.com/herdrdev/herdr/blob/master/skills/herdr/SKILL.md)
+[GitHub で `SKILL.md` を開く →](https://github.com/allisonhere/moo/blob/master/skills/moo/SKILL.md)
+
+[クレジットと文書の変更](/docs/credits/).

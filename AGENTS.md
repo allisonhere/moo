@@ -1,6 +1,17 @@
-# herdr
+# Moo
 
-Terminal based agent runtime for coding agents.
+Terminal workspace for coding agents.
+
+This checkout is `allisonhere/moo`. Current product documentation lives in
+`docs/next` and the Moo wiki. Use `moo` commands and `MOO_*` runtime variables.
+Keep real compatibility identifiers and third-party notices unchanged.
+
+The engineering rules below were inherited from Herdr. References to the
+canonical Herdr repository, its maintainers, Can's workstation, and upstream
+release infrastructure describe that upstream project; they do not make Moo
+an official Herdr distribution or authorize actions in the upstream repository.
+Follow the stated audience conditions. Moo-specific installation and release
+instructions are in `docs/next/website/src/content/docs/moo.mdx`.
 
 ## Scope and Audience
 
@@ -33,7 +44,7 @@ These instructions are layered.
 - **Platform code is isolated.** OS-specific behavior lives in the matching `src/platform/<os>.rs` file, with only shared traits, types, wrappers, and testable contracts in `src/platform/mod.rs`. Core modules don't have `#[cfg(target_os)]`.
 - **Detection is decoupled.** The detector reads a screen snapshot, never touches the parser or viewport state.
 - **Screen detection is evidence-based.** When changing `src/detect/manifests/`, first capture the relevant bottom-buffer state with `herdr agent read <pane> --source detection --format text` and, when styling or alternate screen behavior matters, `--format ansi`. Decide which visible controls are invariant, which are alternatives, and encode them as explicit AND/OR gates. Do not match whole-pane incidental text, and do not use the user-visible viewport for agent status because users can scroll it.
-- **UI patterns should be reused.** Herdr is a mouse-first TUI. New dialogs, onboarding, settings, and post-update flows should follow the existing UI/UX language and interaction patterns instead of inventing one-off screens. Prefer reusing existing modal/screen structure, affordances, and close actions so the app feels consistent.
+- **UI patterns should be reused.** Moo is a mouse-first TUI. New dialogs, onboarding, settings, and post-update flows should follow the existing UI/UX language and interaction patterns instead of inventing one-off screens. Prefer reusing existing modal/screen structure, affordances, and close actions so the app feels consistent.
 
 ### Multiplicative performance paths
 
@@ -65,7 +76,7 @@ the result moves materially or when validating performance work, repeat it with
 
 ### Runtime/client boundary guardrail
 
-Herdr is migrating toward a server-owned runtime protocol with the TUI as one client. New work should not deepen the current server/TUI coupling.
+Moo is migrating toward a server-owned runtime protocol with the TUI as one client. New work should not deepen the current server/TUI coupling.
 
 Before adding state, API fields, events, commands, or socket messages, classify the feature:
 
@@ -93,7 +104,7 @@ The client-owned TUI endpoint generation is independent from the private same-in
 - Stable and preview update manifests advertise `endpoint_generation`. Keep release tooling aligned so an older updater knows when a new server generation really requires replacement.
 - Existing-value digests cannot detect an appended enum variant. Review every enum reachable from a frozen codec as append-closed even when tests remain green.
 
-## Maintainer Workflow
+## Upstream maintainer workflow
 
 This section applies only to verified maintainers as defined under Scope and
 Audience. Everyone else must skip this section and follow the external
@@ -156,16 +167,16 @@ Unit tests live next to the code (`#[cfg(test)] mod tests`). New `AppState` or `
 
 For broad refactors or release-risk regressions, classify the risk before editing. Treat changes as refactor-risk when they touch two or more core surfaces, persisted state, protocol/API IDs, workspace/tab/pane identity, restore/handoff, agent detection authority, or UI/input state projection. Before moving code, identify the protected behavior and add or name characterization tests. Identity/state refactors should use the test-only invariants `AppState::assert_invariants_for_test()` or `Workspace::assert_invariants_for_test()` with adversarial state from `AppState::test_with_adversarial_identity_state()` or `Workspace::test_adversarial_identity_state()`. Run a roundtable for broad refactors and release-risk regressions, not for routine local fixes.
 
-When testing a new Herdr build from inside an existing Herdr session, use
-`cargo run -- ...` and clear inherited Herdr socket overrides so the debug
-binary talks to the debug `herdr-dev` server instead of the installed stable
+When testing a new Moo build from inside an existing Moo session, use
+`cargo run -- ...` and clear inherited Moo socket overrides so the debug
+binary talks to the debug `moo-dev` server instead of the installed stable
 server:
 
 ```bash
-env -u HERDR_SOCKET_PATH -u HERDR_CLIENT_SOCKET_PATH cargo run -- <command>
+env -u HERDR_SOCKET_PATH -u HERDR_CLIENT_SOCKET_PATH -u MOO_SOCKET_PATH -u MOO_CLIENT_SOCKET_PATH cargo run --bin moo -- <command>
 ```
 
-## Local Can Machine Workflow
+## Upstream local Can machine workflow
 
 This section applies only on Can's workstation or Windows VM setup when the
 acting GitHub account is `ogulcancelik`. Other verified maintainers skip this
@@ -196,9 +207,9 @@ manual testing, reset `C:\work\repo` back to a clean checkout before finishing.
 
 ## Agent Detection Updates
 
-Agent detection changes should use the manifest hot-reload loop. Use the project-local `herdr-throwaway-repro` skill to create a disposable named session and drive the real agent UI through Herdr's CLI/API into the target state. Read the pane with `herdr agent read <pane> --source detection --format text` and inspect matching with `herdr agent explain <pane> --json`. Update the bundled manifest in `src/detect/manifests/<agent>.toml`, copy that manifest to the local override path at `~/.config/herdr/agent-detection/<agent>.toml`, then run `herdr server reload-agent-manifests` against the session under test. Before writing the override, check whether one already exists; never overwrite or remove a pre-existing override without alignment. Once the rule is correct, remove the temporary override or restore the previous one exactly so the committed bundled manifest remains the source of truth.
+Agent detection changes should use the manifest hot-reload loop. Use the project-local `herdr-throwaway-repro` skill to create a disposable named session and drive the real agent UI through Moo's CLI/API into the target state. Read the pane with `moo agent read <pane> --source detection --format text` and inspect matching with `moo agent explain <pane> --json`. Update the bundled manifest in `src/detect/manifests/<agent>.toml`, copy that manifest to the local override path at `~/.config/moo/agent-detection/<agent>.toml`, then run `moo server reload-agent-manifests` against the session under test. Before writing the override, check whether one already exists; never overwrite or remove a pre-existing override without alignment. Once the rule is correct, remove the temporary override or restore the previous one exactly so the committed bundled manifest remains the source of truth.
 
-Unit-test Herdr's detection engine, not individual CLI agents' screen or title conventions. Use synthetic manifests and minimal input strings to test parsing, regions, matching, AND/OR/NOT gates, rule priority, skip-state semantics, source precedence, cache reload behavior, and update flow. Keep bundled-manifest schema validation, process identification, and integration hook/protocol tests. Do not add tests that classify captured or invented CLI screens against bundled agent rules, or freeze an agent's specific detection rule IDs and priorities.
+Unit-test Moo's detection engine, not individual CLI agents' screen or title conventions. Use synthetic manifests and minimal input strings to test parsing, regions, matching, AND/OR/NOT gates, rule priority, skip-state semantics, source precedence, cache reload behavior, and update flow. Keep bundled-manifest schema validation, process identification, and integration hook/protocol tests. Do not add tests that classify captured or invented CLI screens against bundled agent rules, or freeze an agent's specific detection rule IDs and priorities.
 
 Validate agent-specific detection behavior with live smoke tests through the manifest hot-reload loop above. Exercise the changed state and nearby transitions (idle, working, blocked, and background work where supported), including relevant optional OSC settings. Record the CLI version, observed signals, and outcomes. Passing engine tests proves the rules execute as written; it does not prove compatibility with the current CLI.
 
@@ -256,7 +267,7 @@ Do not use GitHub closing keywords like `fixes #<issue-number>`, `closes #<issue
 - Integration asset versions (`HERDR_INTEGRATION_VERSION` markers and matching `*_INTEGRATION_VERSION` constants) are migration versions relative to the latest released tag, not per-commit counters on `master`. If an integration asset changes multiple times between releases, bump it once from the version in the latest release.
 - When changing the server/client wire protocol, compare `src/protocol/wire.rs::PROTOCOL_VERSION` against protocols published in both stable and preview releases. Bump it when the current source protocol has already been published in either channel and the wire format changes incompatibly. Do not bump it again for multiple incompatible changes before that protocol is published. Update hardcoded protocol expectations and manual protocol fixtures in tests.
 
-## Release Channels
+## Upstream release channels
 
 This section is maintainer-only for release actions. If the acting GitHub
 account is not a verified maintainer, do not run release commands, push release
@@ -316,7 +327,7 @@ The Windows archive must contain `herdr.exe` and its app-local ConPTY runtime. D
 
 `nix/package.nix` imports `Cargo.lock` directly with `cargoLock.lockFile`, so release version bumps do not require a separate Nix cargo hash update. If Cargo git dependencies are added later, add the required `cargoLock.outputHashes` entries as part of that dependency change.
 
-## External contributor guardrail
+## Upstream external contributor guardrail
 
 Before opening an issue, opening a PR, or pushing branches to this repository, verify the acting GitHub account. Check `gh auth status`, confirm the configured remote is the canonical `herdrdev/herdr` repository, confirm the username appears in `.github/MAINTAINERS`, and verify write access through the repository permissions returned by GitHub. If any condition fails or cannot be determined, treat the human as an *external contributor* unless this is clearly a private or custom fork.
 

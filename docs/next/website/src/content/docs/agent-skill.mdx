@@ -1,17 +1,17 @@
 ---
 title: Agent skill file
-description: Install Herdr instructions for Claude Code or another coding agent.
+description: Install Moo instructions for Claude Code or another coding agent.
 ---
 
-Herdr ships a reusable agent skill file at [`skills/herdr/SKILL.md`](https://github.com/herdrdev/herdr/blob/master/skills/herdr/SKILL.md).
+Moo ships a reusable agent skill file at [`skills/moo/SKILL.md`](https://github.com/allisonhere/moo/blob/master/skills/moo/SKILL.md).
 
-Install that file into any coding agent that supports reusable skills or custom instructions. The skill teaches the agent how to control Herdr from inside a Herdr pane.
+Install that file into any coding agent that supports reusable skills or custom instructions. The skill teaches the agent how to control Moo from inside a Moo pane.
 
-Herdr also serves a separate guide at [`herdr.dev/agent-guide.md`](https://herdr.dev/agent-guide.md) for a different job: an agent helping a human learn, set up, or troubleshoot Herdr. The skill is for an agent operating Herdr; the guide is for an agent teaching a human.
+Moo also serves a separate guide at [`https://raw.githubusercontent.com/allisonhere/moo/master/distribution/agent-guide.md`](https://raw.githubusercontent.com/allisonhere/moo/master/distribution/agent-guide.md) for a different job: an agent helping a human learn, set up, or troubleshoot Moo. The skill is for an agent operating Moo; the guide is for an agent teaching a human.
 
 ## What the skill does
 
-The skill tells an agent to use the `herdr` CLI when `MOO_ENV=1` is set. That means the agent is running inside a Herdr-managed pane and can safely talk to the local Herdr socket.
+The skill tells an agent to use the `moo` CLI when `MOO_ENV=1` is set. That means the agent is running inside a Moo-managed pane and can safely talk to the local Moo socket.
 
 With the skill installed, an agent can:
 
@@ -21,14 +21,14 @@ With the skill installed, an agent can:
 - wait for servers, tests, or another agent to finish
 - start helper agents in sibling panes
 
-The skill is a Markdown instruction file for agents. If Herdr is already installed, run `herdr --skill` to print the release-matched copy bundled with that binary.
+Install the Moo skill from the repository link below. The current binary’s `moo --skill` output still contains the inherited skill; use `skills/moo/SKILL.md` for Moo instructions.
 
 ## Install it
 
 Install the skill with `npx skills`:
 
 ```bash
-npx skills add herdrdev/herdr --skill herdr -g
+npx skills add allisonhere/moo --skill moo -g
 ```
 
 If you installed the skill while it lived at the repository root, rerun this add command once instead of using `skills update`. The add command replaces the oversized copy and records the new location.
@@ -38,25 +38,25 @@ The `-g` flag installs it globally for supported agents. Omit `-g` to install it
 Use the repository copy as the manual fallback and source of truth:
 
 ```text
-https://github.com/herdrdev/herdr/blob/master/skills/herdr/SKILL.md
+https://github.com/allisonhere/moo/blob/master/skills/moo/SKILL.md
 ```
 
-For agents with a skill system, install that file as a skill named `herdr`. For agents without a skill system, paste the file into the agent's project or user instructions.
+For agents with a skill system, install that file as a skill named `moo`. For agents without a skill system, paste the file into the agent's project or user instructions.
 
-After installation, start the agent inside Herdr:
+After installation, start the agent inside Moo:
 
 ```bash
-herdr
+moo
 claude
 ```
 
-Or use any other coding agent in a Herdr pane so `MOO_ENV=1` is available to the agent process.
+Or use any other coding agent in a Moo pane so `MOO_ENV=1` is available to the agent process.
 
 ## Safety rule
 
-The skill starts with one guardrail: if `MOO_ENV=1` is not set, the agent should stop and say it is not running inside a Herdr-managed pane.
+The skill starts with one guardrail: if `MOO_ENV=1` is not set, the agent should stop and say it is not running inside a Moo-managed pane.
 
-This prevents an agent outside Herdr from trying to control a session it does not own.
+This prevents an agent outside Moo from trying to control a session it does not own.
 
 ## Agent-facing reference
 
@@ -64,4 +64,6 @@ The full command guide lives in the skill file itself. It covers pane IDs, `pane
 
 Read the source file here:
 
-[Open `SKILL.md` on GitHub →](https://github.com/herdrdev/herdr/blob/master/skills/herdr/SKILL.md)
+[Open `SKILL.md` on GitHub →](https://github.com/allisonhere/moo/blob/master/skills/moo/SKILL.md)
+
+[Credits and documentation changes](/docs/credits/).

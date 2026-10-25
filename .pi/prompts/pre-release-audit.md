@@ -1,7 +1,7 @@
 ---
 description: Audit next-release docs and changelog before release
 ---
-Audit release readiness for this repo.
+Audit Moo release readiness. Moo normally releases through `./deploy.sh`; the inherited preview-to-stable checks below apply only when intentionally maintaining that machinery. See `docs/next/website/src/content/docs/moo.mdx` for the current release workflow.
 
 Optional starting ref override: `$1`
 Extra user intent/context: `${@:2}`

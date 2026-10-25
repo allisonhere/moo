@@ -1,15 +1,15 @@
 ---
 title: Marketplace
-description: Discover community Herdr plugins on GitHub, and get your own plugin listed.
+description: Discover community Moo plugins on GitHub, and get your own plugin listed.
 ---
 
-The Herdr plugin marketplace indexes community plugins. Browse it at
-[herdr.dev/plugins](/plugins/). The index covers public GitHub repositories; it
+Moo can run compatible community plugins. The external Herdr marketplace is one place to discover them:
+[herdr.dev/plugins](https://herdr.dev/plugins/). The index covers public GitHub repositories; it
 is not a reviewed catalog.
 
 ## Browse plugins
 
-The [marketplace](/plugins/) lists public repositories tagged with the GitHub
+The [marketplace](https://herdr.dev/plugins/) lists public repositories tagged with the GitHub
 topic `herdr-plugin` when their default branch contains at least one
 `herdr-plugin.toml` whose required metadata can be parsed. Search by repository
 or plugin metadata, and sort repository cards by popularity, recent activity,
@@ -17,7 +17,7 @@ or newest. Each card links to its source repository and lists every discovered
 plugin inside it.
 
 Discovery is automatic and unreviewed. A listing means a repository tagged
-itself, not that Herdr vetted it, so the
+itself, not that Moo or the catalog operator vetted it, so the
 [trust guidance](/docs/plugins/#trust-and-security) applies before you install
 anything.
 
@@ -27,7 +27,7 @@ The marketplace helps you discover plugins. Install any plugin straight from
 GitHub:
 
 ```bash
-herdr plugin install owner/repo[/subdir...]
+moo plugin install owner/repo[/subdir...]
 ```
 
 The command works with a public GitHub repository that has a
@@ -52,3 +52,5 @@ source directory. The index records the manifest path, `id`, `name`, `version`,
 `platforms`, and `min_herdr_version` together with the exact default-branch
 commit. Forks, archived repositories, repositories without a valid plugin
 manifest, and malformed manifest metadata are excluded.
+
+[Credits and documentation changes](/docs/credits/).

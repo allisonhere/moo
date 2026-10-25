@@ -1,9 +1,9 @@
 ---
 title: CLI reference
-description: Herdr commands for sessions, workspaces, tabs, panes, notifications, agents, waits, integrations, and status.
+description: Moo commands for sessions, workspaces, tabs, panes, notifications, agents, waits, integrations, and status.
 ---
 
-Herdr’s CLI talks to the running server over the same local socket API used by integrations and agents.
+Moo’s CLI talks to the running server over the same local socket API used by integrations and agents.
 
 Most commands print JSON responses for deterministic automation in scripts.
 
@@ -12,104 +12,104 @@ API-backed commands use the same argument definitions for parsing, `--help`, and
 ## Launch and status
 
 ```bash
-herdr                         # launch or attach to the default session
-herdr --remote workbox        # attach through SSH, using local keybindings
-herdr --default-config        # print default config
-herdr update                  # download and install from the configured channel
-herdr completion zsh          # generate a zsh completion script
-herdr channel show            # print stable or preview
-herdr channel set preview     # opt into preview builds
-herdr channel set stable      # return a direct install to stable
-herdr --version               # print version
+moo                         # launch or attach to the default session
+moo --remote workbox        # attach through SSH, using local keybindings
+moo --default-config        # print default config
+moo update                  # explain how to install a newer Moo build manually
+moo completion zsh          # generate a zsh completion script
+moo channel show            # print stable or preview
+moo --version               # print version
 ```
+
+`moo channel` retains an inherited channel preference; it does not provide Moo stable/preview downloads. Update with the [Moo installer](/docs/install/#update).
 
 Optional launch and update settings:
 
 - Add `--session <name>` to use a named session instead of the default.
 - Add `--remote-keybindings server` to remote attach to use server keybindings instead of local ones.
-- Experimental live handoff requires explicit `--handoff` on `herdr --remote` or `herdr update`. It is not the normal setup or connection path; see [Updates](/docs/install/#update).
+- Experimental live handoff requires explicit `--handoff` on `moo --remote`. It is not the normal setup or connection path; see [Updates](/docs/install/#update).
 
 Status commands:
 
 ```bash
-herdr status
-herdr status server
-herdr status client
+moo status
+moo status server
+moo status client
 ```
 
 API schema commands:
 
 ```bash
-herdr api schema
-herdr api schema --json
-herdr api schema --output herdr-api.schema.json
+moo api schema
+moo api schema --json
+moo api schema --output moo-api.schema.json
 ```
 
-`herdr api schema` prints a short summary of the socket protocol schema bundled
+`moo api schema` prints a short summary of the socket protocol schema bundled
 with the installed binary. Use `--json` for the full JSON Schema document, or
 `--output PATH` to write that document to a file.
 
 ## Saved SSH machines
 
 ```bash
-herdr machine list
-herdr machine add workbox
-herdr machine add workbox --label "Build machine"
-herdr machine rename <profile-id> --label "New name"
-herdr machine disable <profile-id>
-herdr machine enable <profile-id>
-herdr machine remove <profile-id>
+moo machine list
+moo machine add workbox
+moo machine add workbox --label "Build machine"
+moo machine rename <profile-id> --label "New name"
+moo machine disable <profile-id>
+moo machine enable <profile-id>
+moo machine remove <profile-id>
 ```
 
-In an interactive terminal, `machine add` discovers running sessions and lets you choose when several are running. No running sessions, or no Herdr installation, uses `default`; failed queries against an installed binary require an explicit choice. Add `--remote-session <name>` to skip discovery. Non-interactive commands use `default` unless that flag is supplied. `machine list` accepts optional `--json` for scripts. See [Connecting machines](/docs/connecting-machines/) for the full setup and connection guide.
+In an interactive terminal, `machine add` discovers running sessions and lets you choose when several are running. No running sessions, or no Moo installation, uses `default`; failed queries against an installed binary require an explicit choice. Add `--remote-session <name>` to skip discovery. Non-interactive commands use `default` unless that flag is supplied. `machine list` accepts optional `--json` for scripts. See [Connecting machines](/docs/connecting-machines/) for the full setup and connection guide.
 
 `machine add` checks the remote installation's capabilities, installs or updates with approval only when needed, and starts the requested session's background server before saving. Compatible release versions do not need to match. Run setup in an interactive terminal when installation or restart approval is required; failed or cancelled setup does not save a profile. Replacing a running server requires explicit approval with a default answer of No, and stops its pane processes. `machine add` never enables experimental handoff implicitly.
 
-Changes apply automatically to open local Herdr clients, normally within a second. Added or enabled machines connect in the background; renaming does not reconnect. Removing or disabling disconnects only that machine and leaves its remote sessions running. Removing the machine you are viewing returns to Local, or shows Local as unavailable until it reconnects. Each profile stores an opaque ID, label, SSH target, explicit remote session, and enabled state in client state. Herdr does not store passwords, private keys, or other SSH credentials.
+Changes apply automatically to open local Moo clients, normally within a second. Added or enabled machines connect in the background; renaming does not reconnect. Removing or disabling disconnects only that machine and leaves its remote sessions running. Removing the machine you are viewing returns to Local, or shows Local as unavailable until it reconnects. Each profile stores an opaque ID, label, SSH target, explicit remote session, and enabled state in client state. Moo does not store passwords, private keys, or other SSH credentials.
 
-Use `herdr machine status [<label-or-id>] [--json]` for fresh, noninteractive SSH and remote Herdr checks. `reachable` describes this check, not a TUI's current connection. Use `herdr machine reconnect <label-or-id>` in a terminal for SSH authentication and verification; it does not install or update Herdr. Open clients retry failed connections within 30 seconds. Clicking `! auth` or `! error` retries the connection; a failed attempt shows the latest error and CLI guidance; collapsed sidebars show `!`. See [Recovering SSH authentication](/docs/connecting-machines/#recovering-ssh-authentication) for platform limits. For remote setup, use `herdr --remote workbox`, adding `--session <name>` only for a named session.
+Use `moo machine status [<label-or-id>] [--json]` for fresh, noninteractive SSH and remote Moo checks. `reachable` describes this check, not a TUI's current connection. Use `moo machine reconnect <label-or-id>` in a terminal for SSH authentication and verification; it does not install or update Moo. Open clients retry failed connections within 30 seconds. Clicking `! auth` or `! error` retries the connection; a failed attempt shows the latest error and CLI guidance; collapsed sidebars show `!`. See [Recovering SSH authentication](/docs/connecting-machines/#recovering-ssh-authentication) for platform limits. For remote setup, use `moo --remote workbox`, adding `--session <name>` only for a named session.
 
 Workspace, tab, pane IDs, and agent names belong to a single server. Selecting a machine in the UI does not retarget CLI commands. Use the global **prefix** `--machine <label-or-id>` to route API commands to a saved SSH machine:
 
 ```bash
-herdr --machine "Build machine" agent list
-herdr --machine <profile-id> pane list
-herdr --machine "Build machine" agent prompt w1:p1 "review this change"
-herdr --machine "Build machine" worktree create --cwd /srv/project --branch review
+moo --machine "Build machine" agent list
+moo --machine <profile-id> pane list
+moo --machine "Build machine" agent prompt w1:p1 "review this change"
+moo --machine "Build machine" worktree create --cwd /srv/project --branch review
 ```
 
 The selector must match an enabled saved profile ID or a unique, case-sensitive label, not an arbitrary SSH hostname. The saved remote session is used; combining `--machine` with `--session` or `--remote` is an error. Without the prefix, commands retain their existing local session/socket behavior.
 
 Supported commands are `workspace`, `worktree`, `tab`, `pane`, `notification`, `agent` (except `attach` and local `explain --file`), `api snapshot`, `status server`, and API-backed plugin commands (`link`, `unlink`, `enable`, `disable`, `list`, `action`, `log`, `pane`). Server commands support `stop`, `reload-config`, `agent-manifests`, and `reload-agent-manifests`. Local installation/configuration commands, plugin installation, session management, and interactive terminal attachment are not forwarded.
 
-Requests and responses travel through the JSON API over non-interactive SSH; API payloads are not interpolated into the SSH shell command. No open TUI is required, and the bridge never installs, starts, or restarts a server. Update the local CLI and remote Herdr installation to support machine forwarding, and keep the running remote server's API protocol compatible. Authentication, unavailable machines, and incompatible versions fail without falling back to Local. Requests are not automatically retried after connection failure.
+Requests and responses travel through the JSON API over non-interactive SSH; API payloads are not interpolated into the SSH shell command. No open TUI is required, and the bridge never installs, starts, or restarts a server. Update the local CLI and remote Moo installation to support machine forwarding, and keep the running remote server's API protocol compatible. Authentication, unavailable machines, and incompatible versions fail without falling back to Local. Requests are not automatically retried after connection failure.
 
 Local pane IDs are not inherited by remote commands. Use explicit remote IDs; `--current` cannot refer to the caller's local pane. Remote worktree paths must be absolute, `~`, or start with `~/` (expanded on the server); plugin link paths must be absolute. The prefix targets one machine at a time; combined listings and routing through another TUI's connections are not included.
 
 ## Shell completions
 
 ```bash
-herdr completion zsh
-herdr completions zsh
-herdr completion bash
-herdr completion fish
-herdr completion powershell
-herdr completion elvish
+moo completion zsh
+moo completions zsh
+moo completion bash
+moo completion fish
+moo completion powershell
+moo completion elvish
 ```
 
 `completion` prints the script to stdout. `completions` is an alias. For a
 temporary zsh session, load the script directly:
 
 ```bash
-source <(herdr completion zsh)
+source <(moo completion zsh)
 ```
 
-For a persistent zsh setup, write the generated `_herdr` function somewhere on
+For a persistent zsh setup, write the generated `_moo` function somewhere on
 your `fpath` before `compinit` runs:
 
 ```bash
 mkdir -p ~/.zfunc
-herdr completion zsh > ~/.zfunc/_herdr
+moo completion zsh > ~/.zfunc/_moo
 ```
 
 Then make sure your `.zshrc` contains:
@@ -123,31 +123,31 @@ compinit
 ## Server
 
 ```bash
-herdr server
-herdr server stop
-herdr server reload-config
-herdr server agent-manifests [--json]
-herdr server update-agent-manifests [--json]
-herdr server reload-agent-manifests
+moo server
+moo server stop
+moo server reload-config
+moo server agent-manifests [--json]
+moo server update-agent-manifests [--json]
+moo server reload-agent-manifests
 ```
 
-`herdr server` runs the headless server explicitly. Use it for supervised or service-style setups. `reload-config` applies reloadable settings without restarting panes. `agent-manifests` shows the active agent detection manifest sources, cached remote versions, and last remote update results. `update-agent-manifests` fetches remote manifest updates immediately, reloads them into the running server, and prints the updated manifest status; pass `--json` for the raw status response. `reload-agent-manifests` reloads agent detection manifests into the running server after local override edits.
+`moo server` runs the headless server explicitly. Use it for supervised or service-style setups. `reload-config` applies reloadable settings without restarting panes. `agent-manifests` shows the active agent detection manifest sources, cached remote versions, and last remote update results. `update-agent-manifests` fetches remote manifest updates immediately, reloads them into the running server, and prints the updated manifest status; pass `--json` for the raw status response. `reload-agent-manifests` reloads agent detection manifests into the running server after local override edits.
 
 ## Notifications
 
 ```bash
-herdr notification show <title> [--body TEXT] [--position top-left|top-right|bottom-left|bottom-right] [--sound none|done|request]
+moo notification show <title> [--body TEXT] [--position top-left|top-right|bottom-left|bottom-right] [--sound none|done|request]
 ```
 
-`notification show` uses the configured `[ui.toast]` delivery. `--position` only affects in-app Herdr toasts. `--sound` defaults to `none`; `done` and `request` play the existing finished and needs-attention sounds only when the notification is shown.
+`notification show` uses the configured `[ui.toast]` delivery. `--position` only affects in-app Moo toasts. `--sound` defaults to `none`; `done` and `request` play the existing finished and needs-attention sounds only when the notification is shown.
 
 ## Sessions
 
 ```bash
-herdr session list [--json]
-herdr session attach <name>
-herdr session stop <name> [--json]
-herdr session delete <name> [--json]
+moo session list [--json]
+moo session attach <name>
+moo session stop <name> [--json]
+moo session delete <name> [--json]
 ```
 
 Use `default` as the session name when you need to stop the default session explicitly.
@@ -155,19 +155,19 @@ Use `default` as the session name when you need to stop the default session expl
 ## Workspaces
 
 ```bash
-herdr workspace list
-herdr workspace create [--cwd PATH] [--label TEXT] [--env KEY=VALUE] [--focus] [--no-focus]
-herdr workspace get <workspace_id>
-herdr workspace focus <workspace_id>
-herdr workspace rename <workspace_id> <label>
-herdr workspace report-metadata <workspace_id> --source ID [--token NAME=VALUE] [--clear-token NAME] [--seq N] [--ttl-ms N]
-herdr workspace close <workspace_id> [--group]
+moo workspace list
+moo workspace create [--cwd PATH] [--label TEXT] [--env KEY=VALUE] [--focus] [--no-focus]
+moo workspace get <workspace_id>
+moo workspace focus <workspace_id>
+moo workspace rename <workspace_id> <label>
+moo workspace report-metadata <workspace_id> --source ID [--token NAME=VALUE] [--clear-token NAME] [--seq N] [--ttl-ms N]
+moo workspace close <workspace_id> [--group]
 ```
 
 Create a workspace without stealing focus:
 
 ```bash
-herdr workspace create --cwd ~/project --label api --no-focus
+moo workspace create --cwd ~/project --label api --no-focus
 ```
 
 A workspace is a top-level project or work context. Creating one also creates its first tab and root pane. The JSON response exposes their IDs as `.result.workspace.workspace_id`, `.result.tab.tab_id`, and `.result.root_pane.pane_id`.
@@ -175,27 +175,27 @@ A workspace is a top-level project or work context. Creating one also creates it
 ## Worktrees
 
 ```bash
-herdr worktree list [--workspace ID | --cwd PATH] [--trust-repository]
-herdr worktree create [--workspace ID | --cwd PATH] [--branch NAME] [--base REF] [--path PATH] [--label TEXT] [--focus] [--no-focus] [--trust-repository]
-herdr worktree open [--workspace ID | --cwd PATH] (--path PATH | --branch NAME) [--label TEXT] [--focus] [--no-focus] [--trust-repository]
-herdr worktree remove --workspace ID [--force] [--trust-repository]
+moo worktree list [--workspace ID | --cwd PATH] [--trust-repository]
+moo worktree create [--workspace ID | --cwd PATH] [--branch NAME] [--base REF] [--path PATH] [--label TEXT] [--focus] [--no-focus] [--trust-repository]
+moo worktree open [--workspace ID | --cwd PATH] (--path PATH | --branch NAME) [--label TEXT] [--focus] [--no-focus] [--trust-repository]
+moo worktree remove --workspace ID [--force] [--trust-repository]
 ```
 
-Worktrees are normal Herdr workspaces with Git checkout provenance. `worktree create` creates a Git worktree checkout, opens it as a workspace, and groups it with the parent repo workspace. If `--branch` names an existing local branch, Herdr checks it out; otherwise it creates the branch from `--base` or `HEAD`. Without `--path`, Herdr creates the checkout under `<worktrees.directory>/<repo>/<branch-slug>`.
+Worktrees are normal Moo workspaces with Git checkout provenance. `worktree create` creates a Git worktree checkout, opens it as a workspace, and groups it with the parent repo workspace. If `--branch` names an existing local branch, Moo checks it out; otherwise it creates the branch from `--base` or `HEAD`. Without `--path`, Moo creates the checkout under `<worktrees.directory>/<repo>/<branch-slug>`.
 
-`workspace close` closes only Herdr state. Closing a primary workspace while linked-worktree workspaces are open requires `--group`; without it, the command leaves the group open and returns `workspace_group_close_required`. To delete the checkout, run `worktree remove`. It runs `git worktree remove`, never deletes the branch, and requires `--force` when Git refuses a dirty checkout.
+`workspace close` closes only Moo state. Closing a primary workspace while linked-worktree workspaces are open requires `--group`; without it, the command leaves the group open and returns `workspace_group_close_required`. To delete the checkout, run `worktree remove`. It runs `git worktree remove`, never deletes the branch, and requires `--force` when Git refuses a dirty checkout.
 
-Git rejects repositories owned by another user by default. If you have independently verified the repository, pass `--trust-repository` to trust its resolved path for that command only. Herdr does not change your Git configuration.
+Git rejects repositories owned by another user by default. If you have independently verified the repository, pass `--trust-repository` to trust its resolved path for that command only. Moo does not change your Git configuration.
 
 ## Tabs
 
 ```bash
-herdr tab list [--workspace <workspace_id>]
-herdr tab create [--workspace <workspace_id>] [--cwd PATH] [--label TEXT] [--env KEY=VALUE] [--focus] [--no-focus]
-herdr tab get <tab_id>
-herdr tab focus <tab_id>
-herdr tab rename <tab_id> <label>
-herdr tab close <tab_id>
+moo tab list [--workspace <workspace_id>]
+moo tab create [--workspace <workspace_id>] [--cwd PATH] [--label TEXT] [--env KEY=VALUE] [--focus] [--no-focus]
+moo tab get <tab_id>
+moo tab focus <tab_id>
+moo tab rename <tab_id> <label>
+moo tab close <tab_id>
 ```
 
 A tab is another terminal layout inside a workspace. Without `--workspace`, `tab create` uses the active workspace and fails if none exists. Its JSON response exposes `.result.tab.tab_id` and `.result.root_pane.pane_id`. Closing a workspace's last tab also closes the workspace, matching the TUI close-tab action. If `confirm_close` is enabled and closing the tab would also close a whole worktree group, `tab close` returns a `confirmation_required` error instead.
@@ -207,29 +207,29 @@ Workspace and tab creation, and pane splitting, leave focus unchanged by default
 ## Panes
 
 ```bash
-herdr pane list [--workspace <workspace_id>]
-herdr pane current [--pane ID|--current]
-herdr pane get <pane_id>
-herdr pane layout [--pane ID|--current]
-herdr pane process-info [--pane ID|--current]
-herdr pane neighbor --direction left|right|up|down [--pane ID|--current]
-herdr pane edges [--pane ID|--current]
-herdr pane focus --direction left|right|up|down [--pane ID|--current]
-herdr pane resize --direction left|right|up|down [--amount FLOAT] [--pane ID|--current]
-herdr pane zoom [<pane_id>|--pane ID|--current] [--toggle|--on|--off]
-herdr pane rename <pane_id> <label>|--clear
-herdr pane input [<pane_id>|--pane ID|--current] --right-click herdr|pane
-herdr pane split [<pane_id>|--pane ID|--current] --direction right|down [--ratio FLOAT] [--cwd PATH] [--env KEY=VALUE] [--right-click herdr|pane] [--focus] [--no-focus]
-herdr pane swap --direction left|right|up|down [--pane ID|--current]
-herdr pane swap --source-pane ID --target-pane ID
-herdr pane move <pane_id> --tab <tab_id> --split right|down [--target-pane ID] [--ratio FLOAT] [--focus|--no-focus]
-herdr pane move <pane_id> --new-tab [--workspace ID] [--label TEXT] [--focus|--no-focus]
-herdr pane move <pane_id> --new-workspace [--label TEXT] [--tab-label TEXT] [--focus|--no-focus]
-herdr pane close <pane_id>
+moo pane list [--workspace <workspace_id>]
+moo pane current [--pane ID|--current]
+moo pane get <pane_id>
+moo pane layout [--pane ID|--current]
+moo pane process-info [--pane ID|--current]
+moo pane neighbor --direction left|right|up|down [--pane ID|--current]
+moo pane edges [--pane ID|--current]
+moo pane focus --direction left|right|up|down [--pane ID|--current]
+moo pane resize --direction left|right|up|down [--amount FLOAT] [--pane ID|--current]
+moo pane zoom [<pane_id>|--pane ID|--current] [--toggle|--on|--off]
+moo pane rename <pane_id> <label>|--clear
+moo pane input [<pane_id>|--pane ID|--current] --right-click herdr|pane
+moo pane split [<pane_id>|--pane ID|--current] --direction right|down [--ratio FLOAT] [--cwd PATH] [--env KEY=VALUE] [--right-click herdr|pane] [--focus] [--no-focus]
+moo pane swap --direction left|right|up|down [--pane ID|--current]
+moo pane swap --source-pane ID --target-pane ID
+moo pane move <pane_id> --tab <tab_id> --split right|down [--target-pane ID] [--ratio FLOAT] [--focus|--no-focus]
+moo pane move <pane_id> --new-tab [--workspace ID] [--label TEXT] [--focus|--no-focus]
+moo pane move <pane_id> --new-workspace [--label TEXT] [--tab-label TEXT] [--focus|--no-focus]
+moo pane close <pane_id>
 ```
 
-For pane commands that accept `--current`, Herdr uses the calling pane's
-`MOO_PANE_ID` when the command runs inside a Herdr pane. For `pane split`,
+For pane commands that accept `--current`, Moo uses the calling pane's
+`MOO_PANE_ID` when the command runs inside a Moo pane. For `pane split`,
 an explicit pane id or `--pane ID` splits that pane. An omitted target splits
 the calling pane when `MOO_PANE_ID` is available, otherwise the focused pane.
 `--current` requires a calling pane and errors when `MOO_PANE_ID` is unavailable.
@@ -237,17 +237,17 @@ The split response exposes the new pane ID as `.result.pane.pane_id`.
 
 `pane input --right-click pane` forwards unmodified right-click gestures to a
 mouse-reporting pane application. `herdr` restores the default pane menu.
-Right-clicking the pane frame still opens Herdr's menu. `pane split
+Right-clicking the pane frame still opens Moo's menu. `pane split
 --right-click pane` applies the same policy to the new pane at creation.
 
-After `pane move`, use `.result.move_result.pane.pane_id` for later commands. A cross-workspace move changes the workspace-qualified pane ID; the prior value remains at `.result.move_result.previous_pane_id`. The running process keeps its launch-time `MOO_PANE_ID`, `MOO_TAB_ID`, and `MOO_WORKSPACE_ID`; Herdr retains the old pane ID as an alias for that terminal, so pane commands using `--current` still resolve it. A live agent name follows the terminal and continues to resolve after the move.
+After `pane move`, use `.result.move_result.pane.pane_id` for later commands. A cross-workspace move changes the workspace-qualified pane ID; the prior value remains at `.result.move_result.previous_pane_id`. The running process keeps its launch-time `MOO_PANE_ID`, `MOO_TAB_ID`, and `MOO_WORKSPACE_ID`; Moo retains the old pane ID as an alias for that terminal, so pane commands using `--current` still resolve it. A live agent name follows the terminal and continues to resolve after the move.
 
 Read output:
 
 ```bash
-herdr pane read <pane_id> [--source visible|recent|recent-unwrapped|detection] [--lines N] [--format text|ansi] [--ansi] [--raw]
-herdr pane read <pane_id> --source visible --ansi
-herdr pane read <pane_id> --source recent-unwrapped --lines 120
+moo pane read <pane_id> [--source visible|recent|recent-unwrapped|detection] [--lines N] [--format text|ansi] [--ansi] [--raw]
+moo pane read <pane_id> --source visible --ansi
+moo pane read <pane_id> --source recent-unwrapped --lines 120
 ```
 
 `pane read` prints UTF-8 terminal text directly. ANSI escapes are stripped by default; use `--format ansi` or `--ansi` to preserve them where the source exposes styling. The `detection` source is always plain text. For recent sources, `--lines N` selects the last N rendered terminal rows before optional unwrapping; without it, reads default to 80 rows. For `visible` and `detection`, omitting `--lines` returns the full snapshot, while specifying it keeps the last N newline-delimited lines. `agent read` uses the same output and line behavior.
@@ -255,12 +255,12 @@ herdr pane read <pane_id> --source recent-unwrapped --lines 120
 Send input:
 
 ```bash
-herdr pane send-text <pane_id> <text>
-herdr pane send-keys <pane_id> <key> [key ...]
-herdr pane run <pane_id> <command>
+moo pane send-text <pane_id> <text>
+moo pane send-keys <pane_id> <key> [key ...]
+moo pane run <pane_id> <command>
 ```
 
-`<key>` uses Herdr key-combo syntax: plain printable keys such as `a`,
+`<key>` uses Moo key-combo syntax: plain printable keys such as `a`,
 special keys such as `enter`, `tab`, `esc`, `backspace`, `left`, `right`,
 `up`, and `down`, modifier chords such as `ctrl+h`, `control+j`, `alt+x`,
 and `shift+tab`, function keys such as `f1`, and named punctuation such as
@@ -273,7 +273,7 @@ aliases for `ctrl+c`.
 Report agent state from custom hooks:
 
 ```bash
-herdr pane report-agent <pane_id> \
+moo pane report-agent <pane_id> \
   --source ID \
   --agent LABEL \
   --state idle|working|blocked|unknown \
@@ -283,7 +283,7 @@ herdr pane report-agent <pane_id> \
   [--agent-session-path PATH] \
   [-- RESUME_COMMAND...]
 
-herdr pane report-agent-session <pane_id> \
+moo pane report-agent-session <pane_id> \
   --source ID \
   --agent LABEL \
   [--seq N] \
@@ -292,7 +292,7 @@ herdr pane report-agent-session <pane_id> \
   [--session-start-source SOURCE] \
   [-- RESUME_COMMAND...]
 
-herdr pane release-agent <pane_id> \
+moo pane release-agent <pane_id> \
   --source ID \
   --agent LABEL \
   [--seq N]
@@ -300,18 +300,18 @@ herdr pane release-agent <pane_id> \
 
 `report-agent-session` updates native session identity without reporting lifecycle state. `release-agent` ends that source's lifecycle authority when its agent process exits.
 
-Arguments after `--` are the command Herdr runs to resume this session after a server restart. The first argument must be a plain command name on `PATH`, and no argument may contain an apostrophe.
+Arguments after `--` are the command Moo runs to resume this session after a server restart. The first argument must be a plain command name on `PATH`, and no argument may contain an apostrophe.
 
 `pane get`, `pane list`, `agent get`, and `agent list` include a read-only `agent_session` object when an official integration has reported a native session reference. If no native session reference is stored, the field is omitted.
 
-Those commands include `foreground_cwd` when Herdr can resolve the cwd of the foreground process controlling the pane. The `cwd` field remains the pane/workspace cwd used for labels and follow-cwd behavior.
+Those commands include `foreground_cwd` when Moo can resolve the cwd of the foreground process controlling the pane. The `cwd` field remains the pane/workspace cwd used for labels and follow-cwd behavior.
 
 `pane get` and `pane list` include `scroll` when terminal scroll metrics are available. `scroll.offset_from_bottom == 0` means the pane is at the bottom of its scrollback.
 
 Report display-only pane metadata without taking over semantic state:
 
 ```bash
-herdr pane report-metadata <pane_id> \
+moo pane report-metadata <pane_id> \
   --source ID \
   [--agent LABEL] \
   [--applies-to-source ID] \
@@ -327,61 +327,61 @@ herdr pane report-metadata <pane_id> \
 
 `STATUS` is one of `idle`, `working`, `blocked`, `done`, or `unknown`. `--agent` and `--applies-to-source` guard only `--title`, `--display-agent`, and `--state-label`. They do not guard token patches; token reporters own clearing or TTL refresh. Use `--display-agent` to change the visible name.
 
-Metadata text is normalized before storage. Herdr trims surrounding whitespace, removes control characters, and caps `--title`, `--display-agent`, each `--state-label`, and token values at 80 characters. Empty normalized token values clear that key.
+Metadata text is normalized before storage. Moo trims surrounding whitespace, removes control characters, and caps `--title`, `--display-agent`, each `--state-label`, and token values at 80 characters. Empty normalized token values clear that key.
 
 `--token` patches one named display value; `--clear-token` removes one. Unmentioned tokens remain unchanged. Pane tokens are available to Agent sidebar rows as `$name`; workspace tokens are available to Space rows. TTL applies independently to the token keys updated by that call.
 
-`--source` and `--applies-to-source` must be 80 characters or fewer and may contain only ASCII letters, digits, colon, dot, underscore, and hyphen. `--ttl-ms` makes metadata expire automatically and must be between `1` and `86400000` milliseconds. Omit it for metadata that should stay until replaced, cleared, or the pane closes. `--seq` lets Herdr ignore stale reports from the same `--source`; stale reports are accepted by the API but ignored by pane state. A pane or workspace accepts sequenced token reports from at most 32 distinct sources during its lifetime; clearing or expiry does not release those source slots.
+`--source` and `--applies-to-source` must be 80 characters or fewer and may contain only ASCII letters, digits, colon, dot, underscore, and hyphen. `--ttl-ms` makes metadata expire automatically and must be between `1` and `86400000` milliseconds. Omit it for metadata that should stay until replaced, cleared, or the pane closes. `--seq` lets Moo ignore stale reports from the same `--source`; stale reports are accepted by the API but ignored by pane state. A pane or workspace accepts sequenced token reports from at most 32 distinct sources during its lifetime; clearing or expiry does not release those source slots.
 
 ## Agents
 
 For the pane-versus-agent model and complete orchestration examples, see [Agent automation](/docs/agent-automation/).
 
 ```bash
-herdr agent list
-herdr agent get <target>
-herdr agent read <target> [--source visible|recent|recent-unwrapped|detection] [--lines N] [--format text|ansi] [--ansi]
-herdr agent send-keys <target> <key> [key ...]
-herdr agent prompt <target> <text> [--wait] [--until STATUS]... [--timeout MS]
-herdr agent rename <target> <name>|--clear
-herdr agent history [--pane ID] [--limit N]
-herdr agent handoff <from> <to> [--lines N] [--note TEXT]
-herdr agent focus <target>
-herdr agent wait <target> [--until STATUS]... [--timeout MS]
-herdr agent attach <target> [--takeover]
-herdr agent start <name> --kind KIND --pane ID [--timeout MS] [-- <agent-args...>]
-herdr agent explain <target> [--json|--verbose]
-herdr agent explain --file PATH --agent LABEL [--json|--verbose]
+moo agent list
+moo agent get <target>
+moo agent read <target> [--source visible|recent|recent-unwrapped|detection] [--lines N] [--format text|ansi] [--ansi]
+moo agent send-keys <target> <key> [key ...]
+moo agent prompt <target> <text> [--wait] [--until STATUS]... [--timeout MS]
+moo agent rename <target> <name>|--clear
+moo agent history [--pane ID] [--limit N]
+moo agent handoff <from> <to> [--lines N] [--note TEXT]
+moo agent focus <target>
+moo agent wait <target> [--until STATUS]... [--timeout MS]
+moo agent attach <target> [--takeover]
+moo agent start <name> --kind KIND --pane ID [--timeout MS] [-- <agent-args...>]
+moo agent explain <target> [--json|--verbose]
+moo agent explain --file PATH --agent LABEL [--json|--verbose]
 ```
 
 Agent targets are either a unique live agent name or the pane ID that currently hosts the agent. Terminal IDs and bare agent-kind labels are not agent targets. Agents started through `agent start` require a name; manually launched agents remain unnamed and use their pane ID.
 
-`agent start` activates an existing available shell pane: the pane's interactive shell must own the foreground, with no foreground command, editor, or agent running. Topology must be created separately. Names are unique among live agents and must match `[a-z][a-z0-9_-]{0,31}`. The kind selects Herdr's canonical interactive executable, while arguments after `--` are passed to that executable. Supported kinds are `pi`, `claude`, `codex`, `gemini`, `cursor`, `devin`, `agy`, `cline`, `omp`, `mastracode`, `opencode`, `copilot`, `kimi`, `kiro`, `droid`, `amp`, `grok`, `hermes`, `kilo`, `qodercli`, `qwen`, `letta`, `maki`, and `muse`. A name follows the current pane occupant and is cleared when that agent exits, is released, or is replaced. Temporary detection uncertainty does not clear it.
+`agent start` activates an existing available shell pane: the pane's interactive shell must own the foreground, with no foreground command, editor, or agent running. Topology must be created separately. Names are unique among live agents and must match `[a-z][a-z0-9_-]{0,31}`. The kind selects Moo's canonical interactive executable, while arguments after `--` are passed to that executable. Supported kinds are `pi`, `claude`, `codex`, `gemini`, `cursor`, `devin`, `agy`, `cline`, `omp`, `mastracode`, `opencode`, `copilot`, `kimi`, `kiro`, `droid`, `amp`, `grok`, `hermes`, `kilo`, `qodercli`, `qwen`, `letta`, `maki`, and `muse`. A name follows the current pane occupant and is cleared when that agent exits, is released, or is replaced. Temporary detection uncertainty does not clear it.
 
 A successful start returns only after the expected agent owns the same terminal and is ready for interactive input. If detection reports `blocked` during startup, the command returns `agent_not_ready` immediately. The name remains available for `agent read` and `agent send-keys`, and becomes ready for prompts after detection reports `idle`. The default startup timeout is 30000 milliseconds; explicit values must be greater than 3000 and no more than 300000.
 
-`agent prompt` honors live bracketed-paste mode and writes text followed by delayed Enter as one ordered submission, including while the agent is working. Success without `--wait` acknowledges the writes, not the start of a turn. On Windows, Codex receives a paste boundary before Enter so submission does not depend on prompt size; the caller timeout includes submission time. If the agent is already `blocked`, it returns `agent_blocked` without sending input. With `--wait`, a prompt sent from another non-working state has up to five seconds after submission to produce an observed `working` or `blocked` state or Herdr returns `agent_prompt_stalled`; if the caller timeout expires first, Herdr returns the normal `timeout` error. This prevents unrelated `idle`, `done`, or session changes from completing the wait. After activity is observed, it waits for the first requested settled status. It does not track individual turns. If the agent is already working, completion of that active turn may satisfy the wait. `--until` narrows the matching states and is rejected unless `--wait` is also present. Standalone `agent wait` returns immediately when the current status matches. Both default to `idle`, `done`, or `blocked`; use `--until unknown` explicitly when needed.
+`agent prompt` honors live bracketed-paste mode and writes text followed by delayed Enter as one ordered submission, including while the agent is working. Success without `--wait` acknowledges the writes, not the start of a turn. On Windows, Codex receives a paste boundary before Enter so submission does not depend on prompt size; the caller timeout includes submission time. If the agent is already `blocked`, it returns `agent_blocked` without sending input. With `--wait`, a prompt sent from another non-working state has up to five seconds after submission to produce an observed `working` or `blocked` state or Moo returns `agent_prompt_stalled`; if the caller timeout expires first, Moo returns the normal `timeout` error. This prevents unrelated `idle`, `done`, or session changes from completing the wait. After activity is observed, it waits for the first requested settled status. It does not track individual turns. If the agent is already working, completion of that active turn may satisfy the wait. `--until` narrows the matching states and is rejected unless `--wait` is also present. Standalone `agent wait` returns immediately when the current status matches. Both default to `idle`, `done`, or `blocked`; use `--until unknown` explicitly when needed.
 
-`idle` and `done` both mean ready for input. The CLI/API uses the server's seen state: `done` is idle but not yet marked seen, explicit `pane focus` / `agent focus` commands mark the target seen, and reads do not. Each TUI client tracks viewed completions independently, so its Done badge can differ from the CLI or another client. `blocked` means Herdr recognized an approval or question UI. `unknown` means an agent is present but Herdr cannot classify it confidently, not that its work succeeded.
+`idle` and `done` both mean ready for input. The CLI/API uses the server's seen state: `done` is idle but not yet marked seen, explicit `pane focus` / `agent focus` commands mark the target seen, and reads do not. Each TUI client tracks viewed completions independently, so its Done badge can differ from the CLI or another client. `blocked` means Moo recognized an approval or question UI. `unknown` means an agent is present but Moo cannot classify it confidently, not that its work succeeded.
 
 `agent history` prints recorded agent status changes (newest last, default 100, at most 500 retained across restarts). `--pane` limits it to one pane. The TUI's command palette has a **session replay** entry that shows the same timeline for the focused pane.
 
 `agent handoff` reads the last `--lines` lines (default 40) of `<from>`'s recent output and submits them to `<to>` as a prompt, preceded by `--note` when given. It is two ordinary requests, `agent read` then `agent prompt`, so the usual checks apply: a blocked target returns `agent_blocked`, and a source with no output hands off nothing and exits 1. It copies what is on screen at that moment, not the agent's final answer. The TUI's command palette has an **agent handoff** entry that does the same with a picker.
 
-`agent send-keys` sends logical terminal keys such as `enter`, `up`, `esc`, or `ctrl+c`. Herdr validates every key before writing any bytes. `agent read` reads the resolved terminal stream, and `agent rename` names an already detected agent.
+`agent send-keys` sends logical terminal keys such as `enter`, `up`, `esc`, or `ctrl+c`. Moo validates every key before writing any bytes. `agent read` reads the resolved terminal stream, and `agent rename` names an already detected agent.
 
-`agent explain` asks the running server to classify the same bottom-buffer detection snapshot used by screen detection, so live output reflects the server's active manifest cache. Because this uses the `agent.explain` socket method, restart or hand off to an updated server after upgrading Herdr before using live explain. Use `--file PATH --agent LABEL` to explain a saved fixture locally instead. The default output shows the agent, final state, manifest source and version, matched rule with its region evidence, and any fallback, skip, or warning reasons. Add `--verbose` for visible evidence flags, cached remote version, local override shadowing, remote update status, and the full evaluated-rules list with matcher and region evidence. Add `--json` for issue reports or tests.
+`agent explain` asks the running server to classify the same bottom-buffer detection snapshot used by screen detection, so live output reflects the server's active manifest cache. Because this uses the `agent.explain` socket method, restart or hand off to an updated server after upgrading Moo before using live explain. Use `--file PATH --agent LABEL` to explain a saved fixture locally instead. The default output shows the agent, final state, manifest source and version, matched rule with its region evidence, and any fallback, skip, or warning reasons. Add `--verbose` for visible evidence flags, cached remote version, local override shadowing, remote update status, and the full evaluated-rules list with matcher and region evidence. Add `--json` for issue reports or tests.
 
 Use `pane send-text`, `pane send-keys`, `pane run`, and `terminal attach` for ordinary terminals, servers, tests, shells, or low-level terminal control. Use `pane run` when you want to submit a command with Enter.
 
 ## Direct terminal attach
 
 ```bash
-herdr terminal attach <terminal_id> [--takeover]
-herdr terminal session control <target> [--takeover] [--cols N] [--rows N]
-herdr terminal session observe <target> [--cols N] [--rows N]
-herdr terminal title set <title>
-herdr terminal title clear
+moo terminal attach <terminal_id> [--takeover]
+moo terminal session control <target> [--takeover] [--cols N] [--rows N]
+moo terminal session observe <target> [--cols N] [--rows N]
+moo terminal title set <title>
+moo terminal title clear
 ```
 
 Detach from direct attach with `ctrl+b q`. Send literal `ctrl+b` with `ctrl+b ctrl+b`.
@@ -396,7 +396,7 @@ viewport, for example
 `{"type":"terminal.mouse","action":"down","button":"left","column":12,"row":5}`.
 `action` is `down`, `up`, `drag`, or `move`; `button` is `left` (default),
 `right`, or `middle`; `modifiers` is optional and combines Shift = 1, Ctrl = 2,
-and Alt = 4 (default 0). A click is `down` followed by `up`. Herdr encodes the
+and Alt = 4 (default 0). A click is `down` followed by `up`. Moo encodes the
 event for the application's mouse mode and drops it when the application has
 not enabled mouse reporting, so a plain shell never receives stray input.
 `move` reaches only applications that track all mouse motion.
@@ -415,7 +415,7 @@ the pane and other clients keep running. Quiet panes do not trigger this timeout
 Wait for output in a pane:
 
 ```bash
-herdr pane wait-output <pane_id> (--match <text> | --regex <pattern>) [--source visible|recent|recent-unwrapped] [--lines N] [--timeout MS] [--raw]
+moo pane wait-output <pane_id> (--match <text> | --regex <pattern>) [--source visible|recent|recent-unwrapped] [--lines N] [--timeout MS] [--raw]
 ```
 
 Use `pane wait-output` for normal commands and servers. Use `agent wait` for coding agents.
@@ -429,67 +429,67 @@ A timeout or `agent_prompt_stalled` does not prove the prompt was never delivere
 ## Integrations
 
 ```bash
-herdr integration install pi
-herdr integration install omp
-herdr integration install claude
-herdr integration install codex
-herdr integration install copilot
-herdr integration install devin
-herdr integration install droid
-herdr integration install kimi
-herdr integration install opencode
-herdr integration install kilo
-herdr integration install hermes
-herdr integration install qodercli
-herdr integration install qwen
-herdr integration install letta
-herdr integration install cursor
-herdr integration install mastracode
-herdr integration install grok
-herdr integration uninstall pi
-herdr integration uninstall omp
-herdr integration uninstall claude
-herdr integration uninstall codex
-herdr integration uninstall copilot
-herdr integration uninstall devin
-herdr integration uninstall droid
-herdr integration uninstall kimi
-herdr integration uninstall opencode
-herdr integration uninstall kilo
-herdr integration uninstall hermes
-herdr integration uninstall qodercli
-herdr integration uninstall qwen
-herdr integration uninstall letta
-herdr integration uninstall cursor
-herdr integration uninstall mastracode
-herdr integration uninstall grok
-herdr integration status [--outdated-only]
+moo integration install pi
+moo integration install omp
+moo integration install claude
+moo integration install codex
+moo integration install copilot
+moo integration install devin
+moo integration install droid
+moo integration install kimi
+moo integration install opencode
+moo integration install kilo
+moo integration install hermes
+moo integration install qodercli
+moo integration install qwen
+moo integration install letta
+moo integration install cursor
+moo integration install mastracode
+moo integration install grok
+moo integration uninstall pi
+moo integration uninstall omp
+moo integration uninstall claude
+moo integration uninstall codex
+moo integration uninstall copilot
+moo integration uninstall devin
+moo integration uninstall droid
+moo integration uninstall kimi
+moo integration uninstall opencode
+moo integration uninstall kilo
+moo integration uninstall hermes
+moo integration uninstall qodercli
+moo integration uninstall qwen
+moo integration uninstall letta
+moo integration uninstall cursor
+moo integration uninstall mastracode
+moo integration uninstall grok
+moo integration status [--outdated-only]
 ```
 
 ## Plugins
 
-Plugin commands install and run local executable workflow plugins. A plugin is a manifest plus out-of-process commands; Herdr owns the host surface and plugins own their implementation language.
+Plugin commands install and run local executable workflow plugins. A plugin is a manifest plus out-of-process commands; Moo owns the host surface and plugins own their implementation language.
 
 Install, list, and remove plugins:
 
 ```bash
-herdr plugin install <owner>/<repo>[/subdir...] [--ref REF] [--yes]
-herdr plugin update [<plugin_id|owner/repo[/subdir...]>...] [--yes]
-herdr plugin list [--plugin ID] [--json]
-herdr plugin uninstall <plugin_id|owner/repo[/subdir...]>
-herdr plugin enable <plugin_id>
-herdr plugin disable <plugin_id>
+moo plugin install <owner>/<repo>[/subdir...] [--ref REF] [--yes]
+moo plugin update [<plugin_id|owner/repo[/subdir...]>...] [--yes]
+moo plugin list [--plugin ID] [--json]
+moo plugin uninstall <plugin_id|owner/repo[/subdir...]>
+moo plugin enable <plugin_id>
+moo plugin disable <plugin_id>
 ```
 
-`plugin install` accepts GitHub shorthand only, such as `ogulcancelik/herdr-plugin-examples/worktree-bootstrap`. It uses `git`, shows a trust preview in interactive terminals, runs supported manifest build commands, and stores GitHub installs in a Herdr-managed directory. Use `--yes` for noninteractive installs. `plugin update` refreshes every GitHub-managed plugin when no targets are given, or only the listed plugin ids or GitHub sources. It preserves each install's requested ref, skips unchanged commits and ignores locally linked plugins during bulk updates. Reinstalling a GitHub-managed plugin creates a new installation directory. Running plugins keep their original files; new invocations use the new installation. Installing over a locally linked plugin is refused. Plugin manifests must declare `min_herdr_version`; install and link fail when the plugin requires a newer Herdr binary. `plugin list` is human-readable by default; pass `--json` for the raw API response.
+`plugin install` accepts GitHub shorthand only, such as `ogulcancelik/herdr-plugin-examples/worktree-bootstrap`. It uses `git`, shows a trust preview in interactive terminals, runs supported manifest build commands, and stores GitHub installs in a Moo-managed directory. Use `--yes` for noninteractive installs. `plugin update` refreshes every GitHub-managed plugin when no targets are given, or only the listed plugin ids or GitHub sources. It preserves each install's requested ref, skips unchanged commits and ignores locally linked plugins during bulk updates. Reinstalling a GitHub-managed plugin creates a new installation directory. Running plugins keep their original files; new invocations use the new installation. Installing over a locally linked plugin is refused. Plugin manifests must declare `min_herdr_version`; install and link fail when the plugin requires a newer Moo binary. `plugin list` is human-readable by default; pass `--json` for the raw API response.
 
-Plugin installation and enabled state are global to the current user. A plugin installed, linked, enabled, or disabled through one Herdr session is immediately available with the same state in every session.
+Plugin installation and enabled state are global to the current user. A plugin installed, linked, enabled, or disabled through one Moo session is immediately available with the same state in every session.
 
 Local development:
 
 ```bash
-herdr plugin link <path> [--disabled]
-herdr plugin unlink <plugin_id>
+moo plugin link <path> [--disabled]
+moo plugin unlink <plugin_id>
 ```
 
 `plugin link` accepts a plugin directory containing `herdr-plugin.toml` or a direct manifest path. Use it while authoring or testing a plugin from a local checkout. `plugin unlink` and `plugin uninstall` unregister the plugin and leave files in place so running plugins can finish. Updates and reinstalls also retain previous installations; new invocations use the replacement without a config reload. A later successful installation/update or server startup removes obsolete managed installations after the servers using them have exited. Config reload does not release old installations. Plugins must stop detached background processes before their parent command or pane exits; processes surviving server exit are not protected from cleanup. Legacy installations without cleanup tracking and locally linked files are retained. For GitHub installs, uninstall accepts either the plugin id or the same `owner/repo[/subdir...]` shorthand used by install. Actions, event hooks, panes, and link handlers are declared in the manifest; runtime action registration is not part of v1.
@@ -497,7 +497,7 @@ herdr plugin unlink <plugin_id>
 Config directory:
 
 ```bash
-herdr plugin config-dir <plugin_id>
+moo plugin config-dir <plugin_id>
 ```
 
 `plugin config-dir` prints the plugin's config directory. It creates the directory if needed and seeds it from legacy plugin config locations when present. Use it in setup docs and shell scripts to point users at a stable path for `.env` files and other user-editable config, separate from the managed plugin checkout.
@@ -505,8 +505,8 @@ herdr plugin config-dir <plugin_id>
 Actions:
 
 ```bash
-herdr plugin action list [--plugin ID]
-herdr plugin action invoke <action_id> [--plugin ID]
+moo plugin action list [--plugin ID]
+moo plugin action invoke <action_id> [--plugin ID]
 ```
 
 `plugin action invoke` starts the manifest command for an installed, enabled,
@@ -518,33 +518,33 @@ so qualified ids remain unambiguous even when plugin ids contain dots.
 Logs:
 
 ```bash
-herdr plugin log list [--plugin ID] [--limit N]
+moo plugin log list [--plugin ID] [--limit N]
 ```
 
 Managed terminal panes:
 
 ```bash
-herdr plugin pane open --plugin ID --entrypoint ID [--placement overlay|popup|split|tab|zoomed] [--width SIZE] [--height SIZE] [--workspace ID] [--target-pane PANE] [--direction right|down] [--cwd PATH] [--env KEY=VALUE] [--focus|--no-focus]
-herdr plugin pane focus <pane_id>
-herdr plugin pane close <pane_id>
+moo plugin pane open --plugin ID --entrypoint ID [--placement overlay|popup|split|tab|zoomed] [--width SIZE] [--height SIZE] [--workspace ID] [--target-pane PANE] [--direction right|down] [--cwd PATH] [--env KEY=VALUE] [--focus|--no-focus]
+moo plugin pane focus <pane_id>
+moo plugin pane close <pane_id>
 ```
 
 `plugin pane open` requires the plugin to be linked, enabled, and compatible
 with the current platform. It starts a manifest-declared `[[panes]]` command as
-a Herdr-managed terminal pane. The manifest default is `overlay`, which opens a
+a Moo-managed terminal pane. The manifest default is `overlay`, which opens a
 temporary zoomed overlay over the active pane. It can also open as a split, a
 new tab, a zoomed pane, or a session-modal `popup` that does not change the tab
 layout. `--width` and `--height` set the outer popup dimensions in terminal
 cells or percentages such as `80%`; omitted dimensions default to half the
 terminal size, and values smaller than the popup minimum are clamped. A popup
-is not a Herdr pane, does not export `MOO_PANE_ID`, and does not participate
+is not a Moo pane, does not export `MOO_PANE_ID`, and does not participate
 in pane or agent APIs. Native non-terminal plugin panes are outside plugin v1.
 
-New panes identify as `TERM_PROGRAM=herdr`, with `TERM_PROGRAM_VERSION` set to
-Herdr's version. They keep `TERM=xterm-256color` and `COLORTERM=truecolor`.
-They also get `fish_handle_reflow=0`, because Herdr reflows text on resize;
+New panes identify as `TERM_PROGRAM=moo`, with `TERM_PROGRAM_VERSION` set to
+Moo's version. They keep `TERM=xterm-256color` and `COLORTERM=truecolor`.
+They also get `fish_handle_reflow=0`, because Moo reflows text on resize;
 an inherited or explicit `fish_handle_reflow` value is kept.
-Herdr removes inherited outer-terminal session markers (iTerm2, WezTerm, Kitty,
+Moo removes inherited outer-terminal session markers (iTerm2, WezTerm, Kitty,
 Windows Terminal, tmux, screen, and Zellij), iTerm2's `LC_TERMINAL` identity,
 and known Claude Code, Codex, and OMP session markers before applying explicit
 launch environment values. This prevents new panes from claiming the terminal
@@ -553,7 +553,7 @@ variables, including API keys and display settings, remain inherited rather than
 being replaced with the attaching client's environment. SSH-agent forwarding has
 its own reconnect handling. Existing pane processes are unchanged by this cleanup.
 
-`--env KEY=VALUE` can be repeated on process-launching commands. It applies to the newly launched process only. Herdr-managed variables such as `MOO_SOCKET_PATH`, `MOO_BIN_PATH`, `MOO_ENV`, `MOO_WORKSPACE_ID`, `MOO_TAB_ID`, `MOO_PANE_ID`, `MOO_PLUGIN_ID`, `MOO_PLUGIN_ROOT`, `MOO_PLUGIN_CONFIG_DIR`, `MOO_PLUGIN_STATE_DIR`, `MOO_PLUGIN_ENTRYPOINT_ID`, and `MOO_PLUGIN_CONTEXT_JSON` stay authoritative when they conflict with caller-provided env.
+`--env KEY=VALUE` can be repeated on process-launching commands. It applies to the newly launched process only. Moo-managed variables such as `MOO_SOCKET_PATH`, `MOO_BIN_PATH`, `MOO_ENV`, `MOO_WORKSPACE_ID`, `MOO_TAB_ID`, `MOO_PANE_ID`, `MOO_PLUGIN_ID`, `MOO_PLUGIN_ROOT`, `MOO_PLUGIN_CONFIG_DIR`, `MOO_PLUGIN_STATE_DIR`, `MOO_PLUGIN_ENTRYPOINT_ID`, and `MOO_PLUGIN_CONTEXT_JSON` stay authoritative when they conflict with caller-provided env.
 
 ## Read sources
 
@@ -574,9 +574,11 @@ These meanings apply to reads. For `pane wait-output` only, both `recent` and `r
 | `MOO_SESSION` | Select a named session for CLI commands. |
 | `MOO_SOCKET_PATH` | Low-level socket path override. |
 | `MOO_PROCESS_DETECTION` | Linux process detection strategy: `native` (default) or opt-in `child-groups`. |
-| `MOO_ENV` | Set to `1` inside Herdr-managed pane processes. |
+| `MOO_ENV` | Set to `1` inside Moo-managed pane processes. |
 | `MOO_PANE_ID` | Public pane id for the running pane process. |
 | `MOO_TAB_ID` | Public tab id for the running pane process. |
 | `MOO_WORKSPACE_ID` | Public workspace id for the running pane process. |
-| `MOO_LOG` | Set log filter, for example `MOO_LOG=herdr=debug`. |
+| `MOO_LOG` | Set log filter, for example `MOO_LOG=moo=debug`. |
 | `MOO_DISABLE_SOUND` | Disable sound playback even when sound notifications are enabled. |
+
+[Credits and documentation changes](/docs/credits/).

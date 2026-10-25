@@ -4,13 +4,13 @@
   <img src="assets/moo-logo.png" alt="Moo logo" width="180" />
 </p>
 
-A fork of [Herdr](https://github.com/herdrdev/herdr), the terminal runtime for coding agents. It keeps Herdr's detachable server, panes, and agent status, and adds agent-focused features. It installs and runs beside upstream Herdr without sharing state.
+Moo is a terminal workspace for coding agents, with detachable sessions, agent teams, handoffs, and a web client. Run agents across projects, see which ones need attention, and coordinate their work from your terminal.
 
-> **Status:** experimental. The full Rust test suite passes on the fork; the interactive UI has been checked in a terminal only for the features listed below.
+> **Status:** experimental. The full Rust test suite passes on Moo; the interactive UI has been checked in a terminal only for the features listed below.
 
-## what's different
+## features
 
-- **separate identity** — the binary is `moo`. Config, state, logs, and sockets live under `moo` paths, so it never touches an upstream install. Debug builds use `moo-dev`.
+- **separate identity** — the binary is `moo`. Config, state, logs, and sockets live under `moo` paths, so separate installations keep their own data. Debug builds use `moo-dev`.
 - **agent-aware command palette** — open it with `prefix+space` (default prefix `ctrl+b`) and search actions by name.
 - **agent names in the sidebar** — rename an agent from the sidebar or with `moo agent rename <target> <name>`; `--clear` resets it.
 - **attention queue** — agents that need an answer are queued, and you can acknowledge them.
@@ -19,12 +19,12 @@ A fork of [Herdr](https://github.com/herdrdev/herdr), the terminal runtime for c
 - **settings keys** — the Settings dialog's section list answers to `↑`/`↓` and `j`/`k`; `→`/`l`/`Enter` enters a section's choices and `←`/`h` goes back.
 - **plugin actions in settings** — **Settings → plugins** lists the linked plugins' actions (start or stop a plugin, toggle its options) and runs the one you select.
 - **plugin action platform support** — `plugin.action.list` reports an optional `supported` flag so clients can hide actions the server's host can't run.
-- **web UI** — the [Ovis](https://github.com/devswha/ovis) browser and phone client runs as a moo plugin with a **Network access** setting (this PC only, or the local network only) (use the [`moo` branch of the fork](https://github.com/allisonhere/ovis/tree/moo)); see the [wiki](https://github.com/allisonhere/moo/wiki/Web-UI-with-Ovis).
+- **web UI** — the [Ovis](https://github.com/devswha/ovis) browser and phone client runs as a moo plugin with a **Network access** setting (this PC only, or the local network only) (use the [Moo-compatible branch](https://github.com/allisonhere/ovis/tree/moo)); see the [wiki](https://github.com/allisonhere/moo/wiki/Web-UI-with-Ovis).
 - **teams** — optional, Linux and macOS. **teams: open screen** in the command palette (or `moo teams ui`) opens a keyboard-first screen for running a Lead, Developer and QA agent as a team: goal-to-plan drafts you review and edit, declared providers and models, owner approvals for risky actions, bounded disagreements, selective memory for agents, metered-vs-estimated usage with hard limits, and a versioned local JSON API with replayable events. Moo works as a plain multiplexer until you open it. See the [Teams guide](https://github.com/allisonhere/moo/wiki/Docs-teams) and the [Teams API](https://github.com/allisonhere/moo/wiki/Docs-teams-api).
 - **tab colors** — right-click a tab and choose **Color** to give it a theme color. Its tab dot and the bar beside its agents in the sidebar use that color.
-- **fork-only remotes** — remote attach and saved SSH machines look for `moo` on the remote host and never fetch upstream `herdr`. Automated Windows install is refused for now.
+- **remote connections** — remote attach and saved SSH machines look for `moo` on the remote host with explicit binary selection when needed. Automated Windows install is refused for now.
 
-Everything else follows upstream Herdr, with `moo` in place of `herdr`.
+Use the [documentation](https://github.com/allisonhere/moo/wiki/Documentation) for configuration, commands, plugins, and remote connections.
 
 ## install
 
@@ -56,9 +56,9 @@ From `master`, run `./deploy.sh` to open the release console. It shows the four 
 
 ## docs
 
-The [wiki](https://github.com/allisonhere/moo/wiki) covers what moo adds: agent handoff, settings keys, restart behaviour and the web UI.
+The [wiki](https://github.com/allisonhere/moo/wiki) covers agent handoff, settings keys, restart behaviour and the web UI.
 
-The fork guide is [`docs/next/website/src/content/docs/moo.mdx`](docs/next/website/src/content/docs/moo.mdx): requirements, identity paths, troubleshooting, removal, and current limitations. Upstream docs at [herdr.dev/docs](https://herdr.dev/docs/) apply to everything the fork has not changed.
+The Moo guide is [`docs/next/website/src/content/docs/moo.mdx`](docs/next/website/src/content/docs/moo.mdx): requirements, identity paths, troubleshooting, removal, and current limitations. The wiki includes the full command and configuration guides.
 
 ## development
 
@@ -72,4 +72,4 @@ Read [`AGENTS.md`](./AGENTS.md) and [`CLAUDE.md`](./CLAUDE.md) before making cha
 
 ## license
 
-Apache License 2.0, the same as upstream Herdr. See [LICENSE](LICENSE). Herdr is by [herdrdev](https://github.com/herdrdev/herdr).
+Moo builds on [Herdr](https://github.com/herdrdev/herdr) and is distributed under [Apache License 2.0](LICENSE). See [credits](https://github.com/allisonhere/moo/wiki/Docs-credits) for attribution and documentation changes.

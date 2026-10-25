@@ -122,6 +122,7 @@ bench-release-smoke:
 
 # Test public documentation snapshot and release lifecycle tooling
 docs-contract-test:
+    {{python}} -m unittest scripts.test_docs_identity scripts.test_sync_wiki
     bun test ./scripts/docs
 
 # Test bundled agent integration assets
