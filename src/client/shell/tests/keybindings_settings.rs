@@ -30,7 +30,12 @@ fn plus_commands_survive_snapshots_and_reload_for_both_keybinding_sources() {
             let mut projection = snapshot();
             projection.revision = revision;
             projection.server_keybindings_toml = config.local_keybindings_profile_toml().ok();
-            projection.commands = app.client_shell_command_manifest();
+            // Teams adds its own palette entries; this test is about the configured command.
+            projection.commands = app
+                .client_shell_command_manifest()
+                .into_iter()
+                .filter(|command| !command.command_id.contains("_teams_"))
+                .collect();
             assert_eq!(projection.commands.len(), 1);
             let command_id = projection.commands[0].command_id.clone();
             state.set_snapshot(Box::new(projection));
