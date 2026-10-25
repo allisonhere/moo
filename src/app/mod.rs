@@ -620,7 +620,7 @@ impl App {
         let client_shell_keybindings_profile = config.local_keybindings_profile_toml().ok();
         let endpoint_commands =
             custom_commands::EndpointCommandRegistry::new(&state.keybinds.custom_commands)
-                .with_teams(crate::teams::store_present());
+                .with_teams(crate::teams::available());
 
         let mut app = Self {
             plugin_installation_leases,
@@ -852,7 +852,7 @@ impl App {
         };
         self.endpoint_commands =
             custom_commands::EndpointCommandRegistry::new(&self.state.keybinds.custom_commands)
-                .with_teams(crate::teams::store_present());
+                .with_teams(crate::teams::available());
         self.sync_toast_deadline(previous_toast);
         report
     }

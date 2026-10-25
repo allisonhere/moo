@@ -48,8 +48,8 @@ impl EndpointCommandRegistry {
 }
 
 impl EndpointCommandRegistry {
-    /// Adds the Teams commands to what the command palette lists. They appear only when the session
-    /// has a Teams store, and run the Teams screen in a popup like any other custom command.
+    /// Adds the Teams commands to what the command palette lists, where Teams is available. They run
+    /// the Teams screen in a popup like any other custom command.
     pub(super) fn with_teams(mut self, enabled: bool) -> Self {
         if !enabled {
             return self;
@@ -827,7 +827,7 @@ mod tests {
     }
 
     #[test]
-    fn teams_commands_join_the_palette_only_when_a_teams_store_exists() {
+    fn teams_commands_join_the_palette_where_teams_is_available() {
         let none = super::EndpointCommandRegistry::new(&[]);
         assert!(none.with_teams(false).entries.is_empty());
         let registry = super::EndpointCommandRegistry::new(&[]).with_teams(true);

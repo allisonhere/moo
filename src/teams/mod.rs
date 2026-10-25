@@ -929,10 +929,10 @@ pub(crate) fn schema_document() -> Value {
     catalog::schema_document()
 }
 
-/// Whether this session has a Teams store, so the main screen can offer Teams commands only to
-/// people who use Teams. One `stat`, made when commands are (re)loaded, never per frame.
-pub(crate) fn store_present() -> bool {
-    cfg!(unix) && crate::session::data_dir().join(store::STORE_FILE).is_file()
+/// Whether this platform can run Teams, so the main screen offers its commands there. The store is
+/// created the first time the Teams screen opens.
+pub(crate) fn available() -> bool {
+    cfg!(unix)
 }
 
 pub(crate) fn initialize(root: &Path) -> Result<PathBuf> {

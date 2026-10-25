@@ -97,7 +97,7 @@ Press `prefix+space` to open the command palette. Type to filter with fuzzy matc
 
 ### Teams
 
-`moo teams init` creates a Teams store for the session (an owner credential and a durable event log), and `moo teams ui` opens a keyboard-first screen over it: a navigator (All teams, then Projects, Teams and Agents), a workspace with Terminals, Chat, Tasks and Decisions views, and an inspector for the selected team or agent. Once a store exists and the config is loaded, the command palette lists **teams: open screen**, **teams: decisions** and **teams: new team**, each opening the screen in a popup. `moo server reload-config` picks up a store created while the server was running.
+`moo teams ui` opens a keyboard-first screen for Teams, creating the session's store (an owner credential and a durable event log) the first time (`moo teams init` does that step on its own): a navigator (All teams, then Projects, Teams and Agents), a workspace with Terminals, Chat, Tasks and Decisions views, and an inspector for the selected team or agent. On Linux and macOS the command palette always lists **teams: open screen**, **teams: decisions** and **teams: new team**, each opening the screen in a popup.
 
 The screen adapts to the terminal: three areas from 100 columns, the side areas collapsing (`n` and `i` dock them) at 61 to 99, and one area at a time (Tab to switch) at 60 and below. `:` opens its own command palette with the commands that apply to what is selected, `?` lists the keys, `D` switches density, `A` uses ASCII glyphs, `H` makes focus high-contrast and `t` previews the built-in themes. It follows your configured theme.
 

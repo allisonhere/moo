@@ -3,7 +3,7 @@ title: Teams
 description: How Moo Teams works and how to run it - from a goal to a reviewed plan, bounded work, selective memory, disagreements, costs and recovery - plus administration and upgrade notes.
 ---
 
-Teams is an optional part of Moo for people who run several coding agents at once and want some order around them. If you only use Moo as a terminal multiplexer, you can ignore this page: Teams does nothing until you create a store, and it never changes how panes, tabs and workspaces behave.
+Teams is an optional part of Moo for people who run several coding agents at once and want some order around them. If you only use Moo as a terminal multiplexer, you can ignore this page: Teams does nothing until you open it, and it never changes how panes, tabs and workspaces behave.
 
 This page explains how Teams works and how to use it. The full list of requests, fields and errors is in the [Teams API](/docs/teams-api/); the screen is described under *Teams* in [Moo](/docs/moo/).
 
@@ -17,14 +17,11 @@ Everything is kept in one store on your machine, as an append-only history that 
 
 ## Getting started
 
-```bash
-moo teams init       # creates the store and your private Owner credential
-moo teams ui         # opens the Teams screen
-```
+Open the command palette (`prefix+space`) and choose **teams: open screen**, or run `moo teams ui`. The first time, Teams creates its store and your private Owner credential for you. `moo teams init` does that step on its own if you want it done ahead of time.
 
-The store and the Owner credential live in Moo's config directory (`~/.config/moo`, or `~/.config/moo/sessions/<name>` for a named session). The credential file is private to you; keep it away from your agents. Run `moo server reload-config` if the server was already running, so the command palette learns about Teams.
+The store and the Owner credential live in Moo's config directory (`~/.config/moo`, or `~/.config/moo/sessions/<name>` for a named session). The credential file is private to you; keep it away from your agents.
 
-To leave Teams, press `q` in the screen. Your panes and workspaces are untouched. There is no switch that turns Teams off; the Teams commands appear in the palette only while the store exists.
+To leave Teams, press `q` in the screen. Your panes and workspaces are untouched. There is no switch that turns Teams off; the Teams commands stay in the palette on Linux and macOS, and nothing runs until you open the screen.
 
 Teams works for local sessions on Linux and macOS. It is not available on Windows.
 

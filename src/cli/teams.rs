@@ -93,10 +93,12 @@ pub(super) fn run(args: &[String]) -> io::Result<i32> {
             super::print_response(&json!({"result": {"owner_credential_file": path}}))
         }
         Some(("ui", args)) => {
-            let credential = args
-                .get_one::<PathBuf>("credential-file")
-                .cloned()
-                .unwrap_or_else(|| crate::session::data_dir().join("teams-owner.key"));
+            let credential = match args.get_one::<PathBuf>("credential-file") {
+                Some(path) => path.clone(),
+                // The first time the screen opens there is no store yet; create it.
+                None => crate::teams::initialize(&crate::session::data_dir())
+                    .map_err(io::Error::other)?,
+            };
             let token = crate::teams::read_credential(&credential).map_err(io::Error::other)?;
             let client = super::target::api_client()?;
             let start = crate::teams_ui::Start {
