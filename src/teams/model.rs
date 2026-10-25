@@ -8,12 +8,24 @@ use sha2::{Digest, Sha256};
 
 mod bindings;
 mod governance;
+mod memory;
+mod oversight;
+mod planning;
 mod portfolio;
 
 use super::{Error, Result};
 pub use bindings::PaneBinding;
 use governance::RecruitmentRequest;
 pub use governance::{Approval, Authority, ProtectedAction, Recruitment};
+use memory::{ContextNote, KnowledgeKind, KnowledgeStatus, NoteKind, SourceKind, SourceRef};
+pub use memory::{DEFAULT_BUDGET, MAX_BUDGET};
+use oversight::{AgentRunState, AgentState, Dispute, TeamLimits, TeamUsage, UsageBasis};
+pub use oversight::{
+    DEFAULT_STUCK_SECONDS, MAX_ACTIVE_TASKS, MAX_OPEN_DISPUTES, MAX_OPEN_TASKS, MAX_POSITIONS,
+    MAX_QUEUED_DISPATCHES,
+};
+use planning::{Metering, ModelDecl, Plan, PlanEdit, Preference, Provider, RoleAssignment};
+pub use planning::{PlanStatus, PlanTask as PlanTaskView, MAX_DEPENDENCY_DEPTH, MAX_PLAN_TASKS};
 use portfolio::Submission;
 pub use portfolio::{
     ChangeNotice, Conflict, Integration, SharedSurface, TeamStatus, WorktreeClaim,
@@ -191,6 +203,9 @@ pub struct Task {
     pub dependencies: BTreeSet<String>,
     pub status: TaskStatus,
     pub revision: u64,
+    /// Server time (unix seconds) of the last change; 0 for tasks written before this was tracked.
+    #[serde(default)]
+    pub updated_at: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -306,6 +321,10 @@ pub struct KnowledgeEntry {
     pub title: String,
     pub body: String,
     pub evidence: Vec<Evidence>,
+    #[serde(default)]
+    pub kind: KnowledgeKind,
+    #[serde(default)]
+    pub status: KnowledgeStatus,
     pub revision: u64,
 }
 
@@ -568,6 +587,9 @@ pub enum Command {
         body: String,
         #[serde(default)]
         evidence: Vec<Evidence>,
+        /// A requirement or ADR starts as proposed and counts only once the Owner accepts it.
+        #[serde(default)]
+        knowledge_kind: KnowledgeKind,
     },
     RecordDispatchReceipt {
         team_id: String,
@@ -740,6 +762,121 @@ pub enum Command {
     UnbindAgentPane {
         actor_id: String,
     },
+    DeclareProvider {
+        provider_id: String,
+        label: String,
+        #[serde(default)]
+        capabilities: Vec<String>,
+        #[serde(default)]
+        models: Vec<ModelDecl>,
+        metering: Metering,
+        #[serde(default)]
+        hard_spend_limit: bool,
+    },
+    SetRolePreference {
+        role_key: String,
+        provider_id: String,
+        #[serde(default)]
+        model_id: Option<String>,
+    },
+    AssignRoleProvider {
+        team_id: String,
+        role_key: String,
+        provider_id: String,
+        #[serde(default)]
+        model_id: Option<String>,
+    },
+    ReassignRoleProvider {
+        team_id: String,
+        role_key: String,
+        provider_id: String,
+        #[serde(default)]
+        model_id: Option<String>,
+        approval_id: String,
+    },
+    ProposePlan {
+        plan_id: String,
+        goal: String,
+    },
+    EditPlan {
+        plan_id: String,
+        edits: Vec<PlanEdit>,
+    },
+    DiscardPlan {
+        plan_id: String,
+    },
+    MarkPlanLaunched {
+        plan_id: String,
+        team_id: String,
+    },
+    PutContextNote {
+        team_id: String,
+        note_id: String,
+        note_kind: NoteKind,
+        #[serde(default)]
+        role_key: Option<String>,
+        summary: String,
+        sources: Vec<SourceRef>,
+        #[serde(default)]
+        valid_for_seconds: Option<u64>,
+    },
+    SupersedeContextNote {
+        note_id: String,
+        by_note_id: String,
+    },
+    AcceptKnowledge {
+        knowledge_id: String,
+    },
+    SupersedeKnowledge {
+        knowledge_id: String,
+        by_id: String,
+    },
+    RaiseDispute {
+        dispute_id: String,
+        team_id: String,
+        #[serde(default)]
+        task_id: Option<String>,
+        topic: String,
+        #[serde(default)]
+        architectural: bool,
+        position: String,
+        evidence: Vec<Evidence>,
+    },
+    RespondDispute {
+        dispute_id: String,
+        position: String,
+        #[serde(default)]
+        evidence: Vec<Evidence>,
+    },
+    ResolveDispute {
+        dispute_id: String,
+        resolution: String,
+    },
+    DecideDispute {
+        dispute_id: String,
+        decision: String,
+    },
+    ReportUsage {
+        team_id: String,
+        provider_id: String,
+        input_tokens: u64,
+        output_tokens: u64,
+        #[serde(default)]
+        cost_micros: Option<u64>,
+        basis: UsageBasis,
+    },
+    SetTeamLimits {
+        team_id: String,
+        #[serde(default)]
+        max_metered_cost_micros: Option<u64>,
+        #[serde(default)]
+        max_metered_tokens: Option<u64>,
+    },
+    SetAgentState {
+        actor_id: String,
+        state: AgentRunState,
+        reason: String,
+    },
 }
 
 impl Command {
@@ -787,6 +924,25 @@ impl Command {
             Self::AbortMerge { .. } => "abort_merge",
             Self::BindAgentPane { .. } => "bind_agent_pane",
             Self::UnbindAgentPane { .. } => "unbind_agent_pane",
+            Self::DeclareProvider { .. } => "declare_provider",
+            Self::SetRolePreference { .. } => "set_role_preference",
+            Self::AssignRoleProvider { .. } => "assign_role_provider",
+            Self::ReassignRoleProvider { .. } => "reassign_role_provider",
+            Self::ProposePlan { .. } => "propose_plan",
+            Self::EditPlan { .. } => "edit_plan",
+            Self::DiscardPlan { .. } => "discard_plan",
+            Self::MarkPlanLaunched { .. } => "mark_plan_launched",
+            Self::PutContextNote { .. } => "put_context_note",
+            Self::SupersedeContextNote { .. } => "supersede_context_note",
+            Self::AcceptKnowledge { .. } => "accept_knowledge",
+            Self::SupersedeKnowledge { .. } => "supersede_knowledge",
+            Self::RaiseDispute { .. } => "raise_dispute",
+            Self::RespondDispute { .. } => "respond_dispute",
+            Self::ResolveDispute { .. } => "resolve_dispute",
+            Self::DecideDispute { .. } => "decide_dispute",
+            Self::ReportUsage { .. } => "report_usage",
+            Self::SetTeamLimits { .. } => "set_team_limits",
+            Self::SetAgentState { .. } => "set_agent_state",
         }
     }
 }
@@ -833,6 +989,24 @@ pub struct State {
     pub notices: BTreeMap<String, ChangeNotice>,
     #[serde(default)]
     pub pane_bindings: BTreeMap<String, PaneBinding>,
+    #[serde(default)]
+    pub providers: BTreeMap<String, Provider>,
+    #[serde(default)]
+    pub preferences: BTreeMap<String, Preference>,
+    #[serde(default)]
+    pub role_assignments: BTreeMap<String, RoleAssignment>,
+    #[serde(default)]
+    pub plans: BTreeMap<String, Plan>,
+    #[serde(default)]
+    pub context_notes: BTreeMap<String, ContextNote>,
+    #[serde(default)]
+    pub disputes: BTreeMap<String, Dispute>,
+    #[serde(default)]
+    pub usage: BTreeMap<String, TeamUsage>,
+    #[serde(default)]
+    pub team_limits: BTreeMap<String, TeamLimits>,
+    #[serde(default)]
+    pub agent_states: BTreeMap<String, AgentState>,
     /// Server clock for the command being applied (unix seconds); set per command, never stored.
     #[serde(skip)]
     now: u64,
@@ -897,6 +1071,15 @@ impl State {
             conflicts: BTreeMap::new(),
             notices: BTreeMap::new(),
             pane_bindings: BTreeMap::new(),
+            providers: BTreeMap::new(),
+            preferences: BTreeMap::new(),
+            role_assignments: BTreeMap::new(),
+            plans: BTreeMap::new(),
+            context_notes: BTreeMap::new(),
+            disputes: BTreeMap::new(),
+            usage: BTreeMap::new(),
+            team_limits: BTreeMap::new(),
+            agent_states: BTreeMap::new(),
             now: 0,
         }
     }
@@ -951,6 +1134,13 @@ impl State {
         candidate.revision = commit_revision;
         for pending in applied.events {
             candidate.append_event(actor.id.clone(), commit_revision, Some(authority), pending)?;
+        }
+        for task in candidate
+            .tasks
+            .values_mut()
+            .filter(|t| t.revision == commit_revision)
+        {
+            task.updated_at = now;
         }
         candidate.now = 0;
         candidate.compact_events_if_needed();
@@ -1044,6 +1234,42 @@ impl State {
         messages.sort_by(|a, b| (a.revision, &a.id).cmp(&(b.revision, &b.id)));
         let mut decisions = decisions;
         decisions.sort_by(|a, b| (a.revision, &a.id).cmp(&(b.revision, &b.id)));
+        let disputes = filtered_values(&self.disputes, |value| {
+            !specialist && selected_ids.contains(value.team_id.as_str())
+        });
+        let role_assignments = filtered_values(&self.role_assignments, |value| {
+            !specialist && selected_ids.contains(value.team_id.as_str())
+        });
+        let agent_states: Vec<&AgentState> = self
+            .agent_states
+            .values()
+            .filter(|state| {
+                !specialist
+                    && self
+                        .actors
+                        .get(&state.actor_id)
+                        .and_then(|agent| agent.team_id.as_deref())
+                        .is_some_and(|team| selected_ids.contains(team))
+            })
+            .collect();
+        let usage: Vec<Value> = selected_ids
+            .iter()
+            .filter(|_| !specialist)
+            .map(|team| self.team_usage_view(team))
+            .collect();
+        // Notes say whether they still hold, so a client never shows a stale one as current.
+        let context_notes: Vec<Value> = self
+            .context_notes
+            .values()
+            .filter(|note| !specialist && selected_ids.contains(note.team_id.as_str()))
+            .map(|note| {
+                let validity = match self.note_validity(note, wall_clock()) {
+                    memory::Validity::Current => json!({"state": "current"}),
+                    memory::Validity::Stale(reason) => json!({"state": "stale", "reason": reason}),
+                };
+                json!({"note": note, "validity": validity})
+            })
+            .collect();
         let bindings = filtered_values(&self.pane_bindings, |value| {
             !specialist
                 && self
@@ -1124,6 +1350,11 @@ impl State {
                 .filter(|notice| notice.status == portfolio::NoticeStatus::Open)
                 .map(|notice| notice.id.as_str())
                 .collect::<Vec<_>>(),
+            "escalated_disputes": disputes
+                .iter()
+                .filter(|d| matches!(d.status, oversight::DisputeStatus::Escalated { .. }))
+                .map(|d| d.id.as_str())
+                .collect::<Vec<_>>(),
             "merge_unknown": integrations
                 .iter()
                 .filter(|item| matches!(item.status, portfolio::IntegrationStatus::MergeUnknown { .. }))
@@ -1156,6 +1387,12 @@ impl State {
             "conflicts": conflicts,
             "notices": notices,
             "bindings": bindings,
+            "disputes": disputes,
+            "role_assignments": role_assignments,
+            "agent_states": agent_states,
+            "usage": usage,
+            "context_notes": context_notes,
+            "providers": self.providers.values().collect::<Vec<_>>(),
             "attention": attention,
         }))
     }
@@ -1429,6 +1666,7 @@ impl State {
                 title,
                 body,
                 evidence,
+                knowledge_kind: kind,
             } => self.put_knowledge(
                 actor,
                 team_id,
@@ -1437,6 +1675,7 @@ impl State {
                 title,
                 body,
                 evidence,
+                kind,
                 revision,
             ),
             Command::RecordDispatchReceipt {
@@ -1661,6 +1900,154 @@ impl State {
             Command::UnbindAgentPane { actor_id } => {
                 self.unbind_agent_pane(actor, actor_id, revision)
             }
+            Command::DeclareProvider {
+                provider_id,
+                label,
+                capabilities,
+                models,
+                metering,
+                hard_spend_limit,
+            } => self.declare_provider(
+                actor,
+                provider_id,
+                label,
+                capabilities,
+                models,
+                metering,
+                hard_spend_limit,
+                revision,
+            ),
+            Command::SetRolePreference {
+                role_key,
+                provider_id,
+                model_id,
+            } => self.set_role_preference(actor, role_key, provider_id, model_id, revision),
+            Command::AssignRoleProvider {
+                team_id,
+                role_key,
+                provider_id,
+                model_id,
+            } => {
+                self.assign_role_provider(actor, team_id, role_key, provider_id, model_id, revision)
+            }
+            Command::ReassignRoleProvider {
+                team_id,
+                role_key,
+                provider_id,
+                model_id,
+                approval_id,
+            } => self.reassign_role_provider(
+                actor,
+                team_id,
+                role_key,
+                provider_id,
+                model_id,
+                approval_id,
+                revision,
+            ),
+            Command::ProposePlan { plan_id, goal } => {
+                self.propose_plan(actor, plan_id, goal, revision)
+            }
+            Command::EditPlan { plan_id, edits } => self.edit_plan(actor, plan_id, edits, revision),
+            Command::DiscardPlan { plan_id } => self.discard_plan(actor, plan_id, revision),
+            Command::MarkPlanLaunched { plan_id, team_id } => {
+                self.mark_plan_launched(actor, plan_id, team_id, revision)
+            }
+            Command::PutContextNote {
+                team_id,
+                note_id,
+                note_kind: kind,
+                role_key,
+                summary,
+                sources,
+                valid_for_seconds,
+            } => self.put_context_note(
+                actor,
+                team_id,
+                note_id,
+                kind,
+                role_key,
+                summary,
+                sources,
+                valid_for_seconds,
+                revision,
+            ),
+            Command::SupersedeContextNote {
+                note_id,
+                by_note_id,
+            } => self.supersede_context_note(actor, note_id, by_note_id, revision),
+            Command::AcceptKnowledge { knowledge_id } => {
+                self.accept_knowledge(actor, knowledge_id, revision)
+            }
+            Command::SupersedeKnowledge {
+                knowledge_id,
+                by_id,
+            } => self.supersede_knowledge(actor, knowledge_id, by_id, revision),
+            Command::RaiseDispute {
+                dispute_id,
+                team_id,
+                task_id,
+                topic,
+                architectural,
+                position,
+                evidence,
+            } => self.raise_dispute(
+                actor,
+                dispute_id,
+                team_id,
+                task_id,
+                topic,
+                architectural,
+                position,
+                evidence,
+                revision,
+            ),
+            Command::RespondDispute {
+                dispute_id,
+                position,
+                evidence,
+            } => self.respond_dispute(actor, dispute_id, position, evidence, revision),
+            Command::ResolveDispute {
+                dispute_id,
+                resolution,
+            } => self.resolve_dispute(actor, dispute_id, resolution, revision),
+            Command::DecideDispute {
+                dispute_id,
+                decision,
+            } => self.decide_dispute(actor, dispute_id, decision, revision),
+            Command::ReportUsage {
+                team_id,
+                provider_id,
+                input_tokens,
+                output_tokens,
+                cost_micros,
+                basis,
+            } => self.report_usage(
+                actor,
+                team_id,
+                provider_id,
+                input_tokens,
+                output_tokens,
+                cost_micros,
+                basis,
+                revision,
+            ),
+            Command::SetTeamLimits {
+                team_id,
+                max_metered_cost_micros,
+                max_metered_tokens,
+            } => self.set_team_limits(
+                actor,
+                team_id,
+                max_metered_cost_micros,
+                max_metered_tokens,
+                revision,
+            ),
+            Command::SetAgentState {
+                actor_id,
+                state,
+                reason,
+            } => self.set_agent_state(actor, actor_id, state, reason, revision),
         }
     }
 
@@ -2078,6 +2465,8 @@ impl State {
             return Err(Error::new("already_exists", "message already exists"));
         }
         let dependencies = self.validated_dependencies(&team_id, &task_id, dependencies)?;
+        self.ensure_room_for_task(&team_id)?;
+        self.ensure_depth_within_limit(&task_id, &dependencies)?;
         self.ensure_dispatch_intent_available(&dispatch)?;
         self.ensure_target_run(&developer_id, dispatch.run_generation)?;
 
@@ -2090,6 +2479,7 @@ impl State {
             dependencies,
             status: TaskStatus::Assigned,
             revision,
+            updated_at: self.now,
         };
         let message = Message {
             id: assignment_message_id.clone(),
@@ -2159,6 +2549,7 @@ impl State {
             ));
         }
         let dependencies = self.validated_dependencies(&team_id, &task_id, dependencies)?;
+        self.ensure_depth_within_limit(&task_id, &dependencies)?;
         let previous = self
             .tasks
             .get_mut(&task_id)
@@ -2197,6 +2588,7 @@ impl State {
         let team = self
             .require_team_actor(actor, &team_id, Role::Developer)?
             .clone();
+        self.ensure_room_to_start(&team_id)?;
         validate_id("acceptance_id", &acceptance_id)?;
         validate_text("acceptance note", &note, MAX_MESSAGE_BYTES, false)?;
         if self.acceptances.contains_key(&acceptance_id) {
@@ -2819,6 +3211,7 @@ impl State {
         title: String,
         body: String,
         evidence: Vec<Evidence>,
+        kind: KnowledgeKind,
         revision: u64,
     ) -> Result<Applied> {
         let team = self.require_team_member_or_owner(actor, &team_id)?.clone();
@@ -2871,6 +3264,13 @@ impl State {
             title,
             body,
             evidence,
+            kind,
+            // Only the Owner can make a requirement or an ADR count; notes need no acceptance.
+            status: if kind == KnowledgeKind::Note {
+                KnowledgeStatus::Accepted
+            } else {
+                KnowledgeStatus::Proposed
+            },
             revision,
         };
         self.knowledge.insert(knowledge_id.clone(), entry.clone());
@@ -3269,6 +3669,8 @@ impl State {
         attempt_number: u8,
         revision: u64,
     ) -> Result<DispatchAttempt> {
+        self.ensure_agent_available(target_actor_id)?;
+        self.ensure_within_usage_limits(team_id)?;
         Ok(DispatchAttempt {
             id: dispatch.attempt_id,
             team_id: team_id.to_owned(),
@@ -3309,6 +3711,10 @@ impl State {
             + self.conflicts.len()
             + self.notices.len()
             + self.pane_bindings.len()
+            + self.providers.len()
+            + self.plans.len()
+            + self.context_notes.len()
+            + self.disputes.len()
             + self.events.len();
         if records > MAX_RECORDS {
             return Err(Error::new(
@@ -3340,6 +3746,9 @@ impl State {
         self.validate_governance()?;
         self.validate_portfolio()?;
         self.validate_bindings()?;
+        self.validate_planning()?;
+        self.validate_memory()?;
+        self.validate_oversight()?;
         match self.actors.get(OWNER_ID) {
             Some(owner) if owner.role == Role::Owner => {}
             _ => return Err(corrupt("owner actor is missing")),
@@ -3493,6 +3902,13 @@ fn message_visible_to(viewer: &Actor, message: &Message) -> bool {
         Audience::Role { role } => viewer.role == *role,
         Audience::Actor { actor_id } => &viewer.id == actor_id,
     }
+}
+
+/// Seconds since the epoch, for validity windows when a snapshot is read.
+fn wall_clock() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |elapsed| elapsed.as_secs())
 }
 
 fn applied(
@@ -4773,6 +5189,7 @@ mod tests {
                     title: "ADR-1".into(),
                     body: "use queues".into(),
                     evidence: vec![],
+                    knowledge_kind: KnowledgeKind::Note,
                 },
             )
             .unwrap();
@@ -4788,6 +5205,7 @@ mod tests {
                     title: "private".into(),
                     body: "wip".into(),
                     evidence: vec![],
+                    knowledge_kind: KnowledgeKind::Note,
                 },
             )
             .unwrap();
@@ -6105,5 +6523,1468 @@ mod tests {
             event.compute_hash(),
             "the restriction is covered by the chain"
         );
+    }
+    // ---- Phase 6: planning, memory, disputes, usage, controls --------------------------------
+
+    fn declare(
+        state: &mut State,
+        owner: &Actor,
+        id: &str,
+        caps: &[&str],
+        metering: Metering,
+        hard: bool,
+    ) {
+        state
+            .execute(
+                owner,
+                Command::DeclareProvider {
+                    provider_id: id.into(),
+                    label: id.into(),
+                    capabilities: caps.iter().map(|c| c.to_string()).collect(),
+                    models: vec![ModelDecl {
+                        id: "m1".into(),
+                        capabilities: vec![],
+                    }],
+                    metering,
+                    hard_spend_limit: hard,
+                },
+            )
+            .unwrap();
+    }
+
+    fn plan_for(state: &State, goal: &str) -> planning::Plan {
+        state.plan_goal("p", goal, 1)
+    }
+
+    #[test]
+    fn the_planner_explains_every_decision_and_proposes_specialists_only_for_named_gaps() {
+        let (state, _owner, _lead, _dev, _qa) = launched();
+        let oauth = plan_for(
+            &state,
+            "Add OAuth state validation tests for the Google sign-in flow and document it",
+        );
+        let keys: Vec<&str> = oauth.tasks.iter().map(|t| t.key.as_str()).collect();
+        assert_eq!(keys, ["implement", "tests", "docs"]);
+        assert_eq!(oauth.tasks[2].depends_on, ["tests"]);
+        let specialists: Vec<&str> = oauth
+            .recruitments
+            .iter()
+            .map(|r| r.specialty.as_str())
+            .collect();
+        assert_eq!(
+            specialists,
+            ["security"],
+            "OAuth is a security skill the core roles lack"
+        );
+        assert!(oauth.recruitments[0]
+            .because
+            .iter()
+            .any(|b| b.contains("'oauth'")));
+        assert_eq!(oauth.recruitments[0].after_task.as_deref(), Some("tests"));
+        assert!(oauth
+            .explanations
+            .iter()
+            .any(|e| e.decision == "specialist: security" && e.because.len() >= 2));
+        // A goal naming no outside skill gets no specialist, and says so.
+        let typo = plan_for(&state, "Fix the typo in the README");
+        assert!(typo.recruitments.is_empty());
+        assert!(typo
+            .explanations
+            .iter()
+            .any(|e| e.decision == "no specialists"));
+        // An interface migration gets a design step and an architecture review, but not a security one.
+        let migration = plan_for(&state, "Migrate the API schema to the new protocol design");
+        assert_eq!(migration.tasks[0].key, "design");
+        assert_eq!(migration.tasks[1].depends_on, ["design"]);
+        assert_eq!(
+            migration
+                .recruitments
+                .iter()
+                .map(|r| r.specialty.as_str())
+                .collect::<Vec<_>>(),
+            ["architect"]
+        );
+        assert_eq!(planning::plan_depth(&migration.tasks), Some(3));
+        // The same goal and declarations always give the same plan.
+        assert_eq!(
+            plan_for(&state, "Add OAuth tests"),
+            plan_for(&state, "Add OAuth tests")
+        );
+        // Nothing it says claims verification or a cost.
+        assert!(oauth.warnings.iter().any(|w| w.contains("not verified")));
+        assert!(oauth
+            .warnings
+            .iter()
+            .any(|w| w.contains("Nothing here estimates cost")));
+    }
+
+    #[test]
+    fn providers_are_chosen_from_declarations_and_preferences_never_from_assumed_cost() {
+        let (mut state, owner, _lead, _dev, _qa) = launched();
+        // No providers yet: nothing is assumed, and the plan says to assign by hand.
+        let none = plan_for(&state, "Add OAuth tests");
+        assert!(none.roles.iter().all(|r| r.provider_id.is_none()));
+        assert!(none
+            .warnings
+            .iter()
+            .any(|w| w.contains("no providers are declared")));
+        declare(
+            &mut state,
+            &owner,
+            "aaa-reviewer",
+            &["review"],
+            Metering::Metered,
+            true,
+        );
+        declare(
+            &mut state,
+            &owner,
+            "bbb-coder",
+            &["code_edit", "shell"],
+            Metering::Estimated,
+            false,
+        );
+        let chosen = |plan: &planning::Plan, role: &str| {
+            plan.roles
+                .iter()
+                .find(|r| r.role_key == role)
+                .unwrap()
+                .provider_id
+                .clone()
+        };
+        let plan = plan_for(&state, "Add OAuth tests");
+        assert_eq!(
+            chosen(&plan, "developer").as_deref(),
+            Some("bbb-coder"),
+            "the first declared provider with code_edit"
+        );
+        assert_eq!(
+            chosen(&plan, "lead").as_deref(),
+            Some("aaa-reviewer"),
+            "a lead needs nothing, so the first declared one"
+        );
+        assert_eq!(
+            plan.recruitments[0].provider_id.as_deref(),
+            Some("aaa-reviewer"),
+            "the reviewer offers review"
+        );
+        // A preference wins when the provider is declared to offer what the role needs...
+        state
+            .execute(
+                &owner,
+                Command::SetRolePreference {
+                    role_key: "developer".into(),
+                    provider_id: "bbb-coder".into(),
+                    model_id: Some("m1".into()),
+                },
+            )
+            .unwrap();
+        let pref = plan_for(&state, "Add OAuth tests");
+        assert_eq!(
+            pref.roles
+                .iter()
+                .find(|r| r.role_key == "developer")
+                .unwrap()
+                .rationale
+                .contains("your preference"),
+            true
+        );
+        // ...and is ignored, with the fallback explained, when it is not.
+        state
+            .execute(
+                &owner,
+                Command::SetRolePreference {
+                    role_key: "qa".into(),
+                    provider_id: "aaa-reviewer".into(),
+                    model_id: None,
+                },
+            )
+            .unwrap();
+        let qa = plan_for(&state, "Add OAuth tests")
+            .roles
+            .into_iter()
+            .find(|r| r.role_key == "qa")
+            .unwrap();
+        assert_eq!(
+            qa.provider_id.as_deref(),
+            Some("bbb-coder"),
+            "the reviewer is not declared to offer shell"
+        );
+        // Declarations are validated, and are never marked verified.
+        assert_eq!(
+            state
+                .execute(
+                    &owner,
+                    Command::SetRolePreference {
+                        role_key: "qa".into(),
+                        provider_id: "ghost".into(),
+                        model_id: None
+                    }
+                )
+                .unwrap_err()
+                .code,
+            "not_found"
+        );
+        assert_eq!(
+            state
+                .execute(
+                    &owner,
+                    Command::SetRolePreference {
+                        role_key: "boss".into(),
+                        provider_id: "bbb-coder".into(),
+                        model_id: None
+                    }
+                )
+                .unwrap_err()
+                .code,
+            "invalid_params"
+        );
+        assert!(state.providers.values().all(|p| !p.verified));
+        state.validate().unwrap();
+    }
+
+    #[test]
+    fn plans_are_edited_before_launch_within_bounds() {
+        let (mut state, owner, _lead, _dev, _qa) = launched();
+        declare(
+            &mut state,
+            &owner,
+            "coder",
+            &["code_edit", "shell", "review"],
+            Metering::Metered,
+            true,
+        );
+        state
+            .execute(
+                &owner,
+                Command::ProposePlan {
+                    plan_id: "p1".into(),
+                    goal: "Add OAuth tests and document them".into(),
+                },
+            )
+            .unwrap();
+        let edit = |state: &mut State, edits: Vec<PlanEdit>| {
+            state.execute(
+                &owner,
+                Command::EditPlan {
+                    plan_id: "p1".into(),
+                    edits,
+                },
+            )
+        };
+        edit(
+            &mut state,
+            vec![
+                PlanEdit::RemoveTask { key: "docs".into() },
+                PlanEdit::RenameTeam {
+                    name: "Auth team".into(),
+                },
+                PlanEdit::DropRecruitment {
+                    key: "security".into(),
+                },
+            ],
+        )
+        .unwrap();
+        let plan = &state.plans["p1"];
+        assert!(plan.tasks.iter().find(|t| t.key == "docs").unwrap().removed);
+        assert_eq!(
+            (plan.draft.name.as_str(), plan.recruitments[0].dropped),
+            ("Auth team", true)
+        );
+        // Edits that would break the graph are refused and change nothing.
+        assert_eq!(
+            edit(
+                &mut state,
+                vec![PlanEdit::SetTaskDependencies {
+                    key: "implement".into(),
+                    depends_on: vec!["tests".into()]
+                }]
+            )
+            .unwrap_err()
+            .code,
+            "dependency_cycle"
+        );
+        assert_eq!(
+            edit(
+                &mut state,
+                vec![PlanEdit::SetTaskDependencies {
+                    key: "tests".into(),
+                    depends_on: vec!["docs".into()]
+                }]
+            )
+            .unwrap_err()
+            .code,
+            "dependency_cycle",
+            "a removed task cannot be depended on"
+        );
+        let mut chain = Vec::new();
+        for i in 0..8 {
+            chain.push(PlanEdit::AddTask {
+                key: format!("c{i}"),
+                title: format!("step {i}"),
+                description: "d".into(),
+                depends_on: if i == 0 {
+                    vec!["tests".into()]
+                } else {
+                    vec![format!("c{}", i - 1)]
+                },
+            });
+        }
+        let error = edit(&mut state, chain).unwrap_err();
+        assert!(
+            matches!(error.code, "task_depth_limit" | "capacity_exceeded"),
+            "{}",
+            error.code
+        );
+        assert!(
+            !state.plans["p1"].tasks.iter().any(|t| t.key == "c0"),
+            "a refused batch leaves the plan as it was"
+        );
+        assert_eq!(
+            edit(
+                &mut state,
+                vec![PlanEdit::SetRoleProvider {
+                    role_key: "developer".into(),
+                    provider_id: "ghost".into(),
+                    model_id: None
+                }]
+            )
+            .unwrap_err()
+            .code,
+            "not_found"
+        );
+        edit(
+            &mut state,
+            vec![PlanEdit::SetRoleProvider {
+                role_key: "developer".into(),
+                provider_id: "coder".into(),
+                model_id: Some("m1".into()),
+            }],
+        )
+        .unwrap();
+        // Only the Owner edits; a discarded plan is final.
+        let lead = state.authenticate(&digest('1')).unwrap();
+        assert_eq!(
+            state
+                .execute(
+                    &lead,
+                    Command::EditPlan {
+                        plan_id: "p1".into(),
+                        edits: vec![PlanEdit::RenameTeam { name: "x".into() }]
+                    }
+                )
+                .unwrap_err()
+                .code,
+            "forbidden"
+        );
+        state
+            .execute(
+                &owner,
+                Command::DiscardPlan {
+                    plan_id: "p1".into(),
+                },
+            )
+            .unwrap();
+        assert_eq!(
+            edit(&mut state, vec![PlanEdit::RenameTeam { name: "y".into() }])
+                .unwrap_err()
+                .code,
+            "invalid_state"
+        );
+        state.validate().unwrap();
+    }
+
+    #[test]
+    fn a_lead_changes_a_provider_mid_run_only_with_an_owner_approval_for_exactly_that() {
+        let (mut state, owner, lead, _dev, _qa) = launched();
+        declare(
+            &mut state,
+            &owner,
+            "coder",
+            &["code_edit", "shell"],
+            Metering::Metered,
+            true,
+        );
+        declare(
+            &mut state,
+            &owner,
+            "other",
+            &["code_edit"],
+            Metering::Estimated,
+            false,
+        );
+        declare(
+            &mut state,
+            &owner,
+            "reviewer",
+            &["review"],
+            Metering::Metered,
+            true,
+        );
+        let reassign = |state: &mut State, provider: &str, approval: &str, now: u64| {
+            state.execute_at(
+                &lead,
+                Command::ReassignRoleProvider {
+                    team_id: "t".into(),
+                    role_key: "developer".into(),
+                    provider_id: provider.into(),
+                    model_id: Some("m1".into()),
+                    approval_id: approval.into(),
+                },
+                now,
+            )
+        };
+        assert_eq!(
+            reassign(&mut state, "coder", "ap-1", 100).unwrap_err().code,
+            "not_found",
+            "no approval, no change"
+        );
+        let approve = |state: &mut State, id: &str, provider: &str| {
+            state
+                .execute_at(
+                    &lead,
+                    Command::RequestApproval {
+                        approval_id: id.into(),
+                        team_id: "t".into(),
+                        action: planning::reassign_action("t", "developer", provider, Some("m1")),
+                        justification: "swap the developer's provider".into(),
+                        alternatives: vec![],
+                        risks: vec!["different tool behavior".into()],
+                        ttl_seconds: 600,
+                    },
+                    100,
+                )
+                .unwrap();
+            state
+                .execute_at(
+                    &owner,
+                    Command::DecideApproval {
+                        approval_id: id.into(),
+                        approve: true,
+                        rationale: "ok".into(),
+                    },
+                    101,
+                )
+                .unwrap();
+        };
+        approve(&mut state, "ap-1", "coder");
+        // The approval names coder; asking for another provider with it is refused and spends nothing.
+        assert_eq!(
+            reassign(&mut state, "other", "ap-1", 102).unwrap_err().code,
+            "approval_mismatch"
+        );
+        reassign(&mut state, "coder", "ap-1", 102).unwrap();
+        assert_eq!(state.role_assignments["t:developer"].provider_id, "coder");
+        assert_eq!(
+            reassign(&mut state, "coder", "ap-1", 103).unwrap_err().code,
+            "approval_used"
+        );
+        // A provider not declared to offer what the role needs is refused even with an approval.
+        approve(&mut state, "ap-2", "reviewer");
+        assert_eq!(
+            reassign(&mut state, "reviewer", "ap-2", 104)
+                .unwrap_err()
+                .code,
+            "capability_missing"
+        );
+        // And an expired approval does not count.
+        approve(&mut state, "ap-3", "other");
+        assert_eq!(
+            reassign(&mut state, "other", "ap-3", 100 + 602)
+                .unwrap_err()
+                .code,
+            "approval_expired"
+        );
+        assert_eq!(state.role_assignments["t:developer"].provider_id, "coder");
+        state.validate().unwrap();
+    }
+
+    #[test]
+    fn memory_serves_accepted_requirements_exact_evidence_and_never_chat() {
+        let (mut state, owner, lead, dev, qa) = launched();
+        let (lead2, _d2, _q2) = add_team(&mut state, &owner, 2);
+        create_task(&mut state, &lead, "task", &[]).unwrap();
+        state
+            .execute(
+                &lead,
+                Command::AppendChat {
+                    team_id: "t".into(),
+                    message_id: "gossip".into(),
+                    body: "the secret plan is plan-zebra".into(),
+                    task_id: Some("task".into()),
+                    audience: Audience::Actor {
+                        actor_id: "qa".into(),
+                    },
+                },
+            )
+            .unwrap();
+        state
+            .execute(
+                &lead,
+                Command::PutKnowledge {
+                    team_id: "t".into(),
+                    knowledge_id: "adr-1".into(),
+                    scope: KnowledgeScope::Team {
+                        team_id: "t".into(),
+                    },
+                    title: "Use state parameters".into(),
+                    body: "Every OAuth request carries a random state.".into(),
+                    evidence: vec![],
+                    knowledge_kind: KnowledgeKind::Adr,
+                },
+            )
+            .unwrap();
+        let memory = |state: &State, who: &Actor, budget: usize| {
+            state.retrieve_memory(who, Some("t"), Some("task"), budget, 1_000)
+        };
+        // Proposed is not accepted: agents are not told about it yet.
+        assert_eq!(
+            memory(&state, &dev, 8192).unwrap()["context"]["requirements"],
+            json!([])
+        );
+        assert_eq!(
+            state
+                .execute(
+                    &lead,
+                    Command::AcceptKnowledge {
+                        knowledge_id: "adr-1".into()
+                    }
+                )
+                .unwrap_err()
+                .code,
+            "forbidden"
+        );
+        state
+            .execute(
+                &owner,
+                Command::AcceptKnowledge {
+                    knowledge_id: "adr-1".into(),
+                },
+            )
+            .unwrap();
+        // Run the task to a QA review so there is exact evidence to hand over.
+        state
+            .execute(
+                &dev,
+                Command::AcceptTask {
+                    team_id: "t".into(),
+                    task_id: "task".into(),
+                    acceptance_id: "acc".into(),
+                    note: "go".into(),
+                },
+            )
+            .unwrap();
+        let exact = vec![
+            Evidence {
+                kind: EvidenceKind::Commit,
+                reference: "deadbeef00".into(),
+                digest: Some("a".repeat(64)),
+            },
+            Evidence {
+                kind: EvidenceKind::Test,
+                reference: "go test ./... ok".into(),
+                digest: None,
+            },
+        ];
+        state
+            .execute(
+                &dev,
+                Command::SubmitHandoff {
+                    team_id: "t".into(),
+                    task_id: "task".into(),
+                    handoff_id: "h".into(),
+                    message_id: "m-h".into(),
+                    summary: "done".into(),
+                    evidence: exact.clone(),
+                    dispatch: intent("a-h", 1),
+                },
+            )
+            .unwrap();
+        state
+            .execute(
+                &qa,
+                Command::ReviewHandoff {
+                    team_id: "t".into(),
+                    task_id: "task".into(),
+                    handoff_id: "h".into(),
+                    decision_id: "q".into(),
+                    message_id: "m-q".into(),
+                    verdict: QaVerdict::Accept,
+                    rationale: "evidence checked".into(),
+                    evidence: evidence(),
+                    rework_dispatch: None,
+                },
+            )
+            .unwrap();
+        let pack = memory(&state, &dev, 8192).unwrap();
+        assert_eq!(pack["context"]["requirements"][0]["id"], "adr-1");
+        assert_eq!(
+            pack["context"]["requirements"][0]["provenance"]["accepted"],
+            true
+        );
+        assert_eq!(
+            pack["context"]["handoff"][0]["evidence"],
+            serde_json::to_value(&exact).unwrap(),
+            "evidence arrives exactly as submitted"
+        );
+        assert_eq!(pack["context"]["reviews"][0]["body"], "evidence checked");
+        assert_eq!(pack["context"]["task"][0]["provenance"]["kind"], "task");
+        assert!(
+            !pack.to_string().contains("plan-zebra"),
+            "no chat, scoped or otherwise, reaches an agent's context"
+        );
+        assert!(pack["never_included"].as_str().unwrap().contains("chat"));
+        assert!(pack["used_bytes"].as_u64().unwrap() <= pack["budget_bytes"].as_u64().unwrap());
+        // A small budget drops whole items and counts them; nothing is cut in the middle.
+        let tight = memory(&state, &dev, 700).unwrap();
+        assert!(tight["used_bytes"].as_u64().unwrap() <= 700);
+        assert!(
+            tight["omitted_for_budget"]
+                .as_object()
+                .is_some_and(|o| !o.is_empty()),
+            "{tight}"
+        );
+        for item in tight["context"]["handoff"].as_array().unwrap() {
+            assert_eq!(
+                item["evidence"],
+                serde_json::to_value(&exact).unwrap(),
+                "an included handoff is whole"
+            );
+        }
+        // Boundaries: another team's agent, and a budget outside the limits.
+        assert_eq!(
+            state
+                .retrieve_memory(&lead2, Some("t"), Some("task"), 8192, 1)
+                .unwrap_err()
+                .code,
+            "forbidden"
+        );
+        assert_eq!(memory(&state, &dev, 0).unwrap_err().code, "invalid_params");
+        assert_eq!(
+            memory(&state, &dev, MAX_BUDGET + 1).unwrap_err().code,
+            "invalid_params"
+        );
+        assert_eq!(
+            state
+                .retrieve_memory(&owner, None, None, 100, 1)
+                .unwrap_err()
+                .code,
+            "invalid_params"
+        );
+    }
+
+    #[test]
+    fn a_summary_goes_stale_when_what_it_describes_changes_and_is_then_left_out() {
+        let (mut state, owner, lead, dev, _qa) = launched();
+        create_task(&mut state, &lead, "task", &[]).unwrap();
+        let note = |state: &mut State, id: &str, seconds: Option<u64>| {
+            state.execute_at(
+                &lead,
+                Command::PutContextNote {
+                    team_id: "t".into(),
+                    note_id: id.into(),
+                    note_kind: NoteKind::Summary,
+                    role_key: None,
+                    summary: format!("summary {id}"),
+                    sources: vec![SourceRef {
+                        kind: SourceKind::Task,
+                        id: "task".into(),
+                    }],
+                    valid_for_seconds: seconds,
+                },
+                1_000,
+            )
+        };
+        assert_eq!(
+            state
+                .execute(
+                    &lead,
+                    Command::PutContextNote {
+                        team_id: "t".into(),
+                        note_id: "n0".into(),
+                        note_kind: NoteKind::Summary,
+                        role_key: None,
+                        summary: "no sources".into(),
+                        sources: vec![],
+                        valid_for_seconds: None
+                    }
+                )
+                .unwrap_err()
+                .code,
+            "invalid_params",
+            "a summary without provenance is refused"
+        );
+        note(&mut state, "n1", None).unwrap();
+        note(&mut state, "n-timed", Some(60)).unwrap();
+        let served = |state: &State, now: u64| -> (Vec<String>, Vec<String>) {
+            let pack = state
+                .retrieve_memory(&lead, Some("t"), Some("task"), 8192, now)
+                .unwrap();
+            let ids = |v: &Value| {
+                v.as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|n| n["id"].as_str().unwrap().to_owned())
+                    .collect::<Vec<_>>()
+            };
+            (
+                ids(&pack["context"]["notes"]),
+                ids(&pack["excluded_as_stale"]),
+            )
+        };
+        let (current, stale) = served(&state, 1_010);
+        assert_eq!((current.len(), stale.len()), (2, 0));
+        // The validity window ends.
+        let (current, stale) = served(&state, 1_061);
+        assert_eq!(
+            (current, stale),
+            (vec!["n1".to_owned()], vec!["n-timed".to_owned()])
+        );
+        // The task moves on: both notes now describe something that is no longer so.
+        state
+            .execute(
+                &dev,
+                Command::AcceptTask {
+                    team_id: "t".into(),
+                    task_id: "task".into(),
+                    acceptance_id: "acc".into(),
+                    note: "go".into(),
+                },
+            )
+            .unwrap();
+        let (current, stale) = served(&state, 1_010);
+        assert!(
+            current.is_empty() && stale.len() == 2,
+            "{current:?} {stale:?}"
+        );
+        let pack = state
+            .retrieve_memory(&lead, Some("t"), Some("task"), 8192, 1_010)
+            .unwrap();
+        assert!(pack["excluded_as_stale"][0]["reason"]
+            .as_str()
+            .unwrap()
+            .contains("changed at revision"));
+        // A fresh note is current; superseding retires the old one for good.
+        note(&mut state, "n2", None).unwrap();
+        assert_eq!(served(&state, 1_010).0, ["n2"]);
+        state
+            .execute(
+                &lead,
+                Command::SupersedeContextNote {
+                    note_id: "n2".into(),
+                    by_note_id: "n1".into(),
+                },
+            )
+            .unwrap();
+        assert!(served(&state, 1_010).0.is_empty());
+        let reason = state.note_validity(&state.context_notes["n2"], 1_010);
+        assert!(matches!(reason, memory::Validity::Stale(r) if r.contains("superseded")));
+        // Sources must be the team's own records.
+        assert_eq!(
+            state
+                .execute(
+                    &lead,
+                    Command::PutContextNote {
+                        team_id: "t".into(),
+                        note_id: "n9".into(),
+                        note_kind: NoteKind::Summary,
+                        role_key: None,
+                        summary: "x".into(),
+                        sources: vec![SourceRef {
+                            kind: SourceKind::Task,
+                            id: "nope".into()
+                        }],
+                        valid_for_seconds: None
+                    }
+                )
+                .unwrap_err()
+                .code,
+            "invalid_reference"
+        );
+        state.validate().unwrap();
+        let _ = owner;
+    }
+
+    fn evid(reference: &str) -> Evidence {
+        Evidence {
+            kind: EvidenceKind::Note,
+            reference: reference.into(),
+            digest: None,
+        }
+    }
+
+    #[test]
+    fn disagreements_are_bounded_reviewed_by_peers_and_escalated_instead_of_looping() {
+        let (mut state, owner, lead, dev, qa) = launched();
+        create_task(&mut state, &lead, "task", &[]).unwrap();
+        let raise =
+            |state: &mut State, who: &Actor, id: &str, topic: &str, arch: bool, refs: &[&str]| {
+                state.execute(
+                    who,
+                    Command::RaiseDispute {
+                        dispute_id: id.into(),
+                        team_id: "t".into(),
+                        task_id: Some("task".into()),
+                        topic: topic.into(),
+                        architectural: arch,
+                        position: "my view".into(),
+                        evidence: refs.iter().map(|r| evid(r)).collect(),
+                    },
+                )
+            };
+        // Two distinct pieces of conflicting evidence, or it is not a dispute.
+        assert_eq!(
+            raise(&mut state, &dev, "d0", "len", false, &["only-one"])
+                .unwrap_err()
+                .code,
+            "invalid_params"
+        );
+        assert_eq!(
+            raise(&mut state, &dev, "d0", "len", false, &["same", "same"])
+                .unwrap_err()
+                .code,
+            "invalid_params"
+        );
+        raise(
+            &mut state,
+            &dev,
+            "d1",
+            "state length",
+            false,
+            &["rfc", "test-a"],
+        )
+        .unwrap();
+        assert_eq!(state.disputes["d1"].status, oversight::DisputeStatus::Open);
+        // The Lead cannot settle it before a peer has weighed in; the raiser cannot answer themselves.
+        assert_eq!(
+            state
+                .execute(
+                    &lead,
+                    Command::ResolveDispute {
+                        dispute_id: "d1".into(),
+                        resolution: "x".into()
+                    }
+                )
+                .unwrap_err()
+                .code,
+            "invalid_state"
+        );
+        assert_eq!(
+            state
+                .execute(
+                    &dev,
+                    Command::RespondDispute {
+                        dispute_id: "d1".into(),
+                        position: "again".into(),
+                        evidence: vec![]
+                    }
+                )
+                .unwrap_err()
+                .code,
+            "already_exists"
+        );
+        state
+            .execute(
+                &qa,
+                Command::RespondDispute {
+                    dispute_id: "d1".into(),
+                    position: "16 bytes is enough".into(),
+                    evidence: vec![evid("test-b")],
+                },
+            )
+            .unwrap();
+        // The third position ends peer review: it is escalated, not extended.
+        state
+            .execute(
+                &lead,
+                Command::RespondDispute {
+                    dispute_id: "d1".into(),
+                    position: "I see both".into(),
+                    evidence: vec![],
+                },
+            )
+            .unwrap();
+        assert!(matches!(
+            state.disputes["d1"].status,
+            oversight::DisputeStatus::Escalated { .. }
+        ));
+        assert_eq!(state.disputes["d1"].positions.len(), MAX_POSITIONS);
+        assert_eq!(
+            state
+                .execute(
+                    &owner,
+                    Command::RespondDispute {
+                        dispute_id: "d1".into(),
+                        position: "more".into(),
+                        evidence: vec![]
+                    }
+                )
+                .unwrap_err()
+                .code,
+            "forbidden",
+            "owners decide, they do not join a debate"
+        );
+        let snapshot = state.snapshot(&owner, None).unwrap();
+        assert_eq!(snapshot["disputes"].as_array().map(Vec::len), Some(1));
+        assert_eq!(
+            snapshot["attention"]["escalated_disputes"],
+            json!(["d1"]),
+            "an escalated dispute is waiting for the Owner"
+        );
+        state
+            .execute(
+                &owner,
+                Command::DecideDispute {
+                    dispute_id: "d1".into(),
+                    decision: "use 32 bytes".into(),
+                },
+            )
+            .unwrap();
+        assert!(
+            matches!(&state.disputes["d1"].status, oversight::DisputeStatus::Resolved { by, .. } if by == "owner")
+        );
+        // A settled question stays settled unless there is new evidence.
+        assert_eq!(
+            raise(
+                &mut state,
+                &qa,
+                "d2",
+                "state length",
+                false,
+                &["rfc", "test-a"]
+            )
+            .unwrap_err()
+            .code,
+            "dispute_settled"
+        );
+        raise(
+            &mut state,
+            &qa,
+            "d2",
+            "state length",
+            false,
+            &["rfc", "brand-new-evidence"],
+        )
+        .unwrap();
+        // An architectural question goes straight to the Owner, and the Lead cannot decide it.
+        raise(
+            &mut state,
+            &dev,
+            "d3",
+            "storage layout",
+            true,
+            &["adr-a", "adr-b"],
+        )
+        .unwrap();
+        assert!(matches!(
+            state.disputes["d3"].status,
+            oversight::DisputeStatus::Escalated { .. }
+        ));
+        assert_eq!(
+            state
+                .execute(
+                    &lead,
+                    Command::ResolveDispute {
+                        dispute_id: "d3".into(),
+                        resolution: "x".into()
+                    }
+                )
+                .unwrap_err()
+                .code,
+            "forbidden"
+        );
+        // A Lead settles an ordinary dispute once a peer has answered.
+        state
+            .execute(
+                &dev,
+                Command::RespondDispute {
+                    dispute_id: "d2".into(),
+                    position: "agree".into(),
+                    evidence: vec![],
+                },
+            )
+            .unwrap();
+        state
+            .execute(
+                &lead,
+                Command::ResolveDispute {
+                    dispute_id: "d2".into(),
+                    resolution: "go with it".into(),
+                },
+            )
+            .unwrap();
+        // Unresolved disputes are capped, so a team cannot bury itself in them.
+        for i in 0..MAX_OPEN_DISPUTES {
+            let r = raise(
+                &mut state,
+                &dev,
+                &format!("x{i}"),
+                &format!("topic {i}"),
+                false,
+                &["a", "b"],
+            );
+            if i + 1 < MAX_OPEN_DISPUTES {
+                r.unwrap();
+            } else {
+                assert!(r.is_err());
+            }
+        }
+        state.validate().unwrap();
+    }
+
+    #[test]
+    fn usage_is_split_into_reliable_and_estimated_and_only_reliable_usage_enforces_a_limit() {
+        let (mut state, owner, lead, _dev, _qa) = launched();
+        declare(
+            &mut state,
+            &owner,
+            "billed",
+            &["code_edit", "shell"],
+            Metering::Metered,
+            true,
+        );
+        declare(
+            &mut state,
+            &owner,
+            "guess",
+            &["code_edit", "shell"],
+            Metering::Estimated,
+            false,
+        );
+        declare(
+            &mut state,
+            &owner,
+            "silent",
+            &["code_edit", "shell"],
+            Metering::None,
+            false,
+        );
+        let report = |state: &mut State, provider: &str, basis: UsageBasis, cost: Option<u64>| {
+            state.execute(
+                &owner,
+                Command::ReportUsage {
+                    team_id: "t".into(),
+                    provider_id: provider.into(),
+                    input_tokens: 1000,
+                    output_tokens: 200,
+                    cost_micros: cost,
+                    basis,
+                },
+            )
+        };
+        // Only a provider declared as metered can report metered usage, and it must say what it cost.
+        assert_eq!(
+            report(&mut state, "guess", UsageBasis::Metered, Some(5))
+                .unwrap_err()
+                .code,
+            "invalid_state"
+        );
+        assert_eq!(
+            report(&mut state, "billed", UsageBasis::Metered, None)
+                .unwrap_err()
+                .code,
+            "invalid_params"
+        );
+        assert_eq!(
+            state
+                .execute(
+                    &lead,
+                    Command::ReportUsage {
+                        team_id: "t".into(),
+                        provider_id: "billed".into(),
+                        input_tokens: 1,
+                        output_tokens: 1,
+                        cost_micros: Some(1),
+                        basis: UsageBasis::Metered
+                    }
+                )
+                .unwrap_err()
+                .code,
+            "forbidden"
+        );
+        report(&mut state, "billed", UsageBasis::Metered, Some(2_000)).unwrap();
+        report(&mut state, "guess", UsageBasis::Estimated, Some(9_000_000)).unwrap();
+        let view = state.team_usage_view("t");
+        assert_eq!(view["reliable"]["metered_cost_micros"], 2_000);
+        assert_eq!(view["estimated"]["cost_micros"], 9_000_000);
+        assert_eq!(
+            view["reliable"]["metered_tokens"], 1_200,
+            "tokens from estimated sources do not count as reliable"
+        );
+        for assignment in [("billed", "developer"), ("guess", "lead"), ("silent", "qa")] {
+            state
+                .execute(
+                    &owner,
+                    Command::AssignRoleProvider {
+                        team_id: "t".into(),
+                        role_key: assignment.1.into(),
+                        provider_id: assignment.0.into(),
+                        model_id: None,
+                    },
+                )
+                .unwrap();
+        }
+        let warnings = state.usage_warnings("t").join(" | ");
+        assert!(
+            warnings.contains("guess: costs are estimates"),
+            "{warnings}"
+        );
+        assert!(
+            warnings.contains("silent: usage is not measured at all"),
+            "{warnings}"
+        );
+        assert!(
+            warnings.contains("silent: this integration cannot cap billing"),
+            "{warnings}"
+        );
+        assert!(warnings.contains("no usage limit is set"), "{warnings}");
+        assert!(
+            !warnings.contains("billed:"),
+            "a metered provider with a hard limit has nothing to warn about"
+        );
+        // A huge estimate stops nothing; a reached metered limit stops new work.
+        state
+            .execute(
+                &owner,
+                Command::SetTeamLimits {
+                    team_id: "t".into(),
+                    max_metered_cost_micros: Some(2_500),
+                    max_metered_tokens: None,
+                },
+            )
+            .unwrap();
+        create_task(&mut state, &lead, "ok", &[]).unwrap();
+        report(&mut state, "billed", UsageBasis::Metered, Some(600)).unwrap();
+        assert_eq!(
+            create_task(&mut state, &lead, "blocked", &[])
+                .unwrap_err()
+                .code,
+            "usage_limit_reached"
+        );
+        state
+            .execute(
+                &owner,
+                Command::SetTeamLimits {
+                    team_id: "t".into(),
+                    max_metered_cost_micros: Some(10_000),
+                    max_metered_tokens: None,
+                },
+            )
+            .unwrap();
+        create_task(&mut state, &lead, "unblocked", &[]).unwrap();
+        state.validate().unwrap();
+    }
+
+    #[test]
+    fn idle_and_released_agents_take_no_work_and_only_the_owner_brings_one_back() {
+        let (mut state, owner, lead, dev, _qa) = launched();
+        let set = |state: &mut State, who: &Actor, agent: &str, to: AgentRunState| {
+            state.execute(
+                who,
+                Command::SetAgentState {
+                    actor_id: agent.into(),
+                    state: to,
+                    reason: "restarting".into(),
+                },
+            )
+        };
+        assert_eq!(
+            set(&mut state, &dev, "dev", AgentRunState::Idle)
+                .unwrap_err()
+                .code,
+            "forbidden",
+            "an agent cannot idle itself, and Developers cannot set states"
+        );
+        set(&mut state, &lead, "dev", AgentRunState::Idle).unwrap();
+        assert_eq!(
+            create_task(&mut state, &lead, "task", &[])
+                .unwrap_err()
+                .code,
+            "agent_idle"
+        );
+        // Idle keeps the credential working; reading still works.
+        assert!(state.authenticate(&digest('2')).is_ok());
+        set(&mut state, &lead, "dev", AgentRunState::Active).unwrap();
+        create_task(&mut state, &lead, "task", &[]).unwrap();
+        // Release revokes the credential and the pane binding; a Lead cannot undo it.
+        state
+            .execute(
+                &owner,
+                Command::BindAgentPane {
+                    actor_id: "dev".into(),
+                    pane_id: "w1:p1".into(),
+                    provider: None,
+                },
+            )
+            .unwrap();
+        set(&mut state, &lead, "dev", AgentRunState::Released).unwrap();
+        assert_eq!(
+            state.authenticate(&digest('2')).unwrap_err().code,
+            "unauthorized"
+        );
+        assert!(state.pane_bindings.is_empty());
+        assert_eq!(
+            set(&mut state, &lead, "dev", AgentRunState::Active)
+                .unwrap_err()
+                .code,
+            "forbidden"
+        );
+        set(&mut state, &owner, "dev", AgentRunState::Active).unwrap();
+        assert!(state.authenticate(&digest('2')).is_ok());
+        let (lead2, _d, _q) = add_team(&mut state, &owner, 2);
+        assert_eq!(
+            set(&mut state, &lead2, "dev", AgentRunState::Idle)
+                .unwrap_err()
+                .code,
+            "forbidden",
+            "a Lead controls only their own team"
+        );
+        assert_eq!(
+            set(&mut state, &owner, "owner", AgentRunState::Idle)
+                .unwrap_err()
+                .code,
+            "invalid_reference"
+        );
+        state.validate().unwrap();
+    }
+
+    #[test]
+    fn hard_limits_stop_concurrency_and_deep_dependency_chains() {
+        let (mut state, _owner, lead, dev, _qa) = launched();
+        for i in 0..=MAX_ACTIVE_TASKS {
+            create_task(&mut state, &lead, &format!("w{i}"), &[]).unwrap();
+        }
+        for i in 0..MAX_ACTIVE_TASKS {
+            state
+                .execute(
+                    &dev,
+                    Command::AcceptTask {
+                        team_id: "t".into(),
+                        task_id: format!("w{i}"),
+                        acceptance_id: format!("acc{i}"),
+                        note: "go".into(),
+                    },
+                )
+                .unwrap();
+        }
+        let fourth = state.execute(
+            &dev,
+            Command::AcceptTask {
+                team_id: "t".into(),
+                task_id: format!("w{MAX_ACTIVE_TASKS}"),
+                acceptance_id: "acc-last".into(),
+                note: "go".into(),
+            },
+        );
+        assert_eq!(fourth.unwrap_err().code, "concurrency_limit");
+        // A chain deeper than the limit cannot be built, one task at a time or by editing dependencies.
+        let (mut state, _owner, lead, _dev, _qa) = launched();
+        create_task(&mut state, &lead, "c0", &[]).unwrap();
+        for i in 1..MAX_DEPENDENCY_DEPTH {
+            create_task(
+                &mut state,
+                &lead,
+                &format!("c{i}"),
+                &[&format!("c{}", i - 1)],
+            )
+            .unwrap();
+        }
+        let too_deep = create_task(
+            &mut state,
+            &lead,
+            "too-deep",
+            &[&format!("c{}", MAX_DEPENDENCY_DEPTH - 1)],
+        );
+        assert_eq!(too_deep.unwrap_err().code, "task_depth_limit");
+        create_task(&mut state, &lead, "free", &[]).unwrap();
+        let rewire = state.execute(
+            &lead,
+            Command::SetTaskDependencies {
+                team_id: "t".into(),
+                task_id: "free".into(),
+                dependencies: vec![format!("c{}", MAX_DEPENDENCY_DEPTH - 1)],
+            },
+        );
+        assert_eq!(rewire.unwrap_err().code, "task_depth_limit");
+        state.validate().unwrap();
+    }
+
+    #[test]
+    fn the_summary_finds_stuck_work_across_projects_and_suggests_recovery_without_acting() {
+        let (mut state, owner, lead, dev, _qa) = launched();
+        let (lead2, _d2, _q2) = add_team(&mut state, &owner, 2);
+        state
+            .execute(
+                &owner,
+                Command::CreateProject {
+                    project_id: "other".into(),
+                    name: "Other".into(),
+                },
+            )
+            .unwrap();
+        create_task(&mut state, &lead, "old", &[]).unwrap();
+        state
+            .execute_at(
+                &lead2,
+                Command::CreateTask {
+                    team_id: "t2".into(),
+                    task_id: "fresh".into(),
+                    title: "x".into(),
+                    description: "d".into(),
+                    developer_id: "dev2".into(),
+                    dependencies: vec![],
+                    assignment_message_id: "m-fresh".into(),
+                    dispatch: intent("a-fresh", 1),
+                },
+                5_000,
+            )
+            .unwrap();
+        state
+            .execute_at(
+                &lead,
+                Command::RequestApproval {
+                    approval_id: "ap".into(),
+                    team_id: "t".into(),
+                    action: merge_action("x"),
+                    justification: "j".into(),
+                    alternatives: vec![],
+                    risks: vec![],
+                    ttl_seconds: 600,
+                },
+                5_000,
+            )
+            .unwrap();
+        let now = 5_100;
+        let summary = state.summary(&owner, now, 1_800).unwrap();
+        assert_eq!(summary["totals"]["teams"], 2);
+        assert_eq!(summary["totals"]["pending_approvals"], 1);
+        // Nothing has been quiet for half an hour yet, whichever clock the tasks were written with.
+        let quiet = state.summary(&owner, now + 3_600, 1_800).unwrap();
+        let stuck: Vec<&Value> = quiet["projects"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .flat_map(|p| p["teams"].as_array().unwrap())
+            .flat_map(|t| t["stuck"].as_array().unwrap())
+            .collect();
+        assert!(
+            stuck
+                .iter()
+                .any(|s| s["task_id"] == "fresh" && s["idle_seconds"].as_u64().unwrap() >= 3_600),
+            "{quiet}"
+        );
+        let fresh = stuck.iter().find(|s| s["task_id"] == "fresh").unwrap();
+        let actions: Vec<&str> = fresh["suggested_actions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|a| a["command"].as_str())
+            .collect();
+        assert!(actions.contains(&"set_agent_state") && actions.contains(&"cancel_task"));
+        // A failed dispatch adds a retry suggestion; the summary only advises.
+        state
+            .execute(
+                &owner,
+                Command::RecordDispatchReceipt {
+                    team_id: "t2".into(),
+                    attempt_id: "a-fresh".into(),
+                    task_id: "fresh".into(),
+                    message_id: "m-fresh".into(),
+                    run_generation: 1,
+                    content_digest: digest('d'),
+                    provider_session: None,
+                    receipt: DispatchReceiptKind::Attempted,
+                    detail: None,
+                    evidence: vec![],
+                },
+            )
+            .unwrap();
+        state
+            .execute(
+                &owner,
+                Command::RecordDispatchReceipt {
+                    team_id: "t2".into(),
+                    attempt_id: "a-fresh".into(),
+                    task_id: "fresh".into(),
+                    message_id: "m-fresh".into(),
+                    run_generation: 1,
+                    content_digest: digest('d'),
+                    provider_session: None,
+                    receipt: DispatchReceiptKind::Failed,
+                    detail: Some("adapter crashed".into()),
+                    evidence: vec![],
+                },
+            )
+            .unwrap();
+        let again = state.summary(&owner, now + 3_600, 1_800).unwrap();
+        let text = again.to_string();
+        assert!(
+            text.contains("retry_dispatch") && text.contains("the last dispatch did not complete")
+        );
+        assert_eq!(
+            state.dispatches["a-fresh"].team_id, "t2",
+            "nothing was retried on anyone's behalf"
+        );
+        // A team sees only itself; a suspended team reports no stuck work (it is paused on purpose).
+        let mine = state.summary(&lead, now, 1_800).unwrap();
+        assert_eq!(mine["totals"]["teams"], 1);
+        state
+            .execute(
+                &owner,
+                Command::SuspendTeam {
+                    team_id: "t2".into(),
+                    reason: "pause".into(),
+                },
+            )
+            .unwrap();
+        let paused = state.summary(&owner, now + 9_999, 1).unwrap();
+        let t2 = paused["projects"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .flat_map(|p| p["teams"].as_array().unwrap())
+            .find(|t| t["id"] == "t2")
+            .unwrap()
+            .clone();
+        assert_eq!(t2["stuck"], json!([]));
+        let _ = dev;
+    }
+
+    #[test]
+    fn tasks_record_when_they_last_changed() {
+        let (mut state, _owner, lead, dev, _qa) = launched();
+        state
+            .execute_at(
+                &lead,
+                Command::CreateTask {
+                    team_id: "t".into(),
+                    task_id: "x".into(),
+                    title: "x".into(),
+                    description: "d".into(),
+                    developer_id: "dev".into(),
+                    dependencies: vec![],
+                    assignment_message_id: "m-x".into(),
+                    dispatch: intent("a-x", 1),
+                },
+                777,
+            )
+            .unwrap();
+        assert_eq!(state.tasks["x"].updated_at, 777);
+        state
+            .execute_at(
+                &dev,
+                Command::AcceptTask {
+                    team_id: "t".into(),
+                    task_id: "x".into(),
+                    acceptance_id: "acc".into(),
+                    note: "go".into(),
+                },
+                900,
+            )
+            .unwrap();
+        assert_eq!(state.tasks["x"].updated_at, 900);
+        // An unrelated change leaves it alone.
+        chat(&mut state, &lead, "c", Audience::Team).unwrap();
+        assert_eq!(state.tasks["x"].updated_at, 900);
     }
 }

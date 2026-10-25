@@ -85,3 +85,39 @@ pub(super) fn page_limit() -> usize {
 fn default_wait() -> u64 {
     20_000
 }
+
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(super) struct PlanLaunchParams {
+    pub expected_revision: u64,
+    pub idempotency_key: String,
+    pub plan_id: String,
+}
+
+#[derive(Deserialize, Default, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(super) struct MemoryParams {
+    /// The team to build context for; an agent's own team when omitted.
+    #[serde(default)]
+    pub team_id: Option<String>,
+    /// The task the agent is about to work on.
+    #[serde(default)]
+    pub task_id: Option<String>,
+    /// Upper bound on the size of the context, in bytes (default 8192, at most 32768).
+    #[serde(default)]
+    pub budget_bytes: Option<usize>,
+}
+
+#[derive(Deserialize, Default, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(super) struct SummaryParams {
+    /// A task that has not changed for this long is reported as stuck (default 1800).
+    #[serde(default)]
+    pub stuck_after_seconds: Option<u64>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(super) struct PlanRef {
+    pub plan_id: String,
+}

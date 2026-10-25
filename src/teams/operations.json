@@ -212,7 +212,8 @@
    },
    "title": "ADR-1",
    "body": "use queues",
-   "evidence": []
+   "evidence": [],
+   "knowledge_kind": "adr"
   }
  },
  {
@@ -549,6 +550,249 @@
    "kind": "abort_merge",
    "integration_id": "i1",
    "reason": "did not land"
+  }
+ },
+ {
+  "kind": "declare_provider",
+  "area": "providers",
+  "summary": "Declare a provider, its capabilities, models and how it meters usage. Declared, never verified.",
+  "sample": {
+   "kind": "declare_provider",
+   "provider_id": "claude",
+   "label": "Claude Code",
+   "capabilities": [
+    "code_edit",
+    "shell",
+    "review"
+   ],
+   "models": [
+    {
+     "id": "default",
+     "capabilities": []
+    }
+   ],
+   "metering": "estimated",
+   "hard_spend_limit": false
+  }
+ },
+ {
+  "kind": "set_role_preference",
+  "area": "providers",
+  "summary": "Prefer a provider and model for a role (lead, developer, qa, specialist or specialist:<specialty>).",
+  "sample": {
+   "kind": "set_role_preference",
+   "role_key": "developer",
+   "provider_id": "claude",
+   "model_id": "default"
+  }
+ },
+ {
+  "kind": "assign_role_provider",
+  "area": "providers",
+  "summary": "Assign a declared provider to a team's role, if it offers what the role needs.",
+  "sample": {
+   "kind": "assign_role_provider",
+   "team_id": "alpha",
+   "role_key": "developer",
+   "provider_id": "claude",
+   "model_id": "default"
+  }
+ },
+ {
+  "kind": "reassign_role_provider",
+  "area": "providers",
+  "summary": "A Lead changes a role's provider mid-run, spending an Owner approval for exactly that change.",
+  "sample": {
+   "kind": "reassign_role_provider",
+   "team_id": "alpha",
+   "role_key": "developer",
+   "provider_id": "claude",
+   "model_id": "default",
+   "approval_id": "ap1"
+  }
+ },
+ {
+  "kind": "propose_plan",
+  "area": "plans",
+  "summary": "Turn a goal into a reviewable plan: team draft, tasks and dependencies, justified specialists and provider choices, all explained.",
+  "sample": {
+   "kind": "propose_plan",
+   "plan_id": "plan-1",
+   "goal": "Add OAuth state validation tests"
+  }
+ },
+ {
+  "kind": "edit_plan",
+  "area": "plans",
+  "summary": "Change a draft plan before launch: tasks, dependencies, specialists, providers, team name.",
+  "sample": {
+   "kind": "edit_plan",
+   "plan_id": "plan-1",
+   "edits": [
+    {
+     "op": "remove_task",
+     "key": "docs"
+    }
+   ]
+  }
+ },
+ {
+  "kind": "discard_plan",
+  "area": "plans",
+  "summary": "Discard a draft plan.",
+  "sample": {
+   "kind": "discard_plan",
+   "plan_id": "plan-1"
+  }
+ },
+ {
+  "kind": "mark_plan_launched",
+  "area": "plans",
+  "summary": "Record that a plan became a team (done by teams.plans.launch.v1).",
+  "sample": {
+   "kind": "mark_plan_launched",
+   "plan_id": "plan-1",
+   "team_id": "alpha"
+  }
+ },
+ {
+  "kind": "put_context_note",
+  "area": "memory",
+  "summary": "Record a summary or a specialist's role context, with its sources and validity.",
+  "sample": {
+   "kind": "put_context_note",
+   "team_id": "alpha",
+   "note_id": "note-1",
+   "note_kind": "summary",
+   "role_key": null,
+   "summary": "The OAuth change is done and reviewed.",
+   "sources": [
+    {
+     "kind": "task",
+     "id": "t1"
+    }
+   ],
+   "valid_for_seconds": 86400
+  }
+ },
+ {
+  "kind": "supersede_context_note",
+  "area": "memory",
+  "summary": "Replace a note with a newer one; the old one is no longer served.",
+  "sample": {
+   "kind": "supersede_context_note",
+   "note_id": "note-1",
+   "by_note_id": "note-2"
+  }
+ },
+ {
+  "kind": "accept_knowledge",
+  "area": "memory",
+  "summary": "The Owner accepts a proposed requirement or ADR so agents are told about it.",
+  "sample": {
+   "kind": "accept_knowledge",
+   "knowledge_id": "adr-1"
+  }
+ },
+ {
+  "kind": "supersede_knowledge",
+  "area": "memory",
+  "summary": "The Owner replaces an accepted requirement or ADR with another entry.",
+  "sample": {
+   "kind": "supersede_knowledge",
+   "knowledge_id": "adr-1",
+   "by_id": "adr-2"
+  }
+ },
+ {
+  "kind": "raise_dispute",
+  "area": "disputes",
+  "summary": "Raise a bounded disagreement with two pieces of conflicting evidence.",
+  "sample": {
+   "kind": "raise_dispute",
+   "dispute_id": "d1",
+   "team_id": "alpha",
+   "task_id": "t1",
+   "topic": "state parameter length",
+   "architectural": false,
+   "position": "32 bytes is enough",
+   "evidence": [
+    {
+     "kind": "note",
+     "reference": "rfc6749 section 10.12"
+    },
+    {
+     "kind": "test",
+     "reference": "internal/auth/oauth_test.go"
+    }
+   ]
+  }
+ },
+ {
+  "kind": "respond_dispute",
+  "area": "disputes",
+  "summary": "A peer gives their view (at most two peers).",
+  "sample": {
+   "kind": "respond_dispute",
+   "dispute_id": "d1",
+   "position": "use 16 random bytes at least",
+   "evidence": []
+  }
+ },
+ {
+  "kind": "resolve_dispute",
+  "area": "disputes",
+  "summary": "The Lead settles a non-architectural dispute after a peer has responded.",
+  "sample": {
+   "kind": "resolve_dispute",
+   "dispute_id": "d1",
+   "resolution": "keep 32 bytes"
+  }
+ },
+ {
+  "kind": "decide_dispute",
+  "area": "disputes",
+  "summary": "The Owner decides an escalated or architectural dispute.",
+  "sample": {
+   "kind": "decide_dispute",
+   "dispute_id": "d1",
+   "decision": "keep 32 bytes"
+  }
+ },
+ {
+  "kind": "report_usage",
+  "area": "usage",
+  "summary": "The Owner's harness reports usage; only a provider declared as metered may report it as metered.",
+  "sample": {
+   "kind": "report_usage",
+   "team_id": "alpha",
+   "provider_id": "claude",
+   "input_tokens": 1200,
+   "output_tokens": 300,
+   "cost_micros": null,
+   "basis": "estimated"
+  }
+ },
+ {
+  "kind": "set_team_limits",
+  "area": "usage",
+  "summary": "Set a team's limits on reliably metered cost and tokens. Estimates never enforce.",
+  "sample": {
+   "kind": "set_team_limits",
+   "team_id": "alpha",
+   "max_metered_cost_micros": 5000000,
+   "max_metered_tokens": null
+  }
+ },
+ {
+  "kind": "set_agent_state",
+  "area": "agents",
+  "summary": "Idle, release or resume an agent: idle takes no new work, release also revokes its credential.",
+  "sample": {
+   "kind": "set_agent_state",
+   "actor_id": "alpha-dev",
+   "state": "idle",
+   "reason": "restarting its process"
   }
  }
 ]

@@ -1,8 +1,27 @@
 {
-  "api_minor": 2,
+  "api_minor": 3,
   "api_version": 1,
   "command": {
     "$defs": {
+      "AgentRunState": {
+        "oneOf": [
+          {
+            "const": "active",
+            "description": "Working normally.",
+            "type": "string"
+          },
+          {
+            "const": "idle",
+            "description": "Paused: no new work is sent to it; its credential still works.",
+            "type": "string"
+          },
+          {
+            "const": "released",
+            "description": "Gone: its credential is revoked until the Owner reactivates it.",
+            "type": "string"
+          }
+        ]
+      },
       "Audience": {
         "description": "Who a chat message is for. `Team` is the shared channel; the others are scoped: only the\nsender, the addressee and the Owner can read them.",
         "oneOf": [
@@ -121,6 +140,14 @@
         ],
         "type": "string"
       },
+      "KnowledgeKind": {
+        "enum": [
+          "note",
+          "requirement",
+          "adr"
+        ],
+        "type": "string"
+      },
       "KnowledgeScope": {
         "oneOf": [
           {
@@ -154,6 +181,271 @@
             "required": [
               "scope",
               "team_id"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "Metering": {
+        "description": "What a provider says about how it reports usage. Declared, not verified.",
+        "oneOf": [
+          {
+            "const": "metered",
+            "description": "Usage and cost come from the provider's own accounting.",
+            "type": "string"
+          },
+          {
+            "const": "estimated",
+            "description": "Anything reported is an approximation made by the harness.",
+            "type": "string"
+          },
+          {
+            "const": "none",
+            "description": "Nothing is reported.",
+            "type": "string"
+          }
+        ]
+      },
+      "ModelDecl": {
+        "additionalProperties": false,
+        "properties": {
+          "capabilities": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "NoteKind": {
+        "oneOf": [
+          {
+            "const": "summary",
+            "description": "A short account of a thread or task.",
+            "type": "string"
+          },
+          {
+            "const": "role_context",
+            "description": "What a specialist role learned, kept so the next engagement can start informed.",
+            "type": "string"
+          }
+        ]
+      },
+      "PlanEdit": {
+        "description": "A change the Owner makes to a plan before launching it.",
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "op": {
+                "const": "rename_team",
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "name"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "op": {
+                "const": "set_project",
+                "type": "string"
+              },
+              "project_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "project_id"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "op": {
+                "const": "remove_task",
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "key"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "op": {
+                "const": "restore_task",
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "key"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "op": {
+                "const": "set_task_title",
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "key",
+              "title"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "depends_on": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "key": {
+                "type": "string"
+              },
+              "op": {
+                "const": "set_task_dependencies",
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "key",
+              "depends_on"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "depends_on": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "description": {
+                "type": "string"
+              },
+              "key": {
+                "type": "string"
+              },
+              "op": {
+                "const": "add_task",
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "key",
+              "title",
+              "description"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "op": {
+                "const": "drop_recruitment",
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "key"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "op": {
+                "const": "restore_recruitment",
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "key"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "model_id": {
+                "default": null,
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "op": {
+                "const": "set_role_provider",
+                "type": "string"
+              },
+              "provider_id": {
+                "type": "string"
+              },
+              "role_key": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "op",
+              "role_key",
+              "provider_id"
             ],
             "type": "object"
           }
@@ -215,6 +507,39 @@
             "type": "string"
           }
         ]
+      },
+      "SourceKind": {
+        "enum": [
+          "task",
+          "handoff",
+          "decision",
+          "knowledge",
+          "dispute"
+        ],
+        "type": "string"
+      },
+      "SourceRef": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/$defs/SourceKind"
+          }
+        },
+        "required": [
+          "kind",
+          "id"
+        ],
+        "type": "object"
+      },
+      "UsageBasis": {
+        "enum": [
+          "metered",
+          "estimated"
+        ],
+        "type": "string"
       }
     },
     "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -658,6 +983,11 @@
           },
           "knowledge_id": {
             "type": "string"
+          },
+          "knowledge_kind": {
+            "$ref": "#/$defs/KnowledgeKind",
+            "default": "note",
+            "description": "A requirement or ADR starts as proposed and counts only once the Owner accepts it."
           },
           "scope": {
             "$ref": "#/$defs/KnowledgeScope"
@@ -1496,6 +1826,562 @@
           "actor_id"
         ],
         "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "capabilities": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "hard_spend_limit": {
+            "default": false,
+            "type": "boolean"
+          },
+          "kind": {
+            "const": "declare_provider",
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "metering": {
+            "$ref": "#/$defs/Metering"
+          },
+          "models": {
+            "default": [],
+            "items": {
+              "$ref": "#/$defs/ModelDecl"
+            },
+            "type": "array"
+          },
+          "provider_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "provider_id",
+          "label",
+          "metering"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "set_role_preference",
+            "type": "string"
+          },
+          "model_id": {
+            "default": null,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "provider_id": {
+            "type": "string"
+          },
+          "role_key": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "role_key",
+          "provider_id"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "assign_role_provider",
+            "type": "string"
+          },
+          "model_id": {
+            "default": null,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "provider_id": {
+            "type": "string"
+          },
+          "role_key": {
+            "type": "string"
+          },
+          "team_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "team_id",
+          "role_key",
+          "provider_id"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "approval_id": {
+            "type": "string"
+          },
+          "kind": {
+            "const": "reassign_role_provider",
+            "type": "string"
+          },
+          "model_id": {
+            "default": null,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "provider_id": {
+            "type": "string"
+          },
+          "role_key": {
+            "type": "string"
+          },
+          "team_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "team_id",
+          "role_key",
+          "provider_id",
+          "approval_id"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "goal": {
+            "type": "string"
+          },
+          "kind": {
+            "const": "propose_plan",
+            "type": "string"
+          },
+          "plan_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "plan_id",
+          "goal"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "edits": {
+            "items": {
+              "$ref": "#/$defs/PlanEdit"
+            },
+            "type": "array"
+          },
+          "kind": {
+            "const": "edit_plan",
+            "type": "string"
+          },
+          "plan_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "plan_id",
+          "edits"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "discard_plan",
+            "type": "string"
+          },
+          "plan_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "plan_id"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "mark_plan_launched",
+            "type": "string"
+          },
+          "plan_id": {
+            "type": "string"
+          },
+          "team_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "plan_id",
+          "team_id"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "put_context_note",
+            "type": "string"
+          },
+          "note_id": {
+            "type": "string"
+          },
+          "note_kind": {
+            "$ref": "#/$defs/NoteKind"
+          },
+          "role_key": {
+            "default": null,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/$defs/SourceRef"
+            },
+            "type": "array"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "team_id": {
+            "type": "string"
+          },
+          "valid_for_seconds": {
+            "default": null,
+            "format": "uint64",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "team_id",
+          "note_id",
+          "note_kind",
+          "summary",
+          "sources"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "by_note_id": {
+            "type": "string"
+          },
+          "kind": {
+            "const": "supersede_context_note",
+            "type": "string"
+          },
+          "note_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "note_id",
+          "by_note_id"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "accept_knowledge",
+            "type": "string"
+          },
+          "knowledge_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "knowledge_id"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "by_id": {
+            "type": "string"
+          },
+          "kind": {
+            "const": "supersede_knowledge",
+            "type": "string"
+          },
+          "knowledge_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "knowledge_id",
+          "by_id"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "architectural": {
+            "default": false,
+            "type": "boolean"
+          },
+          "dispute_id": {
+            "type": "string"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/$defs/Evidence"
+            },
+            "type": "array"
+          },
+          "kind": {
+            "const": "raise_dispute",
+            "type": "string"
+          },
+          "position": {
+            "type": "string"
+          },
+          "task_id": {
+            "default": null,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "team_id": {
+            "type": "string"
+          },
+          "topic": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "dispute_id",
+          "team_id",
+          "topic",
+          "position",
+          "evidence"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "dispute_id": {
+            "type": "string"
+          },
+          "evidence": {
+            "default": [],
+            "items": {
+              "$ref": "#/$defs/Evidence"
+            },
+            "type": "array"
+          },
+          "kind": {
+            "const": "respond_dispute",
+            "type": "string"
+          },
+          "position": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "dispute_id",
+          "position"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "dispute_id": {
+            "type": "string"
+          },
+          "kind": {
+            "const": "resolve_dispute",
+            "type": "string"
+          },
+          "resolution": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "dispute_id",
+          "resolution"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "decision": {
+            "type": "string"
+          },
+          "dispute_id": {
+            "type": "string"
+          },
+          "kind": {
+            "const": "decide_dispute",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "dispute_id",
+          "decision"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "basis": {
+            "$ref": "#/$defs/UsageBasis"
+          },
+          "cost_micros": {
+            "default": null,
+            "format": "uint64",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "input_tokens": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "kind": {
+            "const": "report_usage",
+            "type": "string"
+          },
+          "output_tokens": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "provider_id": {
+            "type": "string"
+          },
+          "team_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "team_id",
+          "provider_id",
+          "input_tokens",
+          "output_tokens",
+          "basis"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "set_team_limits",
+            "type": "string"
+          },
+          "max_metered_cost_micros": {
+            "default": null,
+            "format": "uint64",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "max_metered_tokens": {
+            "default": null,
+            "format": "uint64",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "team_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "team_id"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "actor_id": {
+            "type": "string"
+          },
+          "kind": {
+            "const": "set_agent_state",
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/$defs/AgentRunState"
+          }
+        },
+        "required": [
+          "kind",
+          "actor_id",
+          "state",
+          "reason"
+        ],
+        "type": "object"
       }
     ],
     "title": "Command"
@@ -1711,6 +2597,36 @@
     {
       "code": "worktree_has_work",
       "description": "The worktree carried submitted work and is preserved.",
+      "retryable": false
+    },
+    {
+      "code": "capability_missing",
+      "description": "The provider is not declared to offer what the role needs.",
+      "retryable": false
+    },
+    {
+      "code": "task_depth_limit",
+      "description": "Dependency chains are limited in depth.",
+      "retryable": false
+    },
+    {
+      "code": "concurrency_limit",
+      "description": "The team is already working on its maximum number of tasks.",
+      "retryable": false
+    },
+    {
+      "code": "usage_limit_reached",
+      "description": "The team reached its reliably metered usage limit; the Owner can raise it.",
+      "retryable": false
+    },
+    {
+      "code": "agent_idle",
+      "description": "The agent is idle or released and takes no new work.",
+      "retryable": false
+    },
+    {
+      "code": "dispute_settled",
+      "description": "That question was already decided and the dispute adds no new evidence.",
       "retryable": false
     },
     {
@@ -1942,6 +2858,18 @@
       "unauthenticated_per_second": 5.0,
       "write_burst": 60.0,
       "write_per_second": 20.0
+    },
+    "work_limits": {
+      "max_active_tasks_per_team": 3,
+      "max_dependency_depth": 6,
+      "max_dispatch_attempts": 3,
+      "max_dispute_positions": 3,
+      "max_open_disputes_per_team": 6,
+      "max_open_tasks_per_team": 40,
+      "max_plan_tasks": 12,
+      "max_queued_dispatches_per_team": 20,
+      "memory_budget_default_bytes": 8192,
+      "memory_budget_max_bytes": 32768
     }
   },
   "method_catalog": [
@@ -2071,6 +2999,46 @@
       "owner_only": false,
       "since_minor": 2,
       "summary": "Decision records with cursor pagination.",
+      "writes": false
+    },
+    {
+      "auth": true,
+      "name": "teams.plans.launch.v1",
+      "owner_only": true,
+      "since_minor": 3,
+      "summary": "Launch a reviewed plan: the team, its tasks and dependencies, and role assignments, all or nothing (Owner only).",
+      "writes": true
+    },
+    {
+      "auth": true,
+      "name": "teams.plans.get.v1",
+      "owner_only": true,
+      "since_minor": 3,
+      "summary": "One plan: team draft, tasks and dependencies, specialists, provider choices and the reasons (Owner only).",
+      "writes": false
+    },
+    {
+      "auth": true,
+      "name": "teams.plans.list.v1",
+      "owner_only": true,
+      "since_minor": 3,
+      "summary": "The plans, by id, goal and status (Owner only).",
+      "writes": false
+    },
+    {
+      "auth": true,
+      "name": "teams.memory.retrieve.v1",
+      "owner_only": false,
+      "since_minor": 3,
+      "summary": "A bounded, provenance-tagged context for an agent: accepted requirements, the task, exact handoff and review evidence, current notes.",
+      "writes": false
+    },
+    {
+      "auth": true,
+      "name": "teams.summary.v1",
+      "owner_only": false,
+      "since_minor": 3,
+      "summary": "Across every visible project: pending approvals, stuck tasks with suggested recovery, escalated disputes, agent states and usage.",
       "writes": false
     },
     {
@@ -2414,6 +3382,7 @@
         "evidence": [],
         "kind": "put_knowledge",
         "knowledge_id": "k1",
+        "knowledge_kind": "adr",
         "scope": {
           "scope": "team",
           "team_id": "alpha"
@@ -2886,6 +3855,351 @@
         "reason": "did not land"
       },
       "summary": "The Owner records that a merge did not land."
+    },
+    {
+      "area": "providers",
+      "authority": "owner_only",
+      "kind": "declare_provider",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "owner"
+      ],
+      "sample": {
+        "capabilities": [
+          "code_edit",
+          "shell",
+          "review"
+        ],
+        "hard_spend_limit": false,
+        "kind": "declare_provider",
+        "label": "Claude Code",
+        "metering": "estimated",
+        "models": [
+          {
+            "capabilities": [],
+            "id": "default"
+          }
+        ],
+        "provider_id": "claude"
+      },
+      "summary": "Declare a provider, its capabilities, models and how it meters usage. Declared, never verified."
+    },
+    {
+      "area": "providers",
+      "authority": "owner_only",
+      "kind": "set_role_preference",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "owner"
+      ],
+      "sample": {
+        "kind": "set_role_preference",
+        "model_id": "default",
+        "provider_id": "claude",
+        "role_key": "developer"
+      },
+      "summary": "Prefer a provider and model for a role (lead, developer, qa, specialist or specialist:<specialty>)."
+    },
+    {
+      "area": "providers",
+      "authority": "owner_only",
+      "kind": "assign_role_provider",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "owner"
+      ],
+      "sample": {
+        "kind": "assign_role_provider",
+        "model_id": "default",
+        "provider_id": "claude",
+        "role_key": "developer",
+        "team_id": "alpha"
+      },
+      "summary": "Assign a declared provider to a team's role, if it offers what the role needs."
+    },
+    {
+      "area": "providers",
+      "authority": "lead_authorized",
+      "kind": "reassign_role_provider",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "lead"
+      ],
+      "sample": {
+        "approval_id": "ap1",
+        "kind": "reassign_role_provider",
+        "model_id": "default",
+        "provider_id": "claude",
+        "role_key": "developer",
+        "team_id": "alpha"
+      },
+      "summary": "A Lead changes a role's provider mid-run, spending an Owner approval for exactly that change."
+    },
+    {
+      "area": "plans",
+      "authority": "owner_only",
+      "kind": "propose_plan",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "owner"
+      ],
+      "sample": {
+        "goal": "Add OAuth state validation tests",
+        "kind": "propose_plan",
+        "plan_id": "plan-1"
+      },
+      "summary": "Turn a goal into a reviewable plan: team draft, tasks and dependencies, justified specialists and provider choices, all explained."
+    },
+    {
+      "area": "plans",
+      "authority": "owner_only",
+      "kind": "edit_plan",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "owner"
+      ],
+      "sample": {
+        "edits": [
+          {
+            "key": "docs",
+            "op": "remove_task"
+          }
+        ],
+        "kind": "edit_plan",
+        "plan_id": "plan-1"
+      },
+      "summary": "Change a draft plan before launch: tasks, dependencies, specialists, providers, team name."
+    },
+    {
+      "area": "plans",
+      "authority": "owner_only",
+      "kind": "discard_plan",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "owner"
+      ],
+      "sample": {
+        "kind": "discard_plan",
+        "plan_id": "plan-1"
+      },
+      "summary": "Discard a draft plan."
+    },
+    {
+      "area": "plans",
+      "authority": "owner_only",
+      "kind": "mark_plan_launched",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "owner"
+      ],
+      "sample": {
+        "kind": "mark_plan_launched",
+        "plan_id": "plan-1",
+        "team_id": "alpha"
+      },
+      "summary": "Record that a plan became a team (done by teams.plans.launch.v1)."
+    },
+    {
+      "area": "memory",
+      "authority": "lead_authorized",
+      "kind": "put_context_note",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "owner",
+        "lead"
+      ],
+      "sample": {
+        "kind": "put_context_note",
+        "note_id": "note-1",
+        "note_kind": "summary",
+        "role_key": null,
+        "sources": [
+          {
+            "id": "t1",
+            "kind": "task"
+          }
+        ],
+        "summary": "The OAuth change is done and reviewed.",
+        "team_id": "alpha",
+        "valid_for_seconds": 86400
+      },
+      "summary": "Record a summary or a specialist's role context, with its sources and validity."
+    },
+    {
+      "area": "memory",
+      "authority": "lead_authorized",
+      "kind": "supersede_context_note",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "owner",
+        "lead"
+      ],
+      "sample": {
+        "by_note_id": "note-2",
+        "kind": "supersede_context_note",
+        "note_id": "note-1"
+      },
+      "summary": "Replace a note with a newer one; the old one is no longer served."
+    },
+    {
+      "area": "memory",
+      "authority": "owner_only",
+      "kind": "accept_knowledge",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "owner"
+      ],
+      "sample": {
+        "kind": "accept_knowledge",
+        "knowledge_id": "adr-1"
+      },
+      "summary": "The Owner accepts a proposed requirement or ADR so agents are told about it."
+    },
+    {
+      "area": "memory",
+      "authority": "owner_only",
+      "kind": "supersede_knowledge",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "owner"
+      ],
+      "sample": {
+        "by_id": "adr-2",
+        "kind": "supersede_knowledge",
+        "knowledge_id": "adr-1"
+      },
+      "summary": "The Owner replaces an accepted requirement or ADR with another entry."
+    },
+    {
+      "area": "disputes",
+      "authority": "agent_autonomous",
+      "kind": "raise_dispute",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "lead",
+        "developer",
+        "qa"
+      ],
+      "sample": {
+        "architectural": false,
+        "dispute_id": "d1",
+        "evidence": [
+          {
+            "kind": "note",
+            "reference": "rfc6749 section 10.12"
+          },
+          {
+            "kind": "test",
+            "reference": "internal/auth/oauth_test.go"
+          }
+        ],
+        "kind": "raise_dispute",
+        "position": "32 bytes is enough",
+        "task_id": "t1",
+        "team_id": "alpha",
+        "topic": "state parameter length"
+      },
+      "summary": "Raise a bounded disagreement with two pieces of conflicting evidence."
+    },
+    {
+      "area": "disputes",
+      "authority": "agent_autonomous",
+      "kind": "respond_dispute",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "lead",
+        "developer",
+        "qa"
+      ],
+      "sample": {
+        "dispute_id": "d1",
+        "evidence": [],
+        "kind": "respond_dispute",
+        "position": "use 16 random bytes at least"
+      },
+      "summary": "A peer gives their view (at most two peers)."
+    },
+    {
+      "area": "disputes",
+      "authority": "lead_authorized",
+      "kind": "resolve_dispute",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "lead"
+      ],
+      "sample": {
+        "dispute_id": "d1",
+        "kind": "resolve_dispute",
+        "resolution": "keep 32 bytes"
+      },
+      "summary": "The Lead settles a non-architectural dispute after a peer has responded."
+    },
+    {
+      "area": "disputes",
+      "authority": "owner_only",
+      "kind": "decide_dispute",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "owner"
+      ],
+      "sample": {
+        "decision": "keep 32 bytes",
+        "dispute_id": "d1",
+        "kind": "decide_dispute"
+      },
+      "summary": "The Owner decides an escalated or architectural dispute."
+    },
+    {
+      "area": "usage",
+      "authority": "owner_only",
+      "kind": "report_usage",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "owner"
+      ],
+      "sample": {
+        "basis": "estimated",
+        "cost_micros": null,
+        "input_tokens": 1200,
+        "kind": "report_usage",
+        "output_tokens": 300,
+        "provider_id": "claude",
+        "team_id": "alpha"
+      },
+      "summary": "The Owner's harness reports usage; only a provider declared as metered may report it as metered."
+    },
+    {
+      "area": "usage",
+      "authority": "owner_only",
+      "kind": "set_team_limits",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "owner"
+      ],
+      "sample": {
+        "kind": "set_team_limits",
+        "max_metered_cost_micros": 5000000,
+        "max_metered_tokens": null,
+        "team_id": "alpha"
+      },
+      "summary": "Set a team's limits on reliably metered cost and tokens. Estimates never enforce."
+    },
+    {
+      "area": "agents",
+      "authority": "lead_authorized",
+      "kind": "set_agent_state",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "owner",
+        "lead"
+      ],
+      "sample": {
+        "actor_id": "alpha-dev",
+        "kind": "set_agent_state",
+        "reason": "restarting its process",
+        "state": "idle"
+      },
+      "summary": "Idle, release or resume an agent: idle takes no new work, release also revokes its credential."
     }
   ],
   "params": {
@@ -3250,6 +4564,40 @@
       "type": "object"
     },
     "teams.list.v1": {},
+    "teams.memory.retrieve.v1": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "budget_bytes": {
+          "default": null,
+          "description": "Upper bound on the size of the context, in bytes (default 8192, at most 32768).",
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "task_id": {
+          "default": null,
+          "description": "The task the agent is about to work on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "team_id": {
+          "default": null,
+          "description": "The team to build context for; an agent's own team when omitted.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "title": "MemoryParams",
+      "type": "object"
+    },
     "teams.messages.list.v1": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
@@ -3300,6 +4648,25 @@
     },
     "teams.mutate.v1": {
       "$defs": {
+        "AgentRunState": {
+          "oneOf": [
+            {
+              "const": "active",
+              "description": "Working normally.",
+              "type": "string"
+            },
+            {
+              "const": "idle",
+              "description": "Paused: no new work is sent to it; its credential still works.",
+              "type": "string"
+            },
+            {
+              "const": "released",
+              "description": "Gone: its credential is revoked until the Owner reactivates it.",
+              "type": "string"
+            }
+          ]
+        },
         "Audience": {
           "description": "Who a chat message is for. `Team` is the shared channel; the others are scoped: only the\nsender, the addressee and the Owner can read them.",
           "oneOf": [
@@ -3793,6 +5160,11 @@
                 },
                 "knowledge_id": {
                   "type": "string"
+                },
+                "knowledge_kind": {
+                  "$ref": "#/$defs/KnowledgeKind",
+                  "default": "note",
+                  "description": "A requirement or ADR starts as proposed and counts only once the Owner accepts it."
                 },
                 "scope": {
                   "$ref": "#/$defs/KnowledgeScope"
@@ -4631,6 +6003,562 @@
                 "actor_id"
               ],
               "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "capabilities": {
+                  "default": [],
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "hard_spend_limit": {
+                  "default": false,
+                  "type": "boolean"
+                },
+                "kind": {
+                  "const": "declare_provider",
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "metering": {
+                  "$ref": "#/$defs/Metering"
+                },
+                "models": {
+                  "default": [],
+                  "items": {
+                    "$ref": "#/$defs/ModelDecl"
+                  },
+                  "type": "array"
+                },
+                "provider_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "provider_id",
+                "label",
+                "metering"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "set_role_preference",
+                  "type": "string"
+                },
+                "model_id": {
+                  "default": null,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "provider_id": {
+                  "type": "string"
+                },
+                "role_key": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "role_key",
+                "provider_id"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "assign_role_provider",
+                  "type": "string"
+                },
+                "model_id": {
+                  "default": null,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "provider_id": {
+                  "type": "string"
+                },
+                "role_key": {
+                  "type": "string"
+                },
+                "team_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "team_id",
+                "role_key",
+                "provider_id"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "approval_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "reassign_role_provider",
+                  "type": "string"
+                },
+                "model_id": {
+                  "default": null,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "provider_id": {
+                  "type": "string"
+                },
+                "role_key": {
+                  "type": "string"
+                },
+                "team_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "team_id",
+                "role_key",
+                "provider_id",
+                "approval_id"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "goal": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "propose_plan",
+                  "type": "string"
+                },
+                "plan_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "plan_id",
+                "goal"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "edits": {
+                  "items": {
+                    "$ref": "#/$defs/PlanEdit"
+                  },
+                  "type": "array"
+                },
+                "kind": {
+                  "const": "edit_plan",
+                  "type": "string"
+                },
+                "plan_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "plan_id",
+                "edits"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "discard_plan",
+                  "type": "string"
+                },
+                "plan_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "plan_id"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "mark_plan_launched",
+                  "type": "string"
+                },
+                "plan_id": {
+                  "type": "string"
+                },
+                "team_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "plan_id",
+                "team_id"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "put_context_note",
+                  "type": "string"
+                },
+                "note_id": {
+                  "type": "string"
+                },
+                "note_kind": {
+                  "$ref": "#/$defs/NoteKind"
+                },
+                "role_key": {
+                  "default": null,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "sources": {
+                  "items": {
+                    "$ref": "#/$defs/SourceRef"
+                  },
+                  "type": "array"
+                },
+                "summary": {
+                  "type": "string"
+                },
+                "team_id": {
+                  "type": "string"
+                },
+                "valid_for_seconds": {
+                  "default": null,
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "kind",
+                "team_id",
+                "note_id",
+                "note_kind",
+                "summary",
+                "sources"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "by_note_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "supersede_context_note",
+                  "type": "string"
+                },
+                "note_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "note_id",
+                "by_note_id"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "accept_knowledge",
+                  "type": "string"
+                },
+                "knowledge_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "knowledge_id"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "by_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "supersede_knowledge",
+                  "type": "string"
+                },
+                "knowledge_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "knowledge_id",
+                "by_id"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "architectural": {
+                  "default": false,
+                  "type": "boolean"
+                },
+                "dispute_id": {
+                  "type": "string"
+                },
+                "evidence": {
+                  "items": {
+                    "$ref": "#/$defs/Evidence"
+                  },
+                  "type": "array"
+                },
+                "kind": {
+                  "const": "raise_dispute",
+                  "type": "string"
+                },
+                "position": {
+                  "type": "string"
+                },
+                "task_id": {
+                  "default": null,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "team_id": {
+                  "type": "string"
+                },
+                "topic": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "dispute_id",
+                "team_id",
+                "topic",
+                "position",
+                "evidence"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "dispute_id": {
+                  "type": "string"
+                },
+                "evidence": {
+                  "default": [],
+                  "items": {
+                    "$ref": "#/$defs/Evidence"
+                  },
+                  "type": "array"
+                },
+                "kind": {
+                  "const": "respond_dispute",
+                  "type": "string"
+                },
+                "position": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "dispute_id",
+                "position"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "dispute_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "resolve_dispute",
+                  "type": "string"
+                },
+                "resolution": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "dispute_id",
+                "resolution"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "decision": {
+                  "type": "string"
+                },
+                "dispute_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "decide_dispute",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "dispute_id",
+                "decision"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "basis": {
+                  "$ref": "#/$defs/UsageBasis"
+                },
+                "cost_micros": {
+                  "default": null,
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "input_tokens": {
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "kind": {
+                  "const": "report_usage",
+                  "type": "string"
+                },
+                "output_tokens": {
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "provider_id": {
+                  "type": "string"
+                },
+                "team_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "team_id",
+                "provider_id",
+                "input_tokens",
+                "output_tokens",
+                "basis"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "set_team_limits",
+                  "type": "string"
+                },
+                "max_metered_cost_micros": {
+                  "default": null,
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "max_metered_tokens": {
+                  "default": null,
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "team_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "team_id"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "actor_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "set_agent_state",
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "state": {
+                  "$ref": "#/$defs/AgentRunState"
+                }
+              },
+              "required": [
+                "kind",
+                "actor_id",
+                "state",
+                "reason"
+              ],
+              "type": "object"
             }
           ]
         },
@@ -4700,6 +6628,14 @@
           ],
           "type": "string"
         },
+        "KnowledgeKind": {
+          "enum": [
+            "note",
+            "requirement",
+            "adr"
+          ],
+          "type": "string"
+        },
         "KnowledgeScope": {
           "oneOf": [
             {
@@ -4733,6 +6669,271 @@
               "required": [
                 "scope",
                 "team_id"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "Metering": {
+          "description": "What a provider says about how it reports usage. Declared, not verified.",
+          "oneOf": [
+            {
+              "const": "metered",
+              "description": "Usage and cost come from the provider's own accounting.",
+              "type": "string"
+            },
+            {
+              "const": "estimated",
+              "description": "Anything reported is an approximation made by the harness.",
+              "type": "string"
+            },
+            {
+              "const": "none",
+              "description": "Nothing is reported.",
+              "type": "string"
+            }
+          ]
+        },
+        "ModelDecl": {
+          "additionalProperties": false,
+          "properties": {
+            "capabilities": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "type": "object"
+        },
+        "NoteKind": {
+          "oneOf": [
+            {
+              "const": "summary",
+              "description": "A short account of a thread or task.",
+              "type": "string"
+            },
+            {
+              "const": "role_context",
+              "description": "What a specialist role learned, kept so the next engagement can start informed.",
+              "type": "string"
+            }
+          ]
+        },
+        "PlanEdit": {
+          "description": "A change the Owner makes to a plan before launching it.",
+          "oneOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "op": {
+                  "const": "rename_team",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "op",
+                "name"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "op": {
+                  "const": "set_project",
+                  "type": "string"
+                },
+                "project_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "op",
+                "project_id"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "op": {
+                  "const": "remove_task",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "op",
+                "key"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "op": {
+                  "const": "restore_task",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "op",
+                "key"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "op": {
+                  "const": "set_task_title",
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "op",
+                "key",
+                "title"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "depends_on": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "key": {
+                  "type": "string"
+                },
+                "op": {
+                  "const": "set_task_dependencies",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "op",
+                "key",
+                "depends_on"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "depends_on": {
+                  "default": [],
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "key": {
+                  "type": "string"
+                },
+                "op": {
+                  "const": "add_task",
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "op",
+                "key",
+                "title",
+                "description"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "op": {
+                  "const": "drop_recruitment",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "op",
+                "key"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "op": {
+                  "const": "restore_recruitment",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "op",
+                "key"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "model_id": {
+                  "default": null,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "op": {
+                  "const": "set_role_provider",
+                  "type": "string"
+                },
+                "provider_id": {
+                  "type": "string"
+                },
+                "role_key": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "op",
+                "role_key",
+                "provider_id"
               ],
               "type": "object"
             }
@@ -4794,6 +6995,39 @@
               "type": "string"
             }
           ]
+        },
+        "SourceKind": {
+          "enum": [
+            "task",
+            "handoff",
+            "decision",
+            "knowledge",
+            "dispute"
+          ],
+          "type": "string"
+        },
+        "SourceRef": {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "kind": {
+              "$ref": "#/$defs/SourceKind"
+            }
+          },
+          "required": [
+            "kind",
+            "id"
+          ],
+          "type": "object"
+        },
+        "UsageBasis": {
+          "enum": [
+            "metered",
+            "estimated"
+          ],
+          "type": "string"
         }
       },
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -4819,6 +7053,45 @@
       "title": "MutationParams",
       "type": "object"
     },
+    "teams.plans.get.v1": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "plan_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "plan_id"
+      ],
+      "title": "PlanRef",
+      "type": "object"
+    },
+    "teams.plans.launch.v1": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "expected_revision": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "idempotency_key": {
+          "type": "string"
+        },
+        "plan_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "expected_revision",
+        "idempotency_key",
+        "plan_id"
+      ],
+      "title": "PlanLaunchParams",
+      "type": "object"
+    },
+    "teams.plans.list.v1": {},
     "teams.snapshot.get.v1": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
@@ -4832,6 +7105,24 @@
         }
       },
       "title": "SnapshotParams",
+      "type": "object"
+    },
+    "teams.summary.v1": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "stuck_after_seconds": {
+          "default": null,
+          "description": "A task that has not changed for this long is reported as stuck (default 1800).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "title": "SummaryParams",
       "type": "object"
     },
     "teams.tasks.list.v1": {
@@ -4884,6 +7175,25 @@
     },
     "teams.validate.v1": {
       "$defs": {
+        "AgentRunState": {
+          "oneOf": [
+            {
+              "const": "active",
+              "description": "Working normally.",
+              "type": "string"
+            },
+            {
+              "const": "idle",
+              "description": "Paused: no new work is sent to it; its credential still works.",
+              "type": "string"
+            },
+            {
+              "const": "released",
+              "description": "Gone: its credential is revoked until the Owner reactivates it.",
+              "type": "string"
+            }
+          ]
+        },
         "Audience": {
           "description": "Who a chat message is for. `Team` is the shared channel; the others are scoped: only the\nsender, the addressee and the Owner can read them.",
           "oneOf": [
@@ -5377,6 +7687,11 @@
                 },
                 "knowledge_id": {
                   "type": "string"
+                },
+                "knowledge_kind": {
+                  "$ref": "#/$defs/KnowledgeKind",
+                  "default": "note",
+                  "description": "A requirement or ADR starts as proposed and counts only once the Owner accepts it."
                 },
                 "scope": {
                   "$ref": "#/$defs/KnowledgeScope"
@@ -6215,6 +8530,562 @@
                 "actor_id"
               ],
               "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "capabilities": {
+                  "default": [],
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "hard_spend_limit": {
+                  "default": false,
+                  "type": "boolean"
+                },
+                "kind": {
+                  "const": "declare_provider",
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "metering": {
+                  "$ref": "#/$defs/Metering"
+                },
+                "models": {
+                  "default": [],
+                  "items": {
+                    "$ref": "#/$defs/ModelDecl"
+                  },
+                  "type": "array"
+                },
+                "provider_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "provider_id",
+                "label",
+                "metering"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "set_role_preference",
+                  "type": "string"
+                },
+                "model_id": {
+                  "default": null,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "provider_id": {
+                  "type": "string"
+                },
+                "role_key": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "role_key",
+                "provider_id"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "assign_role_provider",
+                  "type": "string"
+                },
+                "model_id": {
+                  "default": null,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "provider_id": {
+                  "type": "string"
+                },
+                "role_key": {
+                  "type": "string"
+                },
+                "team_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "team_id",
+                "role_key",
+                "provider_id"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "approval_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "reassign_role_provider",
+                  "type": "string"
+                },
+                "model_id": {
+                  "default": null,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "provider_id": {
+                  "type": "string"
+                },
+                "role_key": {
+                  "type": "string"
+                },
+                "team_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "team_id",
+                "role_key",
+                "provider_id",
+                "approval_id"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "goal": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "propose_plan",
+                  "type": "string"
+                },
+                "plan_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "plan_id",
+                "goal"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "edits": {
+                  "items": {
+                    "$ref": "#/$defs/PlanEdit"
+                  },
+                  "type": "array"
+                },
+                "kind": {
+                  "const": "edit_plan",
+                  "type": "string"
+                },
+                "plan_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "plan_id",
+                "edits"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "discard_plan",
+                  "type": "string"
+                },
+                "plan_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "plan_id"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "mark_plan_launched",
+                  "type": "string"
+                },
+                "plan_id": {
+                  "type": "string"
+                },
+                "team_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "plan_id",
+                "team_id"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "put_context_note",
+                  "type": "string"
+                },
+                "note_id": {
+                  "type": "string"
+                },
+                "note_kind": {
+                  "$ref": "#/$defs/NoteKind"
+                },
+                "role_key": {
+                  "default": null,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "sources": {
+                  "items": {
+                    "$ref": "#/$defs/SourceRef"
+                  },
+                  "type": "array"
+                },
+                "summary": {
+                  "type": "string"
+                },
+                "team_id": {
+                  "type": "string"
+                },
+                "valid_for_seconds": {
+                  "default": null,
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "kind",
+                "team_id",
+                "note_id",
+                "note_kind",
+                "summary",
+                "sources"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "by_note_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "supersede_context_note",
+                  "type": "string"
+                },
+                "note_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "note_id",
+                "by_note_id"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "accept_knowledge",
+                  "type": "string"
+                },
+                "knowledge_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "knowledge_id"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "by_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "supersede_knowledge",
+                  "type": "string"
+                },
+                "knowledge_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "knowledge_id",
+                "by_id"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "architectural": {
+                  "default": false,
+                  "type": "boolean"
+                },
+                "dispute_id": {
+                  "type": "string"
+                },
+                "evidence": {
+                  "items": {
+                    "$ref": "#/$defs/Evidence"
+                  },
+                  "type": "array"
+                },
+                "kind": {
+                  "const": "raise_dispute",
+                  "type": "string"
+                },
+                "position": {
+                  "type": "string"
+                },
+                "task_id": {
+                  "default": null,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "team_id": {
+                  "type": "string"
+                },
+                "topic": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "dispute_id",
+                "team_id",
+                "topic",
+                "position",
+                "evidence"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "dispute_id": {
+                  "type": "string"
+                },
+                "evidence": {
+                  "default": [],
+                  "items": {
+                    "$ref": "#/$defs/Evidence"
+                  },
+                  "type": "array"
+                },
+                "kind": {
+                  "const": "respond_dispute",
+                  "type": "string"
+                },
+                "position": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "dispute_id",
+                "position"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "dispute_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "resolve_dispute",
+                  "type": "string"
+                },
+                "resolution": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "dispute_id",
+                "resolution"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "decision": {
+                  "type": "string"
+                },
+                "dispute_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "decide_dispute",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "dispute_id",
+                "decision"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "basis": {
+                  "$ref": "#/$defs/UsageBasis"
+                },
+                "cost_micros": {
+                  "default": null,
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "input_tokens": {
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "kind": {
+                  "const": "report_usage",
+                  "type": "string"
+                },
+                "output_tokens": {
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "provider_id": {
+                  "type": "string"
+                },
+                "team_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "team_id",
+                "provider_id",
+                "input_tokens",
+                "output_tokens",
+                "basis"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "set_team_limits",
+                  "type": "string"
+                },
+                "max_metered_cost_micros": {
+                  "default": null,
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "max_metered_tokens": {
+                  "default": null,
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "team_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "team_id"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "actor_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "set_agent_state",
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "state": {
+                  "$ref": "#/$defs/AgentRunState"
+                }
+              },
+              "required": [
+                "kind",
+                "actor_id",
+                "state",
+                "reason"
+              ],
+              "type": "object"
             }
           ]
         },
@@ -6284,6 +9155,14 @@
           ],
           "type": "string"
         },
+        "KnowledgeKind": {
+          "enum": [
+            "note",
+            "requirement",
+            "adr"
+          ],
+          "type": "string"
+        },
         "KnowledgeScope": {
           "oneOf": [
             {
@@ -6317,6 +9196,271 @@
               "required": [
                 "scope",
                 "team_id"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "Metering": {
+          "description": "What a provider says about how it reports usage. Declared, not verified.",
+          "oneOf": [
+            {
+              "const": "metered",
+              "description": "Usage and cost come from the provider's own accounting.",
+              "type": "string"
+            },
+            {
+              "const": "estimated",
+              "description": "Anything reported is an approximation made by the harness.",
+              "type": "string"
+            },
+            {
+              "const": "none",
+              "description": "Nothing is reported.",
+              "type": "string"
+            }
+          ]
+        },
+        "ModelDecl": {
+          "additionalProperties": false,
+          "properties": {
+            "capabilities": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "type": "object"
+        },
+        "NoteKind": {
+          "oneOf": [
+            {
+              "const": "summary",
+              "description": "A short account of a thread or task.",
+              "type": "string"
+            },
+            {
+              "const": "role_context",
+              "description": "What a specialist role learned, kept so the next engagement can start informed.",
+              "type": "string"
+            }
+          ]
+        },
+        "PlanEdit": {
+          "description": "A change the Owner makes to a plan before launching it.",
+          "oneOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "op": {
+                  "const": "rename_team",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "op",
+                "name"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "op": {
+                  "const": "set_project",
+                  "type": "string"
+                },
+                "project_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "op",
+                "project_id"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "op": {
+                  "const": "remove_task",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "op",
+                "key"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "op": {
+                  "const": "restore_task",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "op",
+                "key"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "op": {
+                  "const": "set_task_title",
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "op",
+                "key",
+                "title"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "depends_on": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "key": {
+                  "type": "string"
+                },
+                "op": {
+                  "const": "set_task_dependencies",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "op",
+                "key",
+                "depends_on"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "depends_on": {
+                  "default": [],
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "key": {
+                  "type": "string"
+                },
+                "op": {
+                  "const": "add_task",
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "op",
+                "key",
+                "title",
+                "description"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "op": {
+                  "const": "drop_recruitment",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "op",
+                "key"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "op": {
+                  "const": "restore_recruitment",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "op",
+                "key"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "model_id": {
+                  "default": null,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "op": {
+                  "const": "set_role_provider",
+                  "type": "string"
+                },
+                "provider_id": {
+                  "type": "string"
+                },
+                "role_key": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "op",
+                "role_key",
+                "provider_id"
               ],
               "type": "object"
             }
@@ -6378,6 +9522,39 @@
               "type": "string"
             }
           ]
+        },
+        "SourceKind": {
+          "enum": [
+            "task",
+            "handoff",
+            "decision",
+            "knowledge",
+            "dispute"
+          ],
+          "type": "string"
+        },
+        "SourceRef": {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "kind": {
+              "$ref": "#/$defs/SourceKind"
+            }
+          },
+          "required": [
+            "kind",
+            "id"
+          ],
+          "type": "object"
+        },
+        "UsageBasis": {
+          "enum": [
+            "metered",
+            "estimated"
+          ],
+          "type": "string"
         }
       },
       "$schema": "https://json-schema.org/draft/2020-12/schema",

@@ -293,6 +293,49 @@ impl Service {
                 let params: params::DraftParams = decode(params)?;
                 Ok(drafts::preview(store.state()?, &params.draft))
             }
+            "teams.plans.launch.v1" => {
+                let params: params::PlanLaunchParams = decode(params)?;
+                self.launch_plan(store, actor, params)
+            }
+            "teams.memory.retrieve.v1" => {
+                let params: params::MemoryParams = decode(params)?;
+                store.state()?.retrieve_memory(
+                    actor,
+                    params.team_id.as_deref(),
+                    params.task_id.as_deref(),
+                    params.budget_bytes.unwrap_or(model::DEFAULT_BUDGET),
+                    unix_now(),
+                )
+            }
+            "teams.summary.v1" => {
+                let params: params::SummaryParams = decode(params)?;
+                store.state()?.summary(
+                    actor,
+                    unix_now(),
+                    params
+                        .stuck_after_seconds
+                        .unwrap_or(model::DEFAULT_STUCK_SECONDS)
+                        .max(1),
+                )
+            }
+            "teams.plans.get.v1" => {
+                let params: params::PlanRef = decode(params)?;
+                let plan = store
+                    .state()?
+                    .plans
+                    .get(&params.plan_id)
+                    .ok_or_else(|| Error::new("not_found", "plan not found"))?;
+                Ok(json!({"type": "teams_plan", "plan": plan}))
+            }
+            "teams.plans.list.v1" => {
+                let plans: Vec<Value> = store
+                    .state()?
+                    .plans
+                    .values()
+                    .map(|p| json!({"id": p.id, "goal": p.goal, "status": p.status, "revision": p.revision}))
+                    .collect();
+                Ok(json!({"type": "teams_plans", "plans": plans}))
+            }
             "teams.drafts.launch.v1" => {
                 let params: params::DraftLaunchParams = decode(params)?;
                 self.launch_draft(store, actor, params)
@@ -465,6 +508,209 @@ impl Service {
         candidate.validate()?;
         let watermark = candidate.next_sequence.saturating_sub(1);
         store.commit(candidate)?;
+        self.publish(watermark);
+        Ok(result)
+    }
+
+    /// Launches a reviewed plan: the team, its tasks with their dependencies, and the role
+    /// assignments, in one all-or-nothing commit. Specialists are listed, not started: the Lead
+    /// requests them when the task they follow is done.
+    fn launch_plan(
+        &self,
+        store: &mut store::Store,
+        actor: &model::Actor,
+        params: params::PlanLaunchParams,
+    ) -> Result<Value> {
+        if params.idempotency_key.is_empty() || params.idempotency_key.len() > 128 {
+            return Err(Error::new(
+                "invalid_params",
+                "idempotency key must contain 1 to 128 bytes",
+            ));
+        }
+        let command_digest = format!(
+            "{:x}",
+            Sha256::digest(format!("plan-launch\0{}", params.plan_id).as_bytes())
+        );
+        let key = serde_json::to_string(&(actor.id.as_str(), params.idempotency_key.as_str()))
+            .map_err(|_| Error::new("invalid_params", "request key cannot be encoded"))?;
+        if let Some(receipt) = store.state()?.receipts.get(&key) {
+            if receipt.digest != command_digest {
+                return Err(Error::new(
+                    "idempotency_conflict",
+                    "request key was already used for a different command",
+                ));
+            }
+            return Ok(receipt.result.clone());
+        }
+        if params.expected_revision != store.state()?.revision {
+            return Err(Error::new(
+                "revision_conflict",
+                "read a fresh snapshot before retrying with a new request key",
+            ));
+        }
+        let state = store.state()?;
+        let plan = state
+            .plans
+            .get(&params.plan_id)
+            .cloned()
+            .ok_or_else(|| Error::new("not_found", "plan not found"))?;
+        if plan.status != model::PlanStatus::Draft {
+            return Err(Error::new(
+                "invalid_state",
+                "only a draft plan can be launched",
+            ));
+        }
+        let draft = drafts::DraftInput {
+            name: plan.draft.name.clone(),
+            project_id: plan.draft.project_id.clone(),
+            lead: plan.draft.lead.clone(),
+            developer: plan.draft.developer.clone(),
+            qa: plan.draft.qa.clone(),
+        };
+        let problems = drafts::problems(state, &draft);
+        if !problems.is_empty() {
+            return Err(Error::new("draft_invalid", problems[0].clone())
+                .with_details(json!({ "problems": problems })));
+        }
+        let team_id = drafts::team_id(state, &draft);
+        let dir = self.root.join(drafts::KEYS_DIR).join(&team_id);
+        make_private_dir(&dir)?;
+        let mut steps = 1;
+        let outcome = (|| -> Result<(Value, model::State)> {
+            let mut digests = Vec::new();
+            for role in ["lead", "developer", "qa"] {
+                digests.push(create_credential(&dir.join(format!("{role}.key")))?);
+            }
+            let digests: [String; 3] = digests
+                .try_into()
+                .map_err(|_| Error::new("corrupt_state", "credential count"))?;
+            let now = unix_now();
+            let mut candidate = state.clone();
+            let team_commands = drafts::plan(state, &draft, &digests);
+            steps = team_commands.len() as u64;
+            drafts::apply(&mut candidate, actor, team_commands, now)?;
+            // The Lead creates the tasks, as the Lead would.
+            let lead = candidate.authenticate(&digests[0])?;
+            let kept: Vec<&model::PlanTaskView> =
+                plan.tasks.iter().filter(|t| !t.removed).collect();
+            let id_of = |key: &str| format!("{team_id}-{key}");
+            let mut created: Vec<String> = Vec::new();
+            let mut remaining: Vec<&model::PlanTaskView> = kept.clone();
+            while !remaining.is_empty() {
+                let before = remaining.len();
+                let mut next = Vec::new();
+                for task in remaining {
+                    if task.depends_on.iter().all(|d| created.contains(d)) {
+                        let digest = format!(
+                            "{:x}",
+                            Sha256::digest(
+                                format!("{}\0{}", task.title, task.description).as_bytes()
+                            )
+                        );
+                        candidate.execute_at(
+                            &lead,
+                            model::Command::CreateTask {
+                                team_id: team_id.clone(),
+                                task_id: id_of(&task.key),
+                                title: task.title.clone(),
+                                description: task.description.clone(),
+                                developer_id: draft.developer.clone(),
+                                dependencies: task.depends_on.iter().map(|d| id_of(d)).collect(),
+                                assignment_message_id: format!("{}-assign", id_of(&task.key)),
+                                dispatch: model::DispatchIntent {
+                                    attempt_id: format!("{}-attempt-1", id_of(&task.key)),
+                                    run_generation: 1,
+                                    content_digest: digest,
+                                },
+                            },
+                            now,
+                        )?;
+                        steps += 1;
+                        created.push(task.key.clone());
+                    } else {
+                        next.push(task);
+                    }
+                }
+                if next.len() == before {
+                    return Err(Error::new(
+                        "dependency_cycle",
+                        "the plan's tasks do not form a valid graph",
+                    ));
+                }
+                remaining = next;
+            }
+            for role in plan.roles.iter().filter(|r| r.provider_id.is_some()) {
+                candidate.execute_at(
+                    actor,
+                    model::Command::AssignRoleProvider {
+                        team_id: team_id.clone(),
+                        role_key: role.role_key.clone(),
+                        provider_id: role.provider_id.clone().unwrap_or_default(),
+                        model_id: role.model_id.clone(),
+                    },
+                    now,
+                )?;
+                steps += 1;
+            }
+            candidate.execute_at(
+                actor,
+                model::Command::MarkPlanLaunched {
+                    plan_id: plan.id.clone(),
+                    team_id: team_id.clone(),
+                },
+                now,
+            )?;
+            steps += 1;
+            let pending: Vec<Value> = plan
+                .recruitments
+                .iter()
+                .filter(|r| !r.dropped)
+                .map(|r| {
+                    json!({
+                        "key": r.key, "specialty": r.specialty, "deliverable": r.deliverable,
+                        "request_after_task": r.after_task.as_deref().map(|k| id_of(k)),
+                        "capabilities": r.capabilities, "because": r.because,
+                        "provider_id": r.provider_id, "model_id": r.model_id,
+                    })
+                })
+                .collect();
+            let result = json!({
+                "type": "teams_plan_launched",
+                "plan_id": plan.id, "team_id": team_id,
+                "task_ids": created.iter().map(|k| (k.clone(), json!(id_of(k)))).collect::<serde_json::Map<_, _>>(),
+                "pending_specialists": pending,
+                "credential_files": {
+                    "lead": dir.join("lead.key"), "developer": dir.join("developer.key"), "qa": dir.join("qa.key"),
+                },
+                "revision": candidate.revision, "stream_id": candidate.stream_id,
+                "watermark": candidate.next_sequence.saturating_sub(1),
+            });
+            candidate.receipts.insert(
+                key,
+                model::StoredReceipt {
+                    digest: command_digest,
+                    result: result.clone(),
+                    revision: candidate.revision,
+                },
+            );
+            candidate.trim_receipts();
+            candidate.validate()?;
+            Ok((result, candidate))
+        })();
+        let (result, candidate) = match outcome {
+            Ok(done) => done,
+            Err(error) => {
+                let _ = std::fs::remove_dir_all(&dir);
+                return Err(error);
+            }
+        };
+        let watermark = candidate.next_sequence.saturating_sub(1);
+        if let Err(error) = store.commit_steps(candidate, steps) {
+            if error.code != "commit_unknown" {
+                let _ = std::fs::remove_dir_all(&dir);
+            }
+            return Err(error);
+        }
         self.publish(watermark);
         Ok(result)
     }

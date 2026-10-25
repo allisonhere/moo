@@ -169,7 +169,9 @@ impl Command {
             | Self::ConsumeApproval { .. }
             | Self::SubmitSpecialistHandoff { .. }
             | Self::SubmitIntegration { .. }
-            | Self::ReviewIntegration { .. } => Authority::AgentAutonomous,
+            | Self::ReviewIntegration { .. }
+            | Self::RaiseDispute { .. }
+            | Self::RespondDispute { .. } => Authority::AgentAutonomous,
             Self::CreateTask { .. }
             | Self::SetTaskDependencies { .. }
             | Self::FinalizeTask { .. }
@@ -186,6 +188,11 @@ impl Command {
             | Self::AcknowledgeNotice { .. }
             | Self::BindAgentPane { .. }
             | Self::UnbindAgentPane { .. }
+            | Self::ReassignRoleProvider { .. }
+            | Self::ResolveDispute { .. }
+            | Self::PutContextNote { .. }
+            | Self::SupersedeContextNote { .. }
+            | Self::SetAgentState { .. }
             | Self::CancelIntegration { .. } => Authority::LeadAuthorized,
             Self::CreateProject { .. }
             | Self::CreateTeamSpec { .. }
@@ -202,7 +209,19 @@ impl Command {
             | Self::ResolveConflict { .. }
             | Self::BeginMerge { .. }
             | Self::CompleteMerge { .. }
-            | Self::AbortMerge { .. } => Authority::OwnerOnly,
+            | Self::AbortMerge { .. }
+            | Self::DeclareProvider { .. }
+            | Self::SetRolePreference { .. }
+            | Self::AssignRoleProvider { .. }
+            | Self::ProposePlan { .. }
+            | Self::EditPlan { .. }
+            | Self::DiscardPlan { .. }
+            | Self::MarkPlanLaunched { .. }
+            | Self::AcceptKnowledge { .. }
+            | Self::SupersedeKnowledge { .. }
+            | Self::DecideDispute { .. }
+            | Self::ReportUsage { .. }
+            | Self::SetTeamLimits { .. } => Authority::OwnerOnly,
         }
     }
 
@@ -225,7 +244,19 @@ impl Command {
             | Self::ResolveConflict { .. }
             | Self::BeginMerge { .. }
             | Self::CompleteMerge { .. }
-            | Self::AbortMerge { .. } => &[Role::Owner],
+            | Self::AbortMerge { .. }
+            | Self::DeclareProvider { .. }
+            | Self::SetRolePreference { .. }
+            | Self::AssignRoleProvider { .. }
+            | Self::ProposePlan { .. }
+            | Self::EditPlan { .. }
+            | Self::DiscardPlan { .. }
+            | Self::MarkPlanLaunched { .. }
+            | Self::AcceptKnowledge { .. }
+            | Self::SupersedeKnowledge { .. }
+            | Self::DecideDispute { .. }
+            | Self::ReportUsage { .. }
+            | Self::SetTeamLimits { .. } => &[Role::Owner],
             Self::CreateTask { .. }
             | Self::SetTaskDependencies { .. }
             | Self::FinalizeTask { .. }
@@ -233,7 +264,15 @@ impl Command {
             | Self::RetryDispatch { .. }
             | Self::RequestRecruitment { .. }
             | Self::VerifyRecruitment { .. }
-            | Self::AcknowledgeNotice { .. } => &[Role::Lead],
+            | Self::AcknowledgeNotice { .. }
+            | Self::ReassignRoleProvider { .. }
+            | Self::ResolveDispute { .. } => &[Role::Lead],
+            Self::RaiseDispute { .. } | Self::RespondDispute { .. } => {
+                &[Role::Lead, Role::Developer, Role::Qa]
+            }
+            Self::PutContextNote { .. }
+            | Self::SupersedeContextNote { .. }
+            | Self::SetAgentState { .. } => &[Role::Owner, Role::Lead],
             Self::RenameTeam { .. }
             | Self::SuspendTeam { .. }
             | Self::ResumeTeam { .. }
@@ -666,6 +705,7 @@ impl State {
         if self.recruitments.contains_key(&request.id) {
             return Err(Error::new("already_exists", "recruitment already exists"));
         }
+        self.ensure_within_usage_limits(&request.team_id)?;
         let total = self
             .recruitments
             .values()

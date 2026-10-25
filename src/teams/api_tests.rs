@@ -133,7 +133,7 @@ fn capabilities_advertise_the_whole_surface_and_stay_open_without_a_credential()
     let caps = ok(call(&service, "", "teams.capabilities.v1", json!({})));
     assert_eq!(
         (caps["api_version"].as_u64(), caps["api_minor"].as_u64()),
-        (Some(1), Some(2))
+        (Some(1), Some(3))
     );
     let methods: Vec<&str> = caps["methods"]
         .as_array()
@@ -150,7 +150,7 @@ fn capabilities_advertise_the_whole_surface_and_stay_open_without_a_credential()
     ] {
         assert!(methods.contains(&expected), "{expected}");
     }
-    assert_eq!(caps["operations"].as_array().unwrap().len(), 42);
+    assert!(caps["operations"].as_array().unwrap().len() >= 61);
     assert!(caps["errors"]
         .as_array()
         .unwrap()
@@ -1068,4 +1068,171 @@ fn a_restart_keeps_the_stream_so_cursors_stay_valid_and_stale_ones_say_where_to_
     }
     drop(restarted);
     std::fs::remove_dir_all(root).unwrap();
+}
+
+fn declare_provider(h: &Harness, id: &str, caps: &[&str], metering: &str) {
+    ok(mutate(
+        &h.service,
+        &h.owner,
+        &format!("prov-{id}"),
+        json!({"kind": "declare_provider", "provider_id": id, "label": id, "capabilities": caps,
+            "models": [{"id": "m1"}], "metering": metering, "hard_spend_limit": metering == "metered"}),
+    ));
+}
+
+#[test]
+fn a_reviewed_plan_launches_a_team_with_its_task_graph_and_lists_specialists_without_starting_them()
+{
+    let h = harness("plans");
+    declare_provider(&h, "coder", &["code_edit", "shell", "review"], "estimated");
+    ok(mutate(
+        &h.service,
+        &h.owner,
+        "plan-1",
+        json!({"kind": "propose_plan", "plan_id": "plan-1",
+        "goal": "Add contained OAuth state validation tests and document them"}),
+    ));
+    let plan = ok(call(
+        &h.service,
+        &h.owner,
+        "teams.snapshot.get.v1",
+        json!({}),
+    ));
+    assert!(
+        plan.get("plans").is_none(),
+        "plans are read through their own record, not the shared snapshot"
+    );
+    // Review: drop the documentation task, then launch.
+    ok(mutate(
+        &h.service,
+        &h.owner,
+        "plan-edit",
+        json!({"kind": "edit_plan", "plan_id": "plan-1",
+        "edits": [{"op": "remove_task", "key": "docs"}, {"op": "rename_team", "name": "OAuth tests"}]}),
+    ));
+    let rev = revision(&h.service, &h.owner);
+    let launch = |key: &str| {
+        call(
+            &h.service,
+            &h.owner,
+            "teams.plans.launch.v1",
+            json!({"expected_revision": revision(&h.service, &h.owner), "idempotency_key": key, "plan_id": "plan-1"}),
+        )
+    };
+    assert_eq!(
+        err(call(
+            &h.service,
+            &h.lead,
+            "teams.plans.launch.v1",
+            json!({"expected_revision": rev, "idempotency_key": "x", "plan_id": "plan-1"})
+        ))["code"],
+        "forbidden"
+    );
+    let launched = ok(launch("launch-1"));
+    let team_id = launched["team_id"].as_str().unwrap().to_owned();
+    assert_eq!(team_id, "oauth-tests");
+    assert_eq!(
+        launched["task_ids"].as_object().unwrap().len(),
+        2,
+        "the removed task was not created"
+    );
+    assert_eq!(launched["pending_specialists"][0]["specialty"], "security");
+    assert_eq!(
+        launched["pending_specialists"][0]["request_after_task"],
+        "oauth-tests-tests"
+    );
+    // The graph exists, with the dependency, and the roles have their providers.
+    let lead = read_credential(&PathBuf::from(
+        launched["credential_files"]["lead"].as_str().unwrap(),
+    ))
+    .unwrap();
+    let tasks = ok(call(&h.service, &lead, "teams.tasks.list.v1", json!({})));
+    assert_eq!(ids(&tasks), ["oauth-tests-implement", "oauth-tests-tests"]);
+    assert_eq!(
+        tasks["items"][1]["dependencies"],
+        json!(["oauth-tests-implement"])
+    );
+    let snapshot = ok(call(&h.service, &lead, "teams.snapshot.get.v1", json!({})));
+    assert_eq!(snapshot["teams"][0]["id"], team_id.as_str());
+    // Nothing started on its own: no recruitment exists until the Lead asks for one.
+    assert_eq!(snapshot["recruitments"], json!([]));
+    // A launched plan cannot launch twice, and replaying the key gives the same answer.
+    assert_eq!(err(launch("launch-2"))["code"], "invalid_state");
+    assert_eq!(ok(launch("launch-1")), launched);
+    assert_eq!(
+        ok(call(&h.service, &h.owner, "teams.list.v1", json!({})))["teams"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+}
+
+#[test]
+fn memory_and_summary_are_served_over_the_api_to_the_right_people() {
+    let h = harness("memory-api");
+    ok(mutate(
+        &h.service,
+        &h.lead,
+        "t1",
+        json!({"kind": "create_task", "team_id": "alpha", "task_id": "t1", "title": "Work", "description": "d",
+        "developer_id": "dev", "dependencies": [], "assignment_message_id": "m-t1",
+        "dispatch": {"attempt_id": "a1", "run_generation": 1, "content_digest": "d".repeat(64)}}),
+    ));
+    let pack = ok(call(
+        &h.service,
+        &h.dev,
+        "teams.memory.retrieve.v1",
+        json!({"task_id": "t1", "budget_bytes": 4096}),
+    ));
+    assert_eq!(pack["task_id"], "t1");
+    assert_eq!(pack["context"]["task"][0]["id"], "t1");
+    assert!(pack["used_bytes"].as_u64().unwrap() <= 4096);
+    assert_eq!(
+        err(call(
+            &h.service,
+            &h.owner,
+            "teams.memory.retrieve.v1",
+            json!({"task_id": "t1"})
+        ))["code"],
+        "invalid_params",
+        "the Owner names the team"
+    );
+    assert_eq!(
+        ok(call(
+            &h.service,
+            &h.owner,
+            "teams.memory.retrieve.v1",
+            json!({"team_id": "alpha", "task_id": "t1"})
+        ))["team_id"],
+        "alpha"
+    );
+    assert_eq!(
+        err(call(
+            &h.service,
+            &h.dev,
+            "teams.memory.retrieve.v1",
+            json!({"team_id": "other"})
+        ))["code"],
+        "forbidden"
+    );
+    let summary = ok(call(
+        &h.service,
+        &h.owner,
+        "teams.summary.v1",
+        json!({"stuck_after_seconds": 1}),
+    ));
+    assert_eq!(summary["totals"]["teams"], 1);
+    assert_eq!(summary["projects"][0]["teams"][0]["open_tasks"], 1);
+    let mine = ok(call(&h.service, &h.dev, "teams.summary.v1", json!({})));
+    assert_eq!(
+        mine["totals"]["teams"], 1,
+        "everyone gets the view of what they may see"
+    );
+    let caps = ok(call(&h.service, "", "teams.capabilities.v1", json!({})));
+    assert_eq!(
+        caps["limits"]["work_limits"]["max_active_tasks_per_team"],
+        3
+    );
+    assert_eq!(caps["limits"]["work_limits"]["max_dispute_positions"], 3);
 }

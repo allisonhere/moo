@@ -12,7 +12,7 @@ use super::{drafts, pager, params};
 
 /// Bumped when methods or optional fields are added; `api_version` changes only on a break.
 pub(super) const API_VERSION: u32 = 1;
-pub(super) const API_MINOR: u32 = 2;
+pub(super) const API_MINOR: u32 = 3;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum Class {
@@ -161,6 +161,41 @@ pub(super) const METHODS: &[MethodInfo] = &[
         "Decision records with cursor pagination.",
     ),
     m(
+        "teams.plans.launch.v1",
+        3,
+        Class::Write,
+        true,
+        "Launch a reviewed plan: the team, its tasks and dependencies, and role assignments, all or nothing (Owner only).",
+    ),
+    m(
+        "teams.plans.get.v1",
+        3,
+        Class::Read,
+        true,
+        "One plan: team draft, tasks and dependencies, specialists, provider choices and the reasons (Owner only).",
+    ),
+    m(
+        "teams.plans.list.v1",
+        3,
+        Class::Read,
+        true,
+        "The plans, by id, goal and status (Owner only).",
+    ),
+    m(
+        "teams.memory.retrieve.v1",
+        3,
+        Class::Read,
+        false,
+        "A bounded, provenance-tagged context for an agent: accepted requirements, the task, exact handoff and review evidence, current notes.",
+    ),
+    m(
+        "teams.summary.v1",
+        3,
+        Class::Read,
+        false,
+        "Across every visible project: pending approvals, stuck tasks with suggested recovery, escalated disputes, agent states and usage.",
+    ),
+    m(
         "teams.audit.list.v1",
         2,
         Class::Read,
@@ -259,6 +294,18 @@ pub(super) fn limits_json() -> Value {
             "unauthenticated_per_second": RATES.anonymous_per_second,
             "unauthenticated_burst": RATES.anonymous_burst,
         },
+        "work_limits": {
+            "max_active_tasks_per_team": model::MAX_ACTIVE_TASKS,
+            "max_open_tasks_per_team": model::MAX_OPEN_TASKS,
+            "max_queued_dispatches_per_team": model::MAX_QUEUED_DISPATCHES,
+            "max_dependency_depth": model::MAX_DEPENDENCY_DEPTH,
+            "max_dispatch_attempts": 3,
+            "max_open_disputes_per_team": model::MAX_OPEN_DISPUTES,
+            "max_dispute_positions": model::MAX_POSITIONS,
+            "max_plan_tasks": model::MAX_PLAN_TASKS,
+            "memory_budget_default_bytes": model::DEFAULT_BUDGET,
+            "memory_budget_max_bytes": model::MAX_BUDGET,
+        },
         "event_waits": {
             "max_open": MAX_WAITERS, "max_open_per_actor": MAX_WAITERS_PER_ACTOR, "max_timeout_ms": MAX_WAIT_MS,
         },
@@ -313,6 +360,11 @@ pub(super) fn schema_document() -> Value {
         "teams.approvals.list.v1": schema_for!(pager::ListParams),
         "teams.decisions.list.v1": schema_for!(pager::ListParams),
         "teams.audit.list.v1": schema_for!(params::AuditParams),
+        "teams.plans.launch.v1": schema_for!(params::PlanLaunchParams),
+        "teams.plans.get.v1": schema_for!(params::PlanRef),
+        "teams.plans.list.v1": {},
+        "teams.memory.retrieve.v1": schema_for!(params::MemoryParams),
+        "teams.summary.v1": schema_for!(params::SummaryParams),
         "teams.drafts.propose.v1": schema_for!(params::ProposeParams),
         "teams.drafts.validate.v1": schema_for!(params::DraftParams),
         "teams.drafts.launch.v1": schema_for!(params::DraftLaunchParams),

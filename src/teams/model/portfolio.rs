@@ -221,6 +221,14 @@ impl Command {
                 | Self::RevokeApproval { .. }
                 | Self::ResolveConflict { .. }
                 | Self::AcknowledgeNotice { .. }
+                | Self::SetAgentState { .. }
+                | Self::ReportUsage { .. }
+                | Self::SetTeamLimits { .. }
+                | Self::DecideDispute { .. }
+                | Self::ResolveDispute { .. }
+                | Self::AcceptKnowledge { .. }
+                | Self::SupersedeKnowledge { .. }
+                | Self::SupersedeContextNote { .. }
         )
     }
 }
@@ -248,7 +256,33 @@ impl State {
             | Command::CancelTeam { team_id, .. }
             | Command::RenameTeam { team_id, .. }
             | Command::ClaimWorktree { team_id, .. }
-            | Command::SubmitIntegration { team_id, .. } => Some(team_id.clone()),
+            | Command::SubmitIntegration { team_id, .. }
+            | Command::AssignRoleProvider { team_id, .. }
+            | Command::ReassignRoleProvider { team_id, .. }
+            | Command::MarkPlanLaunched { team_id, .. }
+            | Command::PutContextNote { team_id, .. }
+            | Command::RaiseDispute { team_id, .. }
+            | Command::ReportUsage { team_id, .. }
+            | Command::SetTeamLimits { team_id, .. } => Some(team_id.clone()),
+            Command::RespondDispute { dispute_id, .. }
+            | Command::ResolveDispute { dispute_id, .. }
+            | Command::DecideDispute { dispute_id, .. } => self
+                .disputes
+                .get(dispute_id)
+                .map(|item| item.team_id.clone()),
+            Command::SupersedeContextNote { note_id, .. } => self
+                .context_notes
+                .get(note_id)
+                .map(|item| item.team_id.clone()),
+            Command::AcceptKnowledge { knowledge_id }
+            | Command::SupersedeKnowledge { knowledge_id, .. } => self
+                .knowledge
+                .get(knowledge_id)
+                .map(|item| item.team_id.clone()),
+            Command::SetAgentState { actor_id, .. } => self
+                .actors
+                .get(actor_id)
+                .and_then(|agent| agent.team_id.clone()),
             Command::BindAgentPane { actor_id, .. } | Command::UnbindAgentPane { actor_id } => self
                 .actors
                 .get(actor_id)
@@ -285,7 +319,12 @@ impl State {
             | Command::EnrollActor { .. }
             | Command::LaunchTeam { .. }
             | Command::RegisterSurface { .. }
-            | Command::ResolveConflict { .. } => None,
+            | Command::ResolveConflict { .. }
+            | Command::DeclareProvider { .. }
+            | Command::SetRolePreference { .. }
+            | Command::ProposePlan { .. }
+            | Command::EditPlan { .. }
+            | Command::DiscardPlan { .. } => None,
         }
     }
 
