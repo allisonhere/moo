@@ -162,7 +162,7 @@ impl State {
             return Err(Error::new("already_exists", "dispute already exists"));
         }
         if let Some(task) = task_id.as_deref() {
-            if !self.tasks.get(task).is_some_and(|t| t.team_id == team_id) {
+            if self.tasks.get(task).is_none_or(|t| t.team_id != team_id) {
                 return Err(Error::new(
                     "invalid_reference",
                     "the task is not one of this team's",
