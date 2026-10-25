@@ -929,6 +929,10 @@ pub(crate) fn schema_document() -> Value {
     catalog::schema_document()
 }
 
+/// The label of the tab that holds the Teams screen. The tab bar draws a tab with this label as a
+/// pill, so the name is part of how the tab looks.
+pub(crate) const TAB_LABEL: &str = "Teams";
+
 /// Whether this platform can run Teams, so the main screen offers its commands there. The store is
 /// created the first time the Teams screen opens.
 pub(crate) fn available() -> bool {

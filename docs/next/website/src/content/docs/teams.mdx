@@ -17,11 +17,11 @@ Everything is kept in one store on your machine, as an append-only history that 
 
 ## Getting started
 
-Open the command palette (`prefix+space`) and choose **teams: open screen**, or run `moo teams ui`. The first time, Teams creates its store and your private Owner credential for you. `moo teams init` does that step on its own if you want it done ahead of time.
+Open the command palette (`prefix+space`), type `team` and choose **teams: open screen**. It opens in its own tab, shown in the tab bar as a pill, and choosing it again goes back to that tab. `moo teams tab` does the same from a shell, and `moo teams ui` runs the screen in the pane you are in. The first time, Teams creates its store and your private Owner credential for you. `moo teams init` does that step on its own if you want it done ahead of time.
 
 The store and the Owner credential live in Moo's config directory (`~/.config/moo`, or `~/.config/moo/sessions/<name>` for a named session). The credential file is private to you; keep it away from your agents.
 
-To leave Teams, press `q` in the screen. Your panes and workspaces are untouched. There is no switch that turns Teams off; the Teams commands stay in the palette on Linux and macOS, and nothing runs until you open the screen.
+To leave Teams, press `q` in the screen; that closes the Teams tab. Your panes and workspaces are untouched. There is no switch that turns Teams off; the Teams commands stay in the palette on Linux and macOS, and nothing runs until you open the screen.
 
 Teams works for local sessions on Linux and macOS. It is not available on Windows.
 

@@ -49,7 +49,7 @@ impl EndpointCommandRegistry {
 
 impl EndpointCommandRegistry {
     /// Adds the Teams commands to what the command palette lists, where Teams is available. They run
-    /// the Teams screen in a pane like any other custom command.
+    /// the Teams screen in its own tab.
     pub(super) fn with_teams(mut self, enabled: bool) -> Self {
         if !enabled {
             return self;
@@ -59,8 +59,8 @@ impl EndpointCommandRegistry {
             |label: &str, args: &str, description: &str| crate::config::CustomCommandKeybind {
                 bindings: crate::config::ActionKeybinds::default(),
                 label: label.to_owned(),
-                command: format!("\"$MOO_BIN_PATH\" teams ui{args}"),
-                action: crate::config::CustomCommandAction::Pane,
+                command: format!("\"$MOO_BIN_PATH\" teams tab{args}"),
+                action: crate::config::CustomCommandAction::Shell,
                 description: Some(description.to_owned()),
                 width: None,
                 height: None,
@@ -841,8 +841,8 @@ mod tests {
             ["teams: open screen", "teams: decisions", "teams: new team"]
         );
         assert!(registry.entries.iter().all(|e| {
-            e.binding.action == crate::config::CustomCommandAction::Pane
-                && e.binding.command.starts_with("\"$MOO_BIN_PATH\" teams ui")
+            e.binding.action == crate::config::CustomCommandAction::Shell
+                && e.binding.command.starts_with("\"$MOO_BIN_PATH\" teams tab")
                 && e.id.contains("_teams_")
         }));
         // User commands keep their place at the front.

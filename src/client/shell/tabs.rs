@@ -132,6 +132,9 @@ pub(crate) fn render_tab_bar(
             right_padding = padding.saturating_sub(left) as usize,
         );
         put_text(buffer, rect.x, rect.y, rect.width, &text, style);
+        if is_teams_tab(tab) && rect.width >= 3 {
+            draw_teams_pill(buffer, rect, tab.focused, palette);
+        }
         if tab_shows_pill(tab, config.tab_agent_pill) && left < rect.width {
             put_text(
                 buffer,
@@ -398,6 +401,34 @@ fn max_tab_scroll(widths: &[u16], available: u16) -> usize {
 }
 
 const TAB_PILL: &str = "●";
+const PILL_LEFT_CAP: &str = "◖";
+const PILL_RIGHT_CAP: &str = "◗";
+
+/// The tab that holds the Teams screen (`moo teams tab` makes it).
+fn is_teams_tab(tab: &ClientShellTab) -> bool {
+    tab.custom_label && tab.label == crate::teams::TAB_LABEL
+}
+
+/// Draws the Teams tab as a rounded pill in its own color, so it reads differently from the
+/// square tabs around it: a filled pill when focused, a pill-colored label when not.
+fn draw_teams_pill(buffer: &mut Buffer, rect: Rect, focused: bool, palette: &Palette) {
+    let color = palette.mauve;
+    let (fg, bg) = if focused {
+        (panel_contrast_fg(palette), color)
+    } else {
+        (color, palette.surface0)
+    };
+    for x in rect.x + 1..rect.right().saturating_sub(1) {
+        if let Some(cell) = buffer.cell_mut((x, rect.y)) {
+            let symbol = cell.symbol().to_owned();
+            cell.set_symbol(&symbol)
+                .set_style(Style::default().fg(fg).bg(bg));
+        }
+    }
+    let cap = Style::default().fg(bg).bg(palette.panel_bg);
+    put_text(buffer, rect.x, rect.y, 1, PILL_LEFT_CAP, cap);
+    put_text(buffer, rect.right() - 1, rect.y, 1, PILL_RIGHT_CAP, cap);
+}
 
 fn tab_shows_pill(tab: &ClientShellTab, enabled: bool) -> bool {
     enabled && (tab.color.is_some() || tab.agent_status != crate::api::schema::AgentStatus::Unknown)
@@ -419,6 +450,7 @@ fn tab_label(tab: &ClientShellTab, pill: bool) -> String {
 #[cfg(test)]
 mod tests {
     use super::max_tab_scroll;
+    use super::{draw_teams_pill, is_teams_tab, PILL_LEFT_CAP, PILL_RIGHT_CAP};
 
     #[test]
     fn trailing_scroll_limit_accounts_for_full_widths_and_separators() {
@@ -438,5 +470,32 @@ mod tests {
                 "widths={widths:?}, available={available}"
             );
         }
+    }
+
+    #[test]
+    fn the_teams_tab_is_drawn_as_a_pill_and_only_when_its_label_was_set_on_purpose() {
+        let tab = |label: &str, custom_label: bool| crate::protocol::ClientShellTab {
+            tab_id: "w1:t1".into(),
+            workspace_id: "w1".into(),
+            number: 1,
+            label: label.into(),
+            custom_label,
+            zoomed: false,
+            focused: true,
+            agent_status: crate::api::schema::AgentStatus::Unknown,
+            color: None,
+        };
+        assert!(is_teams_tab(&tab("Teams", true)));
+        assert!(!is_teams_tab(&tab("Teams", false)));
+        assert!(!is_teams_tab(&tab("Docs", true)));
+
+        let palette = crate::app::state::Palette::catppuccin();
+        let area = ratatui::layout::Rect::new(0, 0, 12, 1);
+        let mut buffer = ratatui::buffer::Buffer::empty(area);
+        draw_teams_pill(&mut buffer, area, true, &palette);
+        assert_eq!(buffer[(0, 0)].symbol(), PILL_LEFT_CAP);
+        assert_eq!(buffer[(11, 0)].symbol(), PILL_RIGHT_CAP);
+        assert_eq!(buffer[(5, 0)].bg, palette.mauve);
+        assert_eq!(buffer[(0, 0)].fg, palette.mauve);
     }
 }
