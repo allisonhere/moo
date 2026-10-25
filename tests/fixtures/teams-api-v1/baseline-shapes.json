@@ -1,0 +1,16 @@
+{
+  "note": "Frozen: top-level result keys that clients written for Teams API 1.0 (Phases 1-4) rely on. Additions are allowed; removing or renaming any of these is a break. Do not edit to bless a change - add a new method instead.",
+  "teams.capabilities.v1": ["type", "api_version", "store_version", "methods", "local_only", "credential_security_supported", "max_store_bytes", "max_records", "max_message_bytes", "max_page_size", "adapters", "command_schema", "enforcement", "security"],
+  "teams.snapshot.get.v1": ["version", "revision", "stream_id", "last_event_sequence", "viewer", "projects", "team_specs", "teams", "actors", "tasks", "acceptances", "handoffs", "decisions", "messages", "knowledge", "dispatches", "approvals", "recruitments", "surfaces", "worktrees", "integrations", "conflicts", "notices", "bindings", "attention"],
+  "teams.get.v1": ["version", "revision", "stream_id", "last_event_sequence", "teams", "tasks", "messages"],
+  "teams.list.v1": ["teams", "revision", "stream_id"],
+  "teams.conflicts.list.v1": ["revision", "stream_id", "last_event_sequence", "data"],
+  "teams.integrations.list.v1": ["revision", "stream_id", "last_event_sequence", "data"],
+  "teams.events.list.v1": ["stream_id", "after", "next_after", "has_more", "events"],
+  "teams.events.resume.v1": ["stream_id", "after", "next_after", "has_more", "events"],
+  "teams.mutate.v1": ["type", "revision", "stream_id", "watermark", "outcome"],
+  "teams.validate.v1": ["type", "valid", "preview"],
+  "event": ["sequence", "revision", "actor_id", "kind", "payload", "authority", "at", "prev_hash", "hash"],
+  "error": ["code", "message"],
+  "team_in_list": ["id", "name", "project_id", "status", "open_tasks", "open_integrations"]
+}

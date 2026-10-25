@@ -22,6 +22,7 @@ const MAX_SPECIALISTS_PER_TEAM: usize = 1;
 const MAX_SPECIALISTS_PER_PROJECT: usize = 2;
 const MAX_SPECIALIST_RETRIES: u8 = 2;
 const MAX_SPECIALIST_MINUTES: u32 = 240;
+const MAX_APPROVAL_NOTES: usize = 8;
 const MAX_ACTION_PARAMETER_BYTES: usize = 4096;
 const MIN_APPROVAL_TTL_SECONDS: u64 = 60;
 const MAX_APPROVAL_TTL_SECONDS: u64 = 24 * 60 * 60;
@@ -89,6 +90,11 @@ pub struct Approval {
     pub action: ProtectedAction,
     pub action_digest: String,
     pub justification: String,
+    /// What else was considered, and what could go wrong: context for the Owner, not part of what is approved.
+    #[serde(default)]
+    pub alternatives: Vec<String>,
+    #[serde(default)]
+    pub risks: Vec<String>,
     pub ttl_seconds: u64,
     pub requested_at: u64,
     pub status: ApprovalStatus,
@@ -178,6 +184,8 @@ impl Command {
             | Self::ResumeTeam { .. }
             | Self::ReleaseWorktree { .. }
             | Self::AcknowledgeNotice { .. }
+            | Self::BindAgentPane { .. }
+            | Self::UnbindAgentPane { .. }
             | Self::CancelIntegration { .. } => Authority::LeadAuthorized,
             Self::CreateProject { .. }
             | Self::CreateTeamSpec { .. }
@@ -199,7 +207,7 @@ impl Command {
     }
 
     /// The roles allowed to submit this command at all; handlers still check scope and state.
-    fn permitted_roles(&self) -> &'static [Role] {
+    pub(in crate::teams) fn permitted_roles(&self) -> &'static [Role] {
         const ALL_MEMBERS: &[Role] = &[Role::Owner, Role::Lead, Role::Developer, Role::Qa];
         match self {
             Self::CreateProject { .. }
@@ -230,6 +238,8 @@ impl Command {
             | Self::SuspendTeam { .. }
             | Self::ResumeTeam { .. }
             | Self::ReleaseWorktree { .. }
+            | Self::BindAgentPane { .. }
+            | Self::UnbindAgentPane { .. }
             | Self::CancelIntegration { .. } => &[Role::Owner, Role::Lead],
             Self::SubmitIntegration { .. } => &[Role::Developer, Role::Lead],
             Self::ReviewIntegration { .. } => &[Role::Qa],
@@ -313,11 +323,24 @@ impl State {
         team_id: String,
         action: ProtectedAction,
         justification: String,
+        alternatives: Vec<String>,
+        risks: Vec<String>,
         ttl_seconds: u64,
         revision: u64,
     ) -> Result<Applied> {
         let team = self.require_team_member_or_owner(actor, &team_id)?.clone();
         validate_id("approval_id", &approval_id)?;
+        for (what, items) in [("alternative", &alternatives), ("risk", &risks)] {
+            if items.len() > MAX_APPROVAL_NOTES {
+                return Err(Error::new(
+                    "invalid_params",
+                    format!("name at most {MAX_APPROVAL_NOTES} {what}s"),
+                ));
+            }
+            for item in items {
+                validate_text(what, item, MAX_TITLE_BYTES, false)?;
+            }
+        }
         validate_text("justification", &justification, MAX_MESSAGE_BYTES, false)?;
         validate_action(&action)?;
         if !(MIN_APPROVAL_TTL_SECONDS..=MAX_APPROVAL_TTL_SECONDS).contains(&ttl_seconds) {
@@ -351,6 +374,8 @@ impl State {
             action_digest: action_digest(&team_id, &action)?,
             action,
             justification,
+            alternatives,
+            risks,
             ttl_seconds,
             requested_at: self.now,
             status: ApprovalStatus::Pending,

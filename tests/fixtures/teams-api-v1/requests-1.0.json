@@ -1,0 +1,14 @@
+[
+  {"name": "create project", "method": "teams.mutate.v1", "params": {"idempotency_key": "p1", "command": {"kind": "create_project", "project_id": "moo", "name": "Moo"}}},
+  {"name": "create spec", "method": "teams.mutate.v1", "params": {"idempotency_key": "p2", "command": {"kind": "create_team_spec", "spec_id": "s", "project_id": "moo", "name": "Alpha"}}},
+  {"name": "enroll lead", "method": "teams.mutate.v1", "params": {"idempotency_key": "p3", "command": {"kind": "enroll_actor", "spec_id": "s", "actor_id": "lead", "role": "lead", "credential_digest": "$DIGEST_LEAD", "run_generation": 1}}},
+  {"name": "enroll dev", "method": "teams.mutate.v1", "params": {"idempotency_key": "p4", "command": {"kind": "enroll_actor", "spec_id": "s", "actor_id": "dev", "role": "developer", "credential_digest": "$DIGEST_DEV", "run_generation": 1}}},
+  {"name": "enroll qa", "method": "teams.mutate.v1", "params": {"idempotency_key": "p5", "command": {"kind": "enroll_actor", "spec_id": "s", "actor_id": "qa", "role": "qa", "credential_digest": "$DIGEST_QA", "run_generation": 1}}},
+  {"name": "launch", "method": "teams.mutate.v1", "params": {"idempotency_key": "p6", "command": {"kind": "launch_team", "spec_id": "s", "team_id": "alpha"}}},
+  {"name": "chat without an audience field", "as": "lead", "method": "teams.mutate.v1", "params": {"idempotency_key": "c1", "command": {"kind": "append_chat", "team_id": "alpha", "message_id": "m1", "body": "hello"}}},
+  {"name": "approval without alternatives or risks", "as": "lead", "method": "teams.mutate.v1", "params": {"idempotency_key": "a1", "command": {"kind": "request_approval", "approval_id": "ap1", "team_id": "alpha", "action": {"kind": "release", "target": "v1", "parameters": null}, "justification": "ready", "ttl_seconds": 600}}},
+  {"name": "validate a command", "as": "lead", "method": "teams.validate.v1", "params": {"idempotency_key": "v1", "command": {"kind": "append_chat", "team_id": "alpha", "message_id": "m2", "body": "dry run"}}},
+  {"name": "snapshot", "as": "lead", "method": "teams.snapshot.get.v1", "params": {}},
+  {"name": "events", "as": "lead", "method": "teams.events.list.v1", "params": {"stream_id": "$STREAM", "after": 0, "limit": 100}},
+  {"name": "list teams", "as": "lead", "method": "teams.list.v1", "params": {}}
+]

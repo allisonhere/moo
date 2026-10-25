@@ -249,6 +249,10 @@ impl State {
             | Command::RenameTeam { team_id, .. }
             | Command::ClaimWorktree { team_id, .. }
             | Command::SubmitIntegration { team_id, .. } => Some(team_id.clone()),
+            Command::BindAgentPane { actor_id, .. } | Command::UnbindAgentPane { actor_id } => self
+                .actors
+                .get(actor_id)
+                .and_then(|agent| agent.team_id.clone()),
             Command::DecideApproval { approval_id, .. }
             | Command::RevokeApproval { approval_id, .. }
             | Command::ConsumeApproval { approval_id, .. } => self

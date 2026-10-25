@@ -1,0 +1,304 @@
+---
+title: Teams API
+description: The versioned local JSON API for Moo Teams - methods, events and replay, privacy rules, limits, errors, and a sample client.
+---
+
+The Teams API is the source of truth for Teams. The Teams screen (`moo teams ui`) is one client of it and holds no orchestration logic of its own: anything it does, another program can do with the same methods and the same credentials. This page is the reference; the machine-readable form is `moo teams schema` (also `teams.schema.v1`, and checked in at `docs/next/api/teams-api.schema.json`).
+
+## Transport and authentication
+
+- The API is reached through the local Moo API socket, the same socket as the rest of the JSON API. It is **local only**: there is no network listener (see [Remote access](#remote-access)).
+- One request, one response: write a single JSON object and a newline, read a single JSON line back, close.
+- Request: `{"id": "<1-128 bytes>", "method": "teams.list.v1", "auth": {"bearer": "<token>"}, "params": {...}}`. `auth` is omitted for the two open methods.
+- Success: `{"id": ..., "result": {"type": "...", ...}}`. Error: `{"id": ..., "error": {"code", "message", "retryable", "retry_after_ms"?, "details"?}}`.
+- A token is the 64 hex characters in a credential file. Credential files must be private (mode `0600` in a `0700` directory); the server and `moo teams` both refuse a loose one. Create the Owner's with `moo teams init` and others with `moo teams keygen PATH`, or let `teams.drafts.launch.v1` create a team's three. Tokens are never put in request files, argv or logs.
+- Authority comes from the credential, never from message text. Chat messages are data: nothing typed in chat approves, assigns or launches anything.
+
+## Versioning and compatibility
+
+- `api_version` is `1` and changes only on a break. `api_minor` rises when methods or optional fields are added; each method lists the minor that introduced it (`since_minor`).
+- Discover what a server supports with `teams.capabilities.v1` (open, no credential): `methods`, `method_catalog`, `operations`, `errors`, `limits`. A method that is not advertised is not available, and calling it returns `unknown_method` without disconnecting anything else. A client should disable only the feature that needs it.
+- Method names end in `.v1`. A method's meaning and the fields it returns never change: new response fields are additive, new request fields are optional with a documented default, and anything that would change behavior gets a new method name. Clients must ignore response fields they do not know. Requests refuse unknown fields so a typo is an error.
+- Frozen fixtures in `tests/fixtures/teams-api-v1/` record the response keys and the request set of API 1.0 clients; the test suite replays them against the current server. Do not edit them to bless a change.
+- This API is separate from the TUI client endpoint (generation 1). Nothing here changes those codecs.
+
+## Methods
+
+| Method | Since | Needs | Does |
+|---|---|---|---|
+| `teams.capabilities.v1` | 1.0 | nothing | Discover methods, operations, limits and errors. |
+| `teams.validate.v1` | 1.0 | credential | Dry-run one command; nothing is saved. |
+| `teams.snapshot.get.v1` | 1.0 | credential | Everything the caller may see, with the event watermark. |
+| `teams.events.list.v1` | 1.0 | credential | A page of events after a cursor. |
+| `teams.mutate.v1` | 1.0 | credential, writes | Apply one command, idempotently. |
+| `teams.list.v1` | 1.1 | credential | One line per team the caller may see. |
+| `teams.get.v1` | 1.1 | credential | A snapshot limited to one team. |
+| `teams.conflicts.list.v1` | 1.1 | credential | Cross-team conflicts and change notices. |
+| `teams.integrations.list.v1` | 1.1 | credential | Integration queue, worktrees, conflicts and notices. |
+| `teams.events.resume.v1` | 1.1 | credential | Alias of events.list for resuming from a cursor. |
+| `teams.schema.v1` | 1.2 | nothing | The machine-readable schema of this API. |
+| `teams.events.wait.v1` | 1.2 | credential | Like events.list, but holds the request open until there is something to return. |
+| `teams.messages.list.v1` | 1.2 | credential | Chat messages the caller may read, with cursor pagination. |
+| `teams.tasks.list.v1` | 1.2 | credential | Tasks with cursor pagination. |
+| `teams.approvals.list.v1` | 1.2 | credential | Approvals with cursor pagination. |
+| `teams.decisions.list.v1` | 1.2 | credential | Decision records with cursor pagination. |
+| `teams.audit.list.v1` | 1.2 | Owner | Recent refused requests (Owner only). |
+| `teams.drafts.propose.v1` | 1.2 | Owner, writes | A team draft from a goal (Owner only). |
+| `teams.drafts.validate.v1` | 1.2 | Owner | Check a team draft and preview what launching would do (Owner only). |
+| `teams.drafts.launch.v1` | 1.2 | Owner, writes | Create a team from a draft in one all-or-nothing step (Owner only). |
+
+Reads (`snapshot`, `get`, the lists) return only what the caller may see; see [Privacy](#privacy). Every change goes through `teams.mutate.v1`, with the operations below.
+
+## Operations
+
+Every change is one **command** sent in `teams.mutate.v1`: `{"expected_revision": N, "idempotency_key": "...", "command": {"kind": "...", ...}}`. The same command can be dry-run with `teams.validate.v1`. The authority class says who may send it: *agent* (an agent acts inside its own scope), *lead* (a Lead directs bounded work) or *owner* (only the Owner). The server rechecks authorization when the command runs. `teams.capabilities.v1` carries the same table with a sample of every command.
+
+**projects**
+
+| Command (`kind`) | Authority | Roles | Does |
+|---|---|---|---|
+| `create_project` | owner | owner | Create a project. |
+| `register_surface` | owner | owner | Name a shared interface by the paths that define it. |
+
+**teams**
+
+| Command (`kind`) | Authority | Roles | Does |
+|---|---|---|---|
+| `create_team_spec` | owner | owner | Start a team draft (a spec) in a project. |
+| `enroll_actor` | owner | owner | Enroll the Lead, Developer or QA of a draft with a credential digest. |
+| `launch_team` | owner | owner | Launch a complete draft as a team. |
+| `rename_team` | lead | owner, lead | Change a team's name; its id stays. |
+| `suspend_team` | lead | owner, lead | Pause a team: it cannot start or advance work until resumed. |
+| `resume_team` | lead | owner, lead | Resume a suspended team. |
+| `cancel_team` | owner | owner | Stop a team for good, keeping its history. |
+
+**agents**
+
+| Command (`kind`) | Authority | Roles | Does |
+|---|---|---|---|
+| `bind_agent_pane` | lead | owner, lead | Record which Moo pane runs an agent, and with which provider. |
+| `unbind_agent_pane` | lead | owner, lead | Remove an agent's pane binding. |
+| `request_recruitment` | lead | lead | Ask for a temporary specialist, within bounds. |
+| `activate_recruitment` | owner | owner | Start the specialist for an authorized recruitment. |
+| `submit_specialist_handoff` | agent | specialist | The specialist hands off its deliverable with evidence. |
+| `verify_recruitment` | lead | lead | The Lead accepts or rejects a specialist's handoff. |
+| `cancel_recruitment` | lead | owner, lead | Cancel a specialist engagement. |
+
+**chat**
+
+| Command (`kind`) | Authority | Roles | Does |
+|---|---|---|---|
+| `append_chat` | agent | owner, lead, developer, qa | Post a message to the team, a role or one agent (the audience field). |
+| `put_knowledge` | lead | owner, lead | Record project or team knowledge. |
+
+**tasks**
+
+| Command (`kind`) | Authority | Roles | Does |
+|---|---|---|---|
+| `create_task` | lead | lead | Assign a task to the team's Developer. |
+| `set_task_dependencies` | lead | lead | Change which tasks a task waits for. |
+| `accept_task` | agent | developer | The Developer accepts an assigned task. |
+| `submit_handoff` | agent | developer | The Developer hands a task to QA with evidence. |
+| `review_handoff` | agent | qa | QA accepts or sends back a handoff (a decision record). |
+| `finalize_task` | lead | lead | The Lead finalizes a QA-accepted task (a decision record). |
+| `cancel_task` | lead | lead | The Lead cancels a task (a decision record). |
+| `record_dispatch_receipt` | owner | owner | The Owner records what happened to a dispatch attempt. |
+| `retry_dispatch` | lead | lead | The Lead retries a failed dispatch, within bounds. |
+
+**approvals**
+
+| Command (`kind`) | Authority | Roles | Does |
+|---|---|---|---|
+| `request_approval` | agent | lead, developer, qa | Ask the Owner to authorize one exact protected action. |
+| `decide_approval` | owner | owner | The Owner approves or denies. Never reachable through chat. |
+| `revoke_approval` | owner | owner | The Owner revokes a pending or unused approval. |
+| `consume_approval` | agent | owner, lead, developer, qa | Spend an approval once, for exactly the approved action. |
+
+**worktrees**
+
+| Command (`kind`) | Authority | Roles | Does |
+|---|---|---|---|
+| `claim_worktree` | owner | owner | Record a team's exclusive worktree path and branch. |
+| `release_worktree` | lead | owner, lead | Release a worktree; it is never deleted by Teams. |
+| `approve_worktree_cleanup` | owner | owner | Say whether a released, never-used worktree is safe to delete. |
+
+**integrations**
+
+| Command (`kind`) | Authority | Roles | Does |
+|---|---|---|---|
+| `submit_integration` | agent | developer, lead | Queue a branch for integration with its paths and test evidence. |
+| `review_integration` | agent | qa | QA records the review of a queued integration. |
+| `resolve_conflict` | owner | owner | The Owner resolves a cross-team conflict. |
+| `acknowledge_notice` | lead | lead | The receiving Lead acknowledges a change notice. |
+| `cancel_integration` | lead | owner, lead | Withdraw a queued integration. |
+| `begin_merge` | owner | owner | The Owner starts a merge, spending an exact approval. No force option. |
+| `complete_merge` | owner | owner | The Owner records the merge that landed. |
+| `abort_merge` | owner | owner | The Owner records that a merge did not land. |
+
+
+### Team drafts, proposals, launch, pause and resume
+
+A team is built from a **draft**: a name, a project (empty means the default project), and ids for the Lead, Developer and QA. Three Owner-only methods handle it, so a script, the Teams screen and a person at a terminal do exactly the same thing:
+
+1. `teams.drafts.propose.v1 {"goal": "..."}` returns a draft. With no proposer configured the draft is a plain template named from the goal (`"source": "template"`). The operator can set `MOO_TEAMS_PROPOSER` in the **server's** environment to a program that reads the goal on stdin and prints `{"name": ..., "lead": ..., "developer": ..., "qa": ...}`; the request cannot choose or change that command. A proposal is only ever a suggestion.
+2. `teams.drafts.validate.v1 {"draft": {...}}` says whether the draft is valid (`problems` lists why not), which team id it would get and where its credential files would go. Nothing is created.
+3. `teams.drafts.launch.v1 {"expected_revision", "idempotency_key", "draft"}` creates the three private credential files and the team in one all-or-nothing commit, and returns their paths. Replaying the same key returns the same result and creates nothing twice.
+
+`suspend_team`, `resume_team` and `cancel_team` pause, continue and stop a team; a suspended team cannot start or advance work, and attaching or detaching a client never suspends anything.
+
+## Reading chat, tasks, approvals and decisions
+
+`teams.messages.list.v1`, `teams.tasks.list.v1`, `teams.approvals.list.v1` and `teams.decisions.list.v1` take `{"team_id"?, "task_id"?, "status"?, "cursor"?, "limit"?}` and return `{"items", "has_more", "next_cursor", "revision", "stream_id", "watermark"}`.
+
+- `limit` is 1 to 100 (default 50). Pass the previous `next_cursor` as `cursor`; stop when `has_more` is false.
+- Messages and decisions are immutable and ordered by `(revision, id)`, the order they happened. Tasks and approvals change over time, so they are ordered by `id`. A cursor names the last item returned by a key that never changes, so a page never repeats or skips an item because something changed in between.
+- A cursor the server did not issue is `invalid_cursor`. `status` filters on the record's status tag, for example `pending` for approvals.
+
+A message has an `audience`: `{"to": "team"}` (the default), `{"to": "role", "role": "lead"|"developer"|"qa"}` or `{"to": "actor", "actor_id": "..."}`. The audience is a field the server enforces; a leading `@lead` in a client's text box is only that client's way of choosing it.
+
+## Events and replay
+
+Every committed change appends events to one durable, ordered log per store.
+
+- **Ordering model.** Events have a `sequence`, a gapless, strictly increasing integer. The log belongs to a `stream_id`, fixed for the life of the store and unchanged by restarts. `(stream_id, sequence)` is a cursor. Each event carries `prev_hash` and `hash`, a chain over the log, and the `authority` class and server time (`at`) the change ran under.
+- **Reading.** `teams.events.list.v1 {"stream_id", "after", "limit"}` returns events with `sequence > after` (up to 100), `next_after` (use it as the next `after`), `has_more`, and `watermark` (the newest sequence). Only events the caller may read are returned, but `next_after` still advances past the ones they may not, so skipped events cause no loop. `teams.events.resume.v1` is the same call under a name that says what it is for.
+- **Watching.** `teams.events.wait.v1` takes the same parameters plus `timeout_ms` and holds the request open until there is an event the caller may read, or the wait ends with an empty page. Waits are capped at 25 seconds, at 4 open per credential and 64 overall (`too_many_subscriptions` with `retry_after_ms`); `timeout_ms: 0` polls. Waiting never blocks writers.
+- **Backpressure.** The server keeps nothing per subscriber. A slow reader just asks for the next page when it is ready; a reader that falls too far behind gets `cursor_expired`.
+- **Retention and cursor expiry.** The log keeps at most 4000 events; past that the oldest are compacted away down to 2000, and the chain stays verifiable. A cursor older than the retained log, from another stream, or from the future returns `cursor_expired` with `details`: `stream_id`, `retained_from` (the first sequence still held) and `watermark`.
+- **Recovering.** A client that missed events, lost its connection, or got `cursor_expired` does this: read `teams.snapshot.get.v1`, take its `stream_id` and `last_event_sequence` (the watermark), replace its picture of the world with the snapshot, and resume with `after = watermark`. The snapshot is taken at or after the watermark, so nothing after it is lost; re-delivered events are idempotent by `sequence`. After a server restart the same cursor stays valid.
+
+## Writes
+
+- **Revision check.** `expected_revision` must equal the store's current `revision` (from any snapshot or mutation result). Otherwise `revision_conflict`: read a snapshot and retry with a fresh key.
+- **Idempotency.** `idempotency_key` (1-128 bytes) is scoped to the caller. Repeating a request with the same key and command returns the original result and applies nothing again; the same key with a different command is `idempotency_conflict`. Receipts are kept for the newest 4000 writes. Use a fresh random key per intended change and the same key when retrying after a lost reply.
+- **Atomicity.** A command, or a draft launch, commits all of its changes and events or none.
+
+## Limits
+
+- Requests are rate limited per credential: 20 writes/s (burst 60) and 50 reads/s (burst 200). Failed authentications share one small bucket (5/s, burst 20), so guessing a credential is slow and cannot starve real users. A refusal is `rate_limited` with `retry_after_ms`: wait that long.
+- A message body is at most 16 KiB; a page at most 100 items; the store at most 10000 records and 16 MiB.
+
+## Privacy
+
+| Reader | Team chat | Role message | Direct message | Events about them |
+|---|---|---|---|---|
+| Owner | all | all | all | all |
+| Sender | yes | yes | yes | yes |
+| The addressed role or agent | yes | yes | yes | yes |
+| Others on the same team | yes | no | no | no |
+| Another team | no | no | no | no |
+| A recruited specialist | no | no | no | none (sees its own engagement only) |
+
+A teammate who may not read a scoped message cannot learn from the event stream that it exists. Teams only see their own tasks, approvals, worktrees and integrations; cross-team conflicts and notices are shared with the two teams they name. Project knowledge is shared with the project's teams; team knowledge stays private. `teams.audit.list.v1` (Owner only) lists recent refused requests.
+
+## Errors
+
+| Code | Retry | Meaning |
+|---|---|---|
+| `invalid_request` | no | The request envelope is malformed. |
+| `invalid_params` | no | A parameter is missing, malformed or out of range. |
+| `invalid_cursor` | no | A pagination cursor is not one this server issued. |
+| `unknown_method` | no | The server does not advertise this method; check capabilities. |
+| `unauthorized` | no | The credential is missing, invalid or revoked. |
+| `forbidden` | no | The actor's role or team does not allow this. |
+| `not_found` | no | The named record does not exist or is not visible to the actor. |
+| `already_exists` | no | A record with that id exists. |
+| `invalid_reference` | no | A record names something that does not belong to it. |
+| `invalid_state` | no | The record is not in a state that allows this. |
+| `revision_conflict` | yes | Read a fresh snapshot, then retry with a new idempotency key. |
+| `idempotency_conflict` | no | The idempotency key was used for a different command. |
+| `rate_limited` | yes | Too many requests; wait retry_after_ms. |
+| `too_many_subscriptions` | yes | Too many open event waits; retry later or poll. |
+| `cursor_expired` | no | The cursor is older than the retained log; resync from a snapshot (details.retained_from, details.watermark). |
+| `capacity_exceeded` | no | A hard limit on records or items was reached. |
+| `project_capacity` | no | The project already runs its limit of teams or worktrees. |
+| `team_suspended` | no | The team is suspended; resume it first. |
+| `team_cancelled` | no | The team was cancelled. |
+| `not_approved` | no | No granted approval covers this action. |
+| `approval_expired` | no | The approval's time window has passed. |
+| `approval_used` | no | The approval was already spent. |
+| `approval_mismatch` | no | The action differs from the one approved. |
+| `escalation_required` | no | The request needs an Owner-approved rights escalation. |
+| `deadline_exceeded` | no | The engagement passed its time allocation. |
+| `dependency_blocked` | no | A task dependency is not finished. |
+| `dependency_cycle` | no | Task dependencies would form a cycle. |
+| `stale_handoff` | no | The decision names a handoff that is no longer the latest. |
+| `stale_dispatch` | no | A later dispatch attempt already exists. |
+| `stale_run` | no | The agent's run generation changed. |
+| `retry_exhausted` | no | The dispatch used all its attempts. |
+| `not_ready` | no | The integration needs an accepted review and no open conflict. |
+| `integration_open` | no | An open integration still uses this worktree. |
+| `worktree_conflict` | no | The worktree path or branch overlaps another claim. |
+| `worktree_in_use` | no | The worktree is still active. |
+| `worktree_has_work` | no | The worktree carried submitted work and is preserved. |
+| `unknown_surface` | no | The shared surface is not registered for the project. |
+| `draft_invalid` | no | The team draft has problems; see details.problems. |
+| `proposer_failed` | yes | The configured goal proposer failed or timed out. |
+| `unsupported_platform` | no | Teams credentials are not supported on this platform. |
+| `entropy_unavailable` | yes | The OS could not supply randomness for a credential. |
+| `invalid_credential_file` | no | The credential file is not a bounded private regular file. |
+| `store_unavailable` | yes | The store is temporarily unavailable. |
+| `store_locked` | yes | Another process holds the store. |
+| `store_full` | no | The store reached its size limit. |
+| `store_too_large` | no | The store file exceeds the size limit. |
+| `store_poisoned` | yes | The store hit an internal error; retry or restart. |
+| `storage_unavailable` | yes | A storage operation failed. |
+| `storage_error` | yes | An I/O error occurred. |
+| `commit_unknown` | no | A write may or may not have been saved; read a snapshot before retrying. |
+| `corrupt_state` | no | Stored state failed validation. |
+| `not_initialized` | no | The session has no Teams store; run `moo teams init`. |
+| `already_initialized` | no | The store already exists with different contents. |
+| `invalid_store` | no | The store file is not valid. |
+| `invalid_store_lock` | no | The store lock file is not valid. |
+| `invalid_store_root` | no | The store directory is not valid. |
+| `invalid_store_state` | no | The stored state is not valid. |
+| `unsupported_store_version` | no | The store was written by a newer version. |
+| `revision_exhausted` | no | The revision counter is exhausted. |
+
+## Examples
+
+With the `moo teams call` command (credentials are given with `--credential-file`, never inside the request):
+
+```sh
+moo teams init                                   # prints the owner credential file
+echo '{"id":"1","method":"teams.list.v1","params":{}}' > req.json
+moo teams call req.json --credential-file ~/.config/moo-dev/teams-owner.key
+
+moo teams schema > teams-api.schema.json         # this build's machine-readable schema
+```
+
+The sample client in `examples/teams-client/teams_client.py` uses only the Python standard library and shares no code with Moo:
+
+```sh
+K=~/.config/moo-dev/teams-owner.key
+teams_client.py --credential-file $K list-teams
+teams_client.py --credential-file $K read-chat --team alpha
+teams_client.py --credential-file $K send-message --team alpha --to qa "ready for review?"
+teams_client.py --credential-file $K watch-status           # survives restarts and expired cursors
+teams_client.py --credential-file $K submit-approval ap-1 --approve --reason "reviewed"
+```
+
+`submit-approval` works only with the Owner's credential; with any other it prints `refused: forbidden` and exits 1. `watch-status` prints events as they arrive, honors `retry_after_ms`, reconnects after a restart, and resyncs from a snapshot on `cursor_expired`.
+
+## Security checklist
+
+- [x] The API is reachable only through the local socket; there is no network listener and `teams.capabilities.v1` reports `"network_gateway": false`.
+- [x] Every method but discovery and the schema needs a credential; credential files must be private regular files, and tokens are never logged, audited or echoed in errors.
+- [x] Authority is checked on the server, per command, at the moment it runs. No chat, list or event method can approve, deny or revoke anything.
+- [x] Approvals can be decided only by the Owner, bind the exact action by digest, expire, and are single use.
+- [x] Scoped messages are filtered when read and when events are delivered; another team and a specialist see nothing of them.
+- [x] Writes are idempotent and revision-checked; drafts launch atomically.
+- [x] Requests are rate limited per credential, failed authentications share a small bucket, event waits are bounded, and nothing is queued per subscriber.
+- [x] Refused requests (bad credential, forbidden, rate limits, spent or expired approvals) are recorded in a private, bounded audit log; accepted changes are in the hash-chained event log.
+- [x] The goal proposer is a program named by the operator in the server's environment; a request supplies only the goal text, which is length-limited.
+- [ ] **Not enforced:** agents run as ordinary processes. A shell running as the same OS user can read credential files, edit the store directly or run git, so keep the Owner's credential out of agents' reach. The API enforces its rules for callers that use it; it does not sandbox anything. See *Limitations*.
+
+## Remote access
+
+There is deliberately no HTTP, SSE or WebSocket gateway in this release. The raw Moo local control socket must never be exposed, and a gateway that reaches a store holding approval authority needs authentication, scope-based authorization, binding restrictions and protection against browser-origin attacks that cannot be demonstrated here. Until it can be, use the API from the same machine (or over SSH to a shell on it). A future gateway is a design constraint, not a promise: it would be opt-in, listen on nothing by default, bind to loopback or a Tailscale interface only, require a token with scopes (read, chat, approve), reject requests with a browser `Origin` it did not allow, and translate each request to the same `teams.*` methods so there is one implementation.
+
+## Limitations
+
+- Local only; one request per connection; no push channel other than `teams.events.wait.v1`.
+- Every command revalidates the whole state, so cost grows with the store (limited to 10000 records).
+- Teams records worktrees, merges and approvals; it does not run git, start agents, or sandbox them.

@@ -6,10 +6,12 @@ use serde_json::{json, Value};
 
 use sha2::{Digest, Sha256};
 
+mod bindings;
 mod governance;
 mod portfolio;
 
 use super::{Error, Result};
+pub use bindings::PaneBinding;
 use governance::RecruitmentRequest;
 pub use governance::{Approval, Authority, ProtectedAction, Recruitment};
 use portfolio::Submission;
@@ -27,6 +29,9 @@ const MAX_EVIDENCE_ITEMS: usize = 64;
 const MAX_EVIDENCE_REFERENCE_BYTES: usize = 2048;
 const MAX_DISPATCH_ATTEMPTS: usize = 3;
 const MAX_EVENT_PAGE: usize = 100;
+pub const RETAIN_EVENTS_MAX: usize = 4_000;
+pub const RETAIN_EVENTS_KEEP: usize = 2_000;
+pub const MAX_RECEIPTS: usize = 4_000;
 const OWNER_ID: &str = "owner";
 const RECOVERY_ACTOR_ID: &str = "system:recovery";
 
@@ -256,6 +261,21 @@ pub enum MessageKind {
     },
 }
 
+/// Who a chat message is for. `Team` is the shared channel; the others are scoped: only the
+/// sender, the addressee and the Owner can read them.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "to", rename_all = "snake_case", deny_unknown_fields)]
+pub enum Audience {
+    #[default]
+    Team,
+    Role {
+        role: Role,
+    },
+    Actor {
+        actor_id: String,
+    },
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Message {
     pub id: String,
@@ -264,6 +284,8 @@ pub struct Message {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub task_id: Option<String>,
     pub kind: MessageKind,
+    #[serde(default)]
+    pub audience: Audience,
     pub body: String,
     pub revision: u64,
 }
@@ -382,7 +404,7 @@ pub enum DispatchReceiptKind {
     Failed,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Event {
     pub sequence: u64,
     pub revision: u64,
@@ -399,6 +421,9 @@ pub struct Event {
     /// Server clock, unix seconds.
     #[serde(default)]
     pub at: u64,
+    /// Set for events about scoped messages: who besides the Owner may see them at all.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub restricted_to: Option<Vec<String>>,
     /// Hash chain: each event commits to the one before it, so edits to history are detectable.
     #[serde(default)]
     pub prev_hash: String,
@@ -408,19 +433,24 @@ pub struct Event {
 
 impl Event {
     fn compute_hash(&self) -> String {
-        let bytes = serde_json::to_vec(&json!([
-            self.prev_hash,
-            self.sequence,
-            self.revision,
-            self.actor_id,
-            self.project_id,
-            self.team_id,
-            self.kind,
-            self.payload,
-            self.authority,
-            self.at,
-        ]))
-        .unwrap_or_default();
+        let mut fields = vec![
+            json!(self.prev_hash),
+            json!(self.sequence),
+            json!(self.revision),
+            json!(self.actor_id),
+            json!(self.project_id),
+            json!(self.team_id),
+            json!(self.kind),
+            self.payload.clone(),
+            json!(self.authority),
+            json!(self.at),
+        ];
+        // Only restricted events carry the extra field, so every event written before restrictions
+        // existed still hashes exactly as it did and old logs keep verifying.
+        if let Some(allowed) = &self.restricted_to {
+            fields.push(json!(allowed));
+        }
+        let bytes = serde_json::to_vec(&Value::Array(fields)).unwrap_or_default();
         let mut digest = Sha256::new();
         digest.update(b"moo-teams-event-v1\0");
         digest.update(&bytes);
@@ -432,6 +462,9 @@ impl Event {
 pub struct StoredReceipt {
     pub digest: String,
     pub result: Value,
+    /// The revision the command committed at; orders receipts for trimming.
+    #[serde(default)]
+    pub revision: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -523,6 +556,9 @@ pub enum Command {
         body: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         task_id: Option<String>,
+        /// Defaults to the whole team.
+        #[serde(default)]
+        audience: Audience,
     },
     PutKnowledge {
         team_id: String,
@@ -559,6 +595,10 @@ pub enum Command {
         team_id: String,
         action: ProtectedAction,
         justification: String,
+        #[serde(default)]
+        alternatives: Vec<String>,
+        #[serde(default)]
+        risks: Vec<String>,
         ttl_seconds: u64,
     },
     DecideApproval {
@@ -690,6 +730,16 @@ pub enum Command {
         integration_id: String,
         reason: String,
     },
+    /// Record which Moo pane runs an agent, and with which provider CLI.
+    BindAgentPane {
+        actor_id: String,
+        pane_id: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        provider: Option<String>,
+    },
+    UnbindAgentPane {
+        actor_id: String,
+    },
 }
 
 impl Command {
@@ -735,6 +785,8 @@ impl Command {
             Self::BeginMerge { .. } => "begin_merge",
             Self::CompleteMerge { .. } => "complete_merge",
             Self::AbortMerge { .. } => "abort_merge",
+            Self::BindAgentPane { .. } => "bind_agent_pane",
+            Self::UnbindAgentPane { .. } => "unbind_agent_pane",
         }
     }
 }
@@ -745,6 +797,12 @@ pub struct State {
     pub revision: u64,
     pub stream_id: String,
     pub next_sequence: u64,
+    /// Events up to this sequence were compacted away; the first retained one follows it.
+    #[serde(default)]
+    pub events_base: u64,
+    /// Hash of the last compacted event, so the retained chain still verifies.
+    #[serde(default)]
+    pub base_hash: String,
     pub events: Vec<Event>,
     pub receipts: BTreeMap<String, StoredReceipt>,
     pub projects: BTreeMap<String, Project>,
@@ -773,6 +831,8 @@ pub struct State {
     pub conflicts: BTreeMap<String, Conflict>,
     #[serde(default)]
     pub notices: BTreeMap<String, ChangeNotice>,
+    #[serde(default)]
+    pub pane_bindings: BTreeMap<String, PaneBinding>,
     /// Server clock for the command being applied (unix seconds); set per command, never stored.
     #[serde(skip)]
     now: u64,
@@ -783,6 +843,8 @@ struct PendingEvent {
     team_id: Option<String>,
     kind: &'static str,
     payload: Value,
+    /// Only these actors (and the Owner) may read the event; `None` means the whole team.
+    restricted_to: Option<Vec<String>>,
 }
 
 struct Applied {
@@ -804,6 +866,8 @@ impl State {
             revision: 0,
             stream_id,
             next_sequence: 1,
+            events_base: 0,
+            base_hash: String::new(),
             events: Vec::new(),
             receipts: BTreeMap::new(),
             projects: BTreeMap::new(),
@@ -832,6 +896,7 @@ impl State {
             integrations: BTreeMap::new(),
             conflicts: BTreeMap::new(),
             notices: BTreeMap::new(),
+            pane_bindings: BTreeMap::new(),
             now: 0,
         }
     }
@@ -888,13 +953,14 @@ impl State {
             candidate.append_event(actor.id.clone(), commit_revision, Some(authority), pending)?;
         }
         candidate.now = 0;
+        candidate.compact_events_if_needed();
         candidate.validate()?;
         *self = candidate;
         Ok(applied.result)
     }
 
     pub fn snapshot(&self, actor: &Actor, team_id: Option<&str>) -> Result<Value> {
-        self.validate()?;
+        // State is validated when it is loaded and when it is committed, not on every read.
         self.ensure_current_actor(actor)?;
         let selected_team = self.resolve_read_team(actor, team_id)?;
         // A specialist sees its own engagement and the tasks it was scoped to - not the team's
@@ -969,7 +1035,22 @@ impl State {
             !specialist && selected_ids.contains(value.team_id.as_str())
         });
         let messages = filtered_values(&self.messages, |value| {
-            !specialist && selected_ids.contains(value.team_id.as_str())
+            !specialist
+                && selected_ids.contains(value.team_id.as_str())
+                && message_visible_to(actor, value)
+        });
+        // Records are keyed by id, which is not time order: show messages and decisions as they happened.
+        let mut messages = messages;
+        messages.sort_by(|a, b| (a.revision, &a.id).cmp(&(b.revision, &b.id)));
+        let mut decisions = decisions;
+        decisions.sort_by(|a, b| (a.revision, &a.id).cmp(&(b.revision, &b.id)));
+        let bindings = filtered_values(&self.pane_bindings, |value| {
+            !specialist
+                && self
+                    .actors
+                    .get(&value.actor_id)
+                    .and_then(|bound| bound.team_id.as_deref())
+                    .is_some_and(|team| selected_ids.contains(team))
         });
         // Project knowledge is shared by every team of that project; team knowledge stays private.
         let visible_projects: BTreeSet<&str> = self
@@ -1055,6 +1136,7 @@ impl State {
             "stream_id": self.stream_id,
             "viewer": { "id": actor.id, "role": actor.role, "team_id": actor.team_id },
             "last_event_sequence": self.next_sequence.saturating_sub(1),
+            "retained_from": self.events_base + 1,
             "projects": projects,
             "team_specs": specs,
             "teams": teams,
@@ -1073,6 +1155,7 @@ impl State {
             "integrations": integrations,
             "conflicts": conflicts,
             "notices": notices,
+            "bindings": bindings,
             "attention": attention,
         }))
     }
@@ -1084,13 +1167,19 @@ impl State {
         after: u64,
         limit: usize,
     ) -> Result<Value> {
-        self.validate()?;
         self.ensure_current_actor(actor)?;
+        let resync = || {
+            json!({
+                "stream_id": self.stream_id,
+                "retained_from": self.events_base + 1,
+                "watermark": self.next_sequence.saturating_sub(1),
+            })
+        };
         if stream_id != self.stream_id {
-            return Err(Error::new(
-                "cursor_expired",
-                "event cursor belongs to another stream",
-            ));
+            return Err(
+                Error::new("cursor_expired", "event cursor belongs to another stream")
+                    .with_details(resync()),
+            );
         }
         if limit == 0 || limit > MAX_EVENT_PAGE {
             return Err(Error::new(
@@ -1103,7 +1192,15 @@ impl State {
             return Err(Error::new(
                 "cursor_expired",
                 "event cursor is ahead of the durable stream",
-            ));
+            )
+            .with_details(resync()));
+        }
+        if after < self.events_base {
+            return Err(Error::new(
+                "cursor_expired",
+                "event cursor is older than the retained log; read a snapshot and resume from its watermark",
+            )
+            .with_details(resync()));
         }
 
         let mut page = Vec::new();
@@ -1126,6 +1223,8 @@ impl State {
             "after": after,
             "next_after": next_after,
             "has_more": has_more,
+            "watermark": last_sequence,
+            "retained_from": self.events_base + 1,
             "events": page,
         }))
     }
@@ -1177,6 +1276,7 @@ impl State {
             PendingEvent {
                 project_id: None,
                 team_id: None,
+                restricted_to: None,
                 kind: "dispatch_recovery_unknown",
                 payload: json!({ "attempt_ids": affected, "merge_unknown_integration_ids": merges }),
             },
@@ -1318,7 +1418,10 @@ impl State {
                 message_id,
                 body,
                 task_id,
-            } => self.append_chat(actor, team_id, message_id, body, task_id, revision),
+                audience,
+            } => self.append_chat(
+                actor, team_id, message_id, body, task_id, audience, revision,
+            ),
             Command::PutKnowledge {
                 team_id,
                 knowledge_id,
@@ -1371,6 +1474,8 @@ impl State {
                 team_id,
                 action,
                 justification,
+                alternatives,
+                risks,
                 ttl_seconds,
             } => self.request_approval(
                 actor,
@@ -1378,6 +1483,8 @@ impl State {
                 team_id,
                 action,
                 justification,
+                alternatives,
+                risks,
                 ttl_seconds,
                 revision,
             ),
@@ -1546,6 +1653,53 @@ impl State {
                 integration_id,
                 reason,
             } => self.abort_merge(actor, integration_id, reason, revision),
+            Command::BindAgentPane {
+                actor_id,
+                pane_id,
+                provider,
+            } => self.bind_agent_pane(actor, actor_id, pane_id, provider, revision),
+            Command::UnbindAgentPane { actor_id } => {
+                self.unbind_agent_pane(actor, actor_id, revision)
+            }
+        }
+    }
+
+    /// Drops the oldest events once the log passes `RETAIN_EVENTS_MAX`, keeping `RETAIN_EVENTS_KEEP`.
+    /// The hash chain stays verifiable from `base_hash`, and a reader holding an older cursor is told
+    /// to resync from a snapshot instead of silently missing events.
+    pub fn compact_events_if_needed(&mut self) {
+        self.compact_if_over(RETAIN_EVENTS_MAX, RETAIN_EVENTS_KEEP);
+    }
+
+    pub fn compact_if_over(&mut self, max: usize, keep: usize) {
+        if self.events.len() > max {
+            self.compact_events(keep);
+        }
+    }
+
+    pub fn compact_events(&mut self, keep: usize) {
+        if self.events.len() <= keep {
+            return;
+        }
+        let dropped = self.events.len() - keep;
+        self.base_hash = self.events[dropped - 1].hash.clone();
+        self.events_base += dropped as u64;
+        self.events.drain(..dropped);
+    }
+
+    /// Idempotency receipts only need to cover a retry window; keep the newest `MAX_RECEIPTS`.
+    pub fn trim_receipts(&mut self) {
+        if self.receipts.len() <= MAX_RECEIPTS {
+            return;
+        }
+        let mut order: Vec<(u64, String)> = self
+            .receipts
+            .iter()
+            .map(|(key, receipt)| (receipt.revision, key.clone()))
+            .collect();
+        order.sort();
+        for (_, key) in order.into_iter().take(self.receipts.len() - MAX_RECEIPTS) {
+            self.receipts.remove(&key);
         }
     }
 
@@ -1570,11 +1724,11 @@ impl State {
             payload: event.payload,
             authority,
             at: self.now,
+            restricted_to: event.restricted_to,
             prev_hash: self
                 .events
                 .last()
-                .map(|last| last.hash.clone())
-                .unwrap_or_default(),
+                .map_or_else(|| self.base_hash.clone(), |last| last.hash.clone()),
             hash: String::new(),
         };
         entry.hash = entry.compute_hash();
@@ -1629,14 +1783,25 @@ impl State {
     }
 
     fn actor_can_read_event(&self, actor: &Actor, event: &Event) -> bool {
+        if actor.role == Role::Owner {
+            return true;
+        }
         // A specialist sees its engagement through the snapshot, never the team's event stream.
-        actor.role != Role::Specialist
-            && (actor.role == Role::Owner
-                || actor
-                    .team_id
-                    .as_deref()
-                    .zip(event.team_id.as_deref())
-                    .is_some_and(|(actor_team, event_team)| actor_team == event_team))
+        if actor.role == Role::Specialist {
+            return false;
+        }
+        if event
+            .restricted_to
+            .as_ref()
+            .is_some_and(|allowed| !allowed.contains(&actor.id))
+        {
+            return false;
+        }
+        actor
+            .team_id
+            .as_deref()
+            .zip(event.team_id.as_deref())
+            .is_some_and(|(actor_team, event_team)| actor_team == event_team)
     }
 }
 
@@ -1930,6 +2095,7 @@ impl State {
             id: assignment_message_id.clone(),
             team_id: team_id.clone(),
             sender_id: actor.id.clone(),
+            audience: Audience::Team,
             task_id: Some(task_id.clone()),
             kind: MessageKind::TaskAssignment {
                 task_id: task_id.clone(),
@@ -2151,6 +2317,7 @@ impl State {
             id: message_id.clone(),
             team_id: team_id.clone(),
             sender_id: actor.id.clone(),
+            audience: Audience::Team,
             task_id: Some(task_id.clone()),
             kind: MessageKind::Handoff {
                 task_id: task_id.clone(),
@@ -2308,6 +2475,7 @@ impl State {
             id: message_id.clone(),
             team_id: team_id.clone(),
             sender_id: actor.id.clone(),
+            audience: Audience::Team,
             task_id: Some(task_id.clone()),
             kind: MessageKind::QaDecision {
                 task_id: task_id.clone(),
@@ -2416,6 +2584,7 @@ impl State {
             id: message_id.clone(),
             team_id: team_id.clone(),
             sender_id: actor.id.clone(),
+            audience: Audience::Team,
             task_id: Some(task_id.clone()),
             kind: MessageKind::Outcome {
                 task_id: task_id.clone(),
@@ -2500,6 +2669,7 @@ impl State {
             id: message_id.clone(),
             team_id: team_id.clone(),
             sender_id: actor.id.clone(),
+            audience: Audience::Team,
             task_id: Some(task_id.clone()),
             kind: MessageKind::Cancellation {
                 task_id: task_id.clone(),
@@ -2542,6 +2712,7 @@ impl State {
 }
 
 impl State {
+    #[allow(clippy::too_many_arguments)] // A chat message names its channel, audience and task.
     fn append_chat(
         &mut self,
         actor: &Actor,
@@ -2549,6 +2720,7 @@ impl State {
         message_id: String,
         body: String,
         task_id: Option<String>,
+        audience: Audience,
         revision: u64,
     ) -> Result<Applied> {
         let team = self.require_team_member_or_owner(actor, &team_id)?.clone();
@@ -2556,6 +2728,31 @@ impl State {
         validate_text("message body", &body, MAX_MESSAGE_BYTES, false)?;
         if self.messages.contains_key(&message_id) {
             return Err(Error::new("already_exists", "message already exists"));
+        }
+        match &audience {
+            Audience::Team => {}
+            Audience::Role { role } => {
+                if !matches!(role, Role::Lead | Role::Developer | Role::Qa) {
+                    return Err(Error::new(
+                        "invalid_params",
+                        "a role message goes to the Lead, Developer or QA",
+                    ));
+                }
+            }
+            Audience::Actor { actor_id } => {
+                let addressee = self
+                    .actors
+                    .get(actor_id)
+                    .ok_or_else(|| Error::new("not_found", "message addressee not found"))?;
+                if addressee.role != Role::Owner
+                    && addressee.team_id.as_deref() != Some(team_id.as_str())
+                {
+                    return Err(Error::new(
+                        "invalid_reference",
+                        "a direct message goes to someone on the team or to the Owner",
+                    ));
+                }
+            }
         }
         if let Some(task_id) = task_id.as_deref() {
             let task = self
@@ -2573,19 +2770,43 @@ impl State {
             id: message_id.clone(),
             team_id: team_id.clone(),
             sender_id: actor.id.clone(),
+            audience: audience.clone(),
             task_id,
             kind: MessageKind::Text,
             body,
             revision,
         };
         self.messages.insert(message_id.clone(), message.clone());
-        Ok(applied(
+        // Events about scoped messages are scoped too: whoever cannot read the message cannot even
+        // learn from the event stream that it exists.
+        let restricted_to = match &audience {
+            Audience::Team => None,
+            Audience::Role { role } => {
+                let mut allowed = vec![actor.id.clone()];
+                allowed.extend(
+                    self.actors
+                        .values()
+                        .filter(|member| {
+                            member.team_id.as_deref() == Some(team_id.as_str())
+                                && member.role == *role
+                        })
+                        .map(|member| member.id.clone()),
+                );
+                Some(allowed)
+            }
+            Audience::Actor { actor_id } => Some(vec![actor.id.clone(), actor_id.clone()]),
+        };
+        let mut done = applied(
             serialize_value(&message)?,
             Some(team_id.clone()),
             Some(team.project_id),
             "chat_message_appended",
-            json!({ "team_id": team_id, "message_id": message_id }),
-        ))
+            json!({ "team_id": team_id, "message_id": message_id, "audience": audience }),
+        );
+        if let Some(event) = done.events.first_mut() {
+            event.restricted_to = restricted_to;
+        }
+        Ok(done)
     }
 
     #[allow(clippy::too_many_arguments)] // Knowledge content and provenance form one durable entry.
@@ -3087,6 +3308,7 @@ impl State {
             + self.integrations.len()
             + self.conflicts.len()
             + self.notices.len()
+            + self.pane_bindings.len()
             + self.events.len();
         if records > MAX_RECORDS {
             return Err(Error::new(
@@ -3094,12 +3316,12 @@ impl State {
                 "Teams record limit reached",
             ));
         }
-        if self.next_sequence != self.events.len() as u64 + 1 {
+        if self.next_sequence != self.events_base + self.events.len() as u64 + 1 {
             return Err(corrupt("event sequence does not match the event log"));
         }
         let mut previous_revision = 0;
         for (index, event) in self.events.iter().enumerate() {
-            if event.sequence != index as u64 + 1 {
+            if event.sequence != self.events_base + index as u64 + 1 {
                 return Err(corrupt("event log has a gap"));
             }
             if event.revision < previous_revision || event.revision > self.revision {
@@ -3108,14 +3330,16 @@ impl State {
             previous_revision = event.revision;
             let expected_prev = index
                 .checked_sub(1)
-                .map(|before| self.events[before].hash.as_str())
-                .unwrap_or_default();
+                .map_or(self.base_hash.as_str(), |before| {
+                    self.events[before].hash.as_str()
+                });
             if event.prev_hash != expected_prev || event.hash != event.compute_hash() {
                 return Err(corrupt("event log hash chain is broken"));
             }
         }
         self.validate_governance()?;
         self.validate_portfolio()?;
+        self.validate_bindings()?;
         match self.actors.get(OWNER_ID) {
             Some(owner) if owner.role == Role::Owner => {}
             _ => return Err(corrupt("owner actor is missing")),
@@ -3258,6 +3482,19 @@ impl State {
     }
 }
 
+/// Team messages are for the whole team; role and direct messages only for their sender, their
+/// addressee and the Owner.
+fn message_visible_to(viewer: &Actor, message: &Message) -> bool {
+    if viewer.role == Role::Owner || message.sender_id == viewer.id {
+        return true;
+    }
+    match &message.audience {
+        Audience::Team => true,
+        Audience::Role { role } => viewer.role == *role,
+        Audience::Actor { actor_id } => &viewer.id == actor_id,
+    }
+}
+
 fn applied(
     result: Value,
     team_id: Option<String>,
@@ -3272,6 +3509,7 @@ fn applied(
             team_id,
             kind,
             payload,
+            restricted_to: None,
         }],
     }
 }
@@ -3771,6 +4009,8 @@ mod tests {
                 team_id: "t".into(),
                 action,
                 justification: "ready to integrate".into(),
+                alternatives: vec![],
+                risks: vec![],
                 ttl_seconds: 600,
             },
             now,
@@ -3827,6 +4067,7 @@ mod tests {
                         message_id: format!("m-{}", body.len()),
                         body: body.into(),
                         task_id: None,
+                        audience: Audience::Team,
                     },
                     1_000,
                 )
@@ -4100,7 +4341,8 @@ mod tests {
                         team_id: "t".into(),
                         message_id: "x".into(),
                         body: "hi".into(),
-                        task_id: None
+                        task_id: None,
+                        audience: Audience::Team,
                     },
                     103
                 )
@@ -4447,6 +4689,8 @@ mod tests {
                 team_id: team.into(),
                 action: portfolio::merge_action_for(&state.integrations[integration]),
                 justification: "reviewed and tested".into(),
+                alternatives: vec![],
+                risks: vec![],
                 ttl_seconds: 600,
             },
             10_000,
@@ -4513,6 +4757,7 @@ mod tests {
                     message_id: "c1".into(),
                     body: "team one only".into(),
                     task_id: None,
+                    audience: Audience::Team,
                 },
             )
             .unwrap();
@@ -4589,6 +4834,8 @@ mod tests {
                     team_id: "t2".into(),
                     action: portfolio::merge_action_for(&state.integrations["i1"]),
                     justification: "j".into(),
+                    alternatives: vec![],
+                    risks: vec![],
                     ttl_seconds: 600,
                 },
                 10_000,
@@ -5209,6 +5456,8 @@ mod tests {
                     team_id: "t".into(),
                     action: merge_action("x"),
                     justification: "j".into(),
+                    alternatives: vec![],
+                    risks: vec![],
                     ttl_seconds: 600,
                 },
                 10,
@@ -5448,5 +5697,413 @@ mod tests {
         assert_eq!(legacy.teams["t"].status, TeamStatus::Active);
         create_task(&mut legacy, &lead, "task", &[]).unwrap();
         legacy.snapshot(&owner, None).unwrap();
+    }
+    fn chat(state: &mut State, who: &Actor, id: &str, audience: Audience) -> Result<Value> {
+        state.execute(
+            who,
+            Command::AppendChat {
+                team_id: "t".into(),
+                message_id: id.into(),
+                body: format!("body of {id}"),
+                task_id: None,
+                audience,
+            },
+        )
+    }
+
+    fn visible_ids(state: &State, viewer: &Actor) -> Vec<String> {
+        let snapshot = state.snapshot(viewer, None).unwrap();
+        snapshot["messages"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|m| m["id"].as_str().map(str::to_owned))
+            .collect()
+    }
+
+    #[test]
+    fn role_and_direct_messages_reach_only_their_audience() {
+        let (mut state, owner, lead, dev, qa) = launched();
+        let (lead2, _dev2, _qa2) = add_team(&mut state, &owner, 2);
+        chat(&mut state, &lead, "all", Audience::Team).unwrap();
+        chat(
+            &mut state,
+            &lead,
+            "to-dev-role",
+            Audience::Role {
+                role: Role::Developer,
+            },
+        )
+        .unwrap();
+        chat(
+            &mut state,
+            &dev,
+            "dev-to-qa",
+            Audience::Actor {
+                actor_id: "qa".into(),
+            },
+        )
+        .unwrap();
+        assert_eq!(visible_ids(&state, &lead), ["all", "to-dev-role"]);
+        assert_eq!(
+            visible_ids(&state, &dev),
+            ["all", "to-dev-role", "dev-to-qa"]
+        );
+        assert_eq!(visible_ids(&state, &qa), ["all", "dev-to-qa"]);
+        assert_eq!(
+            visible_ids(&state, &owner).len(),
+            3,
+            "the Owner reads every channel"
+        );
+        assert!(
+            visible_ids(&state, &lead2).is_empty(),
+            "another team sees none"
+        );
+        // The audience is part of the record, so clients can label it.
+        let snapshot = state.snapshot(&dev, None).unwrap();
+        let direct = snapshot["messages"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|m| m["id"] == "dev-to-qa")
+            .unwrap();
+        assert_eq!(
+            direct["audience"],
+            json!({ "to": "actor", "actor_id": "qa" })
+        );
+        // Bad audiences are refused by the server, not by whoever typed an @.
+        assert_eq!(
+            chat(
+                &mut state,
+                &lead,
+                "x1",
+                Audience::Role { role: Role::Owner }
+            )
+            .unwrap_err()
+            .code,
+            "invalid_params"
+        );
+        assert_eq!(
+            chat(
+                &mut state,
+                &lead,
+                "x2",
+                Audience::Actor {
+                    actor_id: "lead2".into()
+                }
+            )
+            .unwrap_err()
+            .code,
+            "invalid_reference",
+            "no direct message across teams"
+        );
+        assert_eq!(
+            chat(
+                &mut state,
+                &lead,
+                "x3",
+                Audience::Actor {
+                    actor_id: "ghost".into()
+                }
+            )
+            .unwrap_err()
+            .code,
+            "not_found"
+        );
+        state.validate().unwrap();
+    }
+
+    #[test]
+    fn an_agent_is_bound_to_a_pane_by_the_owner_or_its_own_lead() {
+        let (mut state, owner, lead, dev, _qa) = launched();
+        let (lead2, _dev2, _qa2) = add_team(&mut state, &owner, 2);
+        let bind = |who: &Actor, state: &mut State, agent: &str, pane: &str| {
+            state.execute(
+                who,
+                Command::BindAgentPane {
+                    actor_id: agent.into(),
+                    pane_id: pane.into(),
+                    provider: Some("claude".into()),
+                },
+            )
+        };
+        bind(&lead, &mut state, "dev", "pane-7").unwrap();
+        assert_eq!(
+            bind(&dev, &mut state, "dev", "pane-8").unwrap_err().code,
+            "forbidden"
+        );
+        assert_eq!(
+            bind(&lead2, &mut state, "qa", "pane-9").unwrap_err().code,
+            "forbidden",
+            "not their team"
+        );
+        assert_eq!(
+            bind(&owner, &mut state, "qa", "pane-7").unwrap_err().code,
+            "already_exists",
+            "one pane, one agent"
+        );
+        assert_eq!(
+            bind(&owner, &mut state, "owner", "pane-1")
+                .unwrap_err()
+                .code,
+            "invalid_reference"
+        );
+        bind(&owner, &mut state, "dev", "pane-70").unwrap();
+        // Visible to the team and the Owner, not to another team; it survives a restart.
+        assert_eq!(
+            state.snapshot(&lead, None).unwrap()["bindings"][0]["pane_id"],
+            "pane-70"
+        );
+        assert_eq!(state.snapshot(&lead2, None).unwrap()["bindings"], json!([]));
+        let restored: State = serde_json::from_slice(&serde_json::to_vec(&state).unwrap()).unwrap();
+        restored.validate().unwrap();
+        assert_eq!(
+            restored.pane_bindings["dev"].provider.as_deref(),
+            Some("claude")
+        );
+        state
+            .execute(
+                &lead,
+                Command::UnbindAgentPane {
+                    actor_id: "dev".into(),
+                },
+            )
+            .unwrap();
+        assert!(state.pane_bindings.is_empty());
+        assert_eq!(
+            state
+                .execute(
+                    &lead,
+                    Command::UnbindAgentPane {
+                        actor_id: "dev".into()
+                    }
+                )
+                .unwrap_err()
+                .code,
+            "not_found"
+        );
+    }
+
+    #[test]
+    fn approvals_carry_bounded_alternatives_and_risks_outside_the_digest() {
+        let (mut state, owner, lead, _dev, _qa) = launched();
+        let request =
+            |id: &str, alternatives: Vec<String>, risks: Vec<String>| Command::RequestApproval {
+                approval_id: id.into(),
+                team_id: "t".into(),
+                action: merge_action("f"),
+                justification: "j".into(),
+                alternatives,
+                risks,
+                ttl_seconds: 600,
+            };
+        state
+            .execute_at(
+                &lead,
+                request(
+                    "a",
+                    vec!["wait for the next release".into()],
+                    vec!["touches the public API".into()],
+                ),
+                10,
+            )
+            .unwrap();
+        state
+            .execute_at(&lead, request("b", vec![], vec![]), 10)
+            .unwrap();
+        assert_eq!(state.approvals["a"].risks, ["touches the public API"]);
+        assert_eq!(
+            state.approvals["a"].action_digest, state.approvals["b"].action_digest,
+            "context is for the Owner and is not what gets approved"
+        );
+        assert_eq!(
+            state
+                .execute_at(&lead, request("c", vec!["x".into(); 9], vec![]), 10)
+                .unwrap_err()
+                .code,
+            "invalid_params"
+        );
+        decide(&mut state, &owner, "a", true, 11).unwrap();
+    }
+    fn event_ids(page: &Value) -> Vec<u64> {
+        page["events"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|e| e["sequence"].as_u64().unwrap())
+            .collect()
+    }
+
+    #[test]
+    fn compaction_keeps_the_chain_verifiable_and_tells_old_cursors_to_resync() {
+        let (mut state, owner, lead, _dev, _qa) = launched();
+        for i in 0..30 {
+            chat(&mut state, &lead, &format!("c{i}"), Audience::Team).unwrap();
+        }
+        let before = state.next_sequence - 1;
+        state.compact_events(10);
+        state.validate().unwrap();
+        assert_eq!((state.events.len(), state.events_base), (10, before - 10));
+        assert_eq!(
+            state.next_sequence - 1,
+            before,
+            "the watermark does not move"
+        );
+        // Appending after compaction continues the sequence and the chain.
+        chat(&mut state, &lead, "after", Audience::Team).unwrap();
+        state.validate().unwrap();
+        assert_eq!(state.events.last().unwrap().sequence, before + 1);
+        // A cursor inside the retained log pages normally and in order.
+        let page = state.event_page(&owner, "stream", before - 5, 100).unwrap();
+        assert_eq!(
+            event_ids(&page),
+            (before - 4..=before + 1).collect::<Vec<_>>()
+        );
+        // A cursor older than the log is told where to resume, never handed a gap.
+        let error = state.event_page(&owner, "stream", 3, 100).unwrap_err();
+        assert_eq!(error.code, "cursor_expired");
+        let details = error.details.unwrap();
+        assert_eq!(details["retained_from"], before - 10 + 1);
+        assert_eq!(details["watermark"], before + 1);
+        // Resyncing from a snapshot's watermark loses nothing after it.
+        let snapshot = state.snapshot(&owner, None).unwrap();
+        let watermark = snapshot["last_event_sequence"].as_u64().unwrap();
+        chat(&mut state, &lead, "later", Audience::Team).unwrap();
+        let resumed = state.event_page(&owner, "stream", watermark, 100).unwrap();
+        assert_eq!(event_ids(&resumed), vec![watermark + 1]);
+        // And a compacted store survives a restart and still validates.
+        let restored: State = serde_json::from_slice(&serde_json::to_vec(&state).unwrap()).unwrap();
+        restored.validate().unwrap();
+        assert_eq!(restored.events_base, state.events_base);
+        // Tampering with what is left is still caught.
+        let mut tampered = state.clone();
+        tampered.events[0].payload = json!({"forged": true});
+        assert_eq!(tampered.validate().unwrap_err().code, "corrupt_state");
+    }
+
+    #[test]
+    fn compaction_triggers_past_the_limit_and_the_limits_are_sane() {
+        const { assert!(RETAIN_EVENTS_KEEP < RETAIN_EVENTS_MAX) };
+        const { assert!(RETAIN_EVENTS_MAX + 100 < MAX_RECORDS) };
+        let (mut state, _owner, lead, _dev, _qa) = launched();
+        for i in 0..40 {
+            chat(&mut state, &lead, &format!("m{i}"), Audience::Team).unwrap();
+        }
+        let total = state.events.len();
+        state.compact_if_over(total + 5, 20);
+        assert_eq!(
+            state.events.len(),
+            total,
+            "under the limit nothing is dropped"
+        );
+        state.compact_if_over(total - 1, 20);
+        assert_eq!(state.events.len(), 20);
+        state.validate().unwrap();
+    }
+
+    #[test]
+    fn events_about_scoped_messages_are_scoped_too() {
+        let (mut state, owner, lead, dev, qa) = launched();
+        let (lead2, _dev2, _qa2) = add_team(&mut state, &owner, 2);
+        chat(&mut state, &lead, "open", Audience::Team).unwrap();
+        chat(
+            &mut state,
+            &lead,
+            "to-dev",
+            Audience::Role {
+                role: Role::Developer,
+            },
+        )
+        .unwrap();
+        chat(
+            &mut state,
+            &dev,
+            "dev-to-qa",
+            Audience::Actor {
+                actor_id: "qa".into(),
+            },
+        )
+        .unwrap();
+        let seen = |viewer: &Actor| -> Vec<String> {
+            state.event_page(viewer, "stream", 0, 100).unwrap()["events"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter(|e| e["kind"] == "chat_message_appended")
+                .map(|e| e["payload"]["message_id"].as_str().unwrap().to_owned())
+                .collect()
+        };
+        assert_eq!(seen(&owner), ["open", "to-dev", "dev-to-qa"]);
+        assert_eq!(
+            seen(&lead),
+            ["open", "to-dev"],
+            "lead sent the role message but was not party to dev-to-qa"
+        );
+        assert_eq!(seen(&dev), ["open", "to-dev", "dev-to-qa"]);
+        assert_eq!(
+            seen(&qa),
+            ["open", "dev-to-qa"],
+            "QA is not the developer role"
+        );
+        assert!(seen(&lead2).is_empty());
+    }
+
+    #[test]
+    fn receipts_are_trimmed_oldest_first() {
+        let (mut state, _owner, _lead, _dev, _qa) = launched();
+        for i in 0..(MAX_RECEIPTS + 10) {
+            state.receipts.insert(
+                format!("k{i}"),
+                StoredReceipt {
+                    digest: String::new(),
+                    result: json!({}),
+                    revision: i as u64,
+                },
+            );
+        }
+        state.trim_receipts();
+        assert_eq!(state.receipts.len(), MAX_RECEIPTS);
+        assert!(
+            !state.receipts.contains_key("k0")
+                && state
+                    .receipts
+                    .contains_key(&format!("k{}", MAX_RECEIPTS + 9))
+        );
+    }
+
+    #[test]
+    fn an_event_without_restrictions_hashes_exactly_as_it_did_before_they_existed() {
+        let event = Event {
+            sequence: 3,
+            revision: 3,
+            actor_id: "owner".into(),
+            project_id: Some("p".into()),
+            team_id: None,
+            kind: "project_created".into(),
+            payload: json!({"project_id": "p"}),
+            authority: Some(Authority::OwnerOnly),
+            at: 77,
+            restricted_to: None,
+            prev_hash: "abc".into(),
+            hash: String::new(),
+        };
+        // The pre-restriction formula, spelled out: ten fields, no eleventh.
+        let legacy = serde_json::to_vec(&json!([
+            "abc", 3, 3, "owner", "p", null, "project_created", {"project_id": "p"}, "owner_only", 77
+        ]))
+        .unwrap();
+        let mut digest = Sha256::new();
+        digest.update(b"moo-teams-event-v1\0");
+        digest.update(&legacy);
+        assert_eq!(event.compute_hash(), format!("{:x}", digest.finalize()));
+        let restricted = Event {
+            restricted_to: Some(vec!["a".into()]),
+            ..event.clone()
+        };
+        assert_ne!(
+            restricted.compute_hash(),
+            event.compute_hash(),
+            "the restriction is covered by the chain"
+        );
     }
 }

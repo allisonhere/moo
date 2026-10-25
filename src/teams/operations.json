@@ -1,0 +1,554 @@
+[
+ {
+  "kind": "create_project",
+  "area": "projects",
+  "summary": "Create a project.",
+  "sample": {
+   "kind": "create_project",
+   "project_id": "moo",
+   "name": "Moo"
+  }
+ },
+ {
+  "kind": "register_surface",
+  "area": "projects",
+  "summary": "Name a shared interface by the paths that define it.",
+  "sample": {
+   "kind": "register_surface",
+   "surface_id": "plugin-api",
+   "project_id": "moo",
+   "path_prefixes": [
+    "src/api"
+   ]
+  }
+ },
+ {
+  "kind": "create_team_spec",
+  "area": "teams",
+  "summary": "Start a team draft (a spec) in a project.",
+  "sample": {
+   "kind": "create_team_spec",
+   "spec_id": "alpha-spec",
+   "project_id": "moo",
+   "name": "Alpha"
+  }
+ },
+ {
+  "kind": "enroll_actor",
+  "area": "teams",
+  "summary": "Enroll the Lead, Developer or QA of a draft with a credential digest.",
+  "sample": {
+   "kind": "enroll_actor",
+   "spec_id": "alpha-spec",
+   "actor_id": "alpha-lead",
+   "role": "lead",
+   "credential_digest": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+   "run_generation": 1
+  }
+ },
+ {
+  "kind": "launch_team",
+  "area": "teams",
+  "summary": "Launch a complete draft as a team.",
+  "sample": {
+   "kind": "launch_team",
+   "spec_id": "alpha-spec",
+   "team_id": "alpha"
+  }
+ },
+ {
+  "kind": "rename_team",
+  "area": "teams",
+  "summary": "Change a team's name; its id stays.",
+  "sample": {
+   "kind": "rename_team",
+   "team_id": "alpha",
+   "name": "Alpha Platform"
+  }
+ },
+ {
+  "kind": "suspend_team",
+  "area": "teams",
+  "summary": "Pause a team: it cannot start or advance work until resumed.",
+  "sample": {
+   "kind": "suspend_team",
+   "team_id": "alpha",
+   "reason": "pause"
+  }
+ },
+ {
+  "kind": "resume_team",
+  "area": "teams",
+  "summary": "Resume a suspended team.",
+  "sample": {
+   "kind": "resume_team",
+   "team_id": "alpha"
+  }
+ },
+ {
+  "kind": "cancel_team",
+  "area": "teams",
+  "summary": "Stop a team for good, keeping its history.",
+  "sample": {
+   "kind": "cancel_team",
+   "team_id": "alpha",
+   "reason": "descoped"
+  }
+ },
+ {
+  "kind": "bind_agent_pane",
+  "area": "agents",
+  "summary": "Record which Moo pane runs an agent, and with which provider.",
+  "sample": {
+   "kind": "bind_agent_pane",
+   "actor_id": "alpha-dev",
+   "pane_id": "w1:p1",
+   "provider": "claude"
+  }
+ },
+ {
+  "kind": "unbind_agent_pane",
+  "area": "agents",
+  "summary": "Remove an agent's pane binding.",
+  "sample": {
+   "kind": "unbind_agent_pane",
+   "actor_id": "alpha-dev"
+  }
+ },
+ {
+  "kind": "request_recruitment",
+  "area": "agents",
+  "summary": "Ask for a temporary specialist, within bounds.",
+  "sample": {
+   "kind": "request_recruitment",
+   "recruitment_id": "r1",
+   "team_id": "alpha",
+   "specialty": "security",
+   "justification": "audit",
+   "deliverable": "review notes",
+   "capabilities": [
+    "review"
+   ],
+   "dependencies": [],
+   "stop_condition": "notes delivered",
+   "max_retries": 1,
+   "max_minutes": 30
+  }
+ },
+ {
+  "kind": "activate_recruitment",
+  "area": "agents",
+  "summary": "Start the specialist for an authorized recruitment.",
+  "sample": {
+   "kind": "activate_recruitment",
+   "recruitment_id": "r1",
+   "actor_id": "sec-1",
+   "credential_digest": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+   "run_generation": 1
+  }
+ },
+ {
+  "kind": "submit_specialist_handoff",
+  "area": "agents",
+  "summary": "The specialist hands off its deliverable with evidence.",
+  "sample": {
+   "kind": "submit_specialist_handoff",
+   "recruitment_id": "r1",
+   "summary": "no blocking issues",
+   "evidence": [
+    {
+     "kind": "test",
+     "reference": "cargo nextest run"
+    }
+   ]
+  }
+ },
+ {
+  "kind": "verify_recruitment",
+  "area": "agents",
+  "summary": "The Lead accepts or rejects a specialist's handoff.",
+  "sample": {
+   "kind": "verify_recruitment",
+   "recruitment_id": "r1",
+   "accepted": true,
+   "rationale": "evidence ok"
+  }
+ },
+ {
+  "kind": "cancel_recruitment",
+  "area": "agents",
+  "summary": "Cancel a specialist engagement.",
+  "sample": {
+   "kind": "cancel_recruitment",
+   "recruitment_id": "r1",
+   "reason": "no longer needed"
+  }
+ },
+ {
+  "kind": "append_chat",
+  "area": "chat",
+  "summary": "Post a message to the team, a role or one agent (the audience field).",
+  "sample": {
+   "kind": "append_chat",
+   "team_id": "alpha",
+   "message_id": "m1",
+   "body": "hello team",
+   "audience": {
+    "to": "team"
+   }
+  }
+ },
+ {
+  "kind": "put_knowledge",
+  "area": "chat",
+  "summary": "Record project or team knowledge.",
+  "sample": {
+   "kind": "put_knowledge",
+   "team_id": "alpha",
+   "knowledge_id": "k1",
+   "scope": {
+    "scope": "team",
+    "team_id": "alpha"
+   },
+   "title": "ADR-1",
+   "body": "use queues",
+   "evidence": []
+  }
+ },
+ {
+  "kind": "create_task",
+  "area": "tasks",
+  "summary": "Assign a task to the team's Developer.",
+  "sample": {
+   "kind": "create_task",
+   "team_id": "alpha",
+   "task_id": "t1",
+   "title": "Build it",
+   "description": "details",
+   "developer_id": "alpha-dev",
+   "dependencies": [],
+   "assignment_message_id": "m-t1",
+   "dispatch": {
+    "attempt_id": "attempt-1",
+    "run_generation": 1,
+    "content_digest": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+   }
+  }
+ },
+ {
+  "kind": "set_task_dependencies",
+  "area": "tasks",
+  "summary": "Change which tasks a task waits for.",
+  "sample": {
+   "kind": "set_task_dependencies",
+   "team_id": "alpha",
+   "task_id": "t1",
+   "dependencies": []
+  }
+ },
+ {
+  "kind": "accept_task",
+  "area": "tasks",
+  "summary": "The Developer accepts an assigned task.",
+  "sample": {
+   "kind": "accept_task",
+   "team_id": "alpha",
+   "task_id": "t1",
+   "acceptance_id": "acc1",
+   "note": "starting"
+  }
+ },
+ {
+  "kind": "submit_handoff",
+  "area": "tasks",
+  "summary": "The Developer hands a task to QA with evidence.",
+  "sample": {
+   "kind": "submit_handoff",
+   "team_id": "alpha",
+   "task_id": "t1",
+   "handoff_id": "h1",
+   "message_id": "m-h1",
+   "summary": "done",
+   "evidence": [
+    {
+     "kind": "test",
+     "reference": "cargo nextest run"
+    }
+   ],
+   "dispatch": {
+    "attempt_id": "attempt-2",
+    "run_generation": 1,
+    "content_digest": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+   }
+  }
+ },
+ {
+  "kind": "review_handoff",
+  "area": "tasks",
+  "summary": "QA accepts or sends back a handoff (a decision record).",
+  "sample": {
+   "kind": "review_handoff",
+   "team_id": "alpha",
+   "task_id": "t1",
+   "handoff_id": "h1",
+   "decision_id": "q1",
+   "message_id": "m-q1",
+   "verdict": "accept",
+   "rationale": "tests pass",
+   "evidence": []
+  }
+ },
+ {
+  "kind": "finalize_task",
+  "area": "tasks",
+  "summary": "The Lead finalizes a QA-accepted task (a decision record).",
+  "sample": {
+   "kind": "finalize_task",
+   "team_id": "alpha",
+   "task_id": "t1",
+   "decision_id": "o1",
+   "message_id": "m-o1",
+   "outcome": "shipped",
+   "evidence": [
+    {
+     "kind": "test",
+     "reference": "cargo nextest run"
+    }
+   ]
+  }
+ },
+ {
+  "kind": "cancel_task",
+  "area": "tasks",
+  "summary": "The Lead cancels a task (a decision record).",
+  "sample": {
+   "kind": "cancel_task",
+   "team_id": "alpha",
+   "task_id": "t1",
+   "decision_id": "c1",
+   "message_id": "m-c1",
+   "reason": "descoped"
+  }
+ },
+ {
+  "kind": "record_dispatch_receipt",
+  "area": "tasks",
+  "summary": "The Owner records what happened to a dispatch attempt.",
+  "sample": {
+   "kind": "record_dispatch_receipt",
+   "team_id": "alpha",
+   "attempt_id": "attempt-1",
+   "task_id": "t1",
+   "message_id": "m-t1",
+   "run_generation": 1,
+   "content_digest": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+   "receipt": "attempted"
+  }
+ },
+ {
+  "kind": "retry_dispatch",
+  "area": "tasks",
+  "summary": "The Lead retries a failed dispatch, within bounds.",
+  "sample": {
+   "kind": "retry_dispatch",
+   "team_id": "alpha",
+   "previous_attempt_id": "attempt-1",
+   "dispatch": {
+    "attempt_id": "attempt-3",
+    "run_generation": 1,
+    "content_digest": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+   }
+  }
+ },
+ {
+  "kind": "request_approval",
+  "area": "approvals",
+  "summary": "Ask the Owner to authorize one exact protected action.",
+  "sample": {
+   "kind": "request_approval",
+   "approval_id": "ap1",
+   "team_id": "alpha",
+   "action": {
+    "kind": "protected_branch_integration",
+    "target": "main",
+    "parameters": {
+     "integration_id": "i1",
+     "commit": "1111111111111111111111111111111111111111"
+    }
+   },
+   "justification": "tests green",
+   "alternatives": [
+    "wait"
+   ],
+   "risks": [
+    "touches the API"
+   ],
+   "ttl_seconds": 3600
+  }
+ },
+ {
+  "kind": "decide_approval",
+  "area": "approvals",
+  "summary": "The Owner approves or denies. Never reachable through chat.",
+  "sample": {
+   "kind": "decide_approval",
+   "approval_id": "ap1",
+   "approve": true,
+   "rationale": "reviewed"
+  }
+ },
+ {
+  "kind": "revoke_approval",
+  "area": "approvals",
+  "summary": "The Owner revokes a pending or unused approval.",
+  "sample": {
+   "kind": "revoke_approval",
+   "approval_id": "ap1",
+   "rationale": "changed my mind"
+  }
+ },
+ {
+  "kind": "consume_approval",
+  "area": "approvals",
+  "summary": "Spend an approval once, for exactly the approved action.",
+  "sample": {
+   "kind": "consume_approval",
+   "approval_id": "ap1",
+   "execution_id": "exec-1",
+   "action": {
+    "kind": "protected_branch_integration",
+    "target": "main",
+    "parameters": {
+     "integration_id": "i1",
+     "commit": "1111111111111111111111111111111111111111"
+    }
+   }
+  }
+ },
+ {
+  "kind": "claim_worktree",
+  "area": "worktrees",
+  "summary": "Record a team's exclusive worktree path and branch.",
+  "sample": {
+   "kind": "claim_worktree",
+   "claim_id": "w1",
+   "team_id": "alpha",
+   "path": "/work/alpha",
+   "branch": "alpha",
+   "base_commit": "1111111111111111111111111111111111111111"
+  }
+ },
+ {
+  "kind": "release_worktree",
+  "area": "worktrees",
+  "summary": "Release a worktree; it is never deleted by Teams.",
+  "sample": {
+   "kind": "release_worktree",
+   "claim_id": "w1"
+  }
+ },
+ {
+  "kind": "approve_worktree_cleanup",
+  "area": "worktrees",
+  "summary": "Say whether a released, never-used worktree is safe to delete.",
+  "sample": {
+   "kind": "approve_worktree_cleanup",
+   "claim_id": "w1"
+  }
+ },
+ {
+  "kind": "submit_integration",
+  "area": "integrations",
+  "summary": "Queue a branch for integration with its paths and test evidence.",
+  "sample": {
+   "kind": "submit_integration",
+   "integration_id": "i1",
+   "team_id": "alpha",
+   "claim_id": "w1",
+   "target_branch": "main",
+   "commit": "1111111111111111111111111111111111111111",
+   "changed_paths": [
+    "src/a.rs"
+   ],
+   "touches": [],
+   "depends_on": [],
+   "tests": [
+    {
+     "kind": "test",
+     "reference": "cargo nextest run"
+    }
+   ]
+  }
+ },
+ {
+  "kind": "review_integration",
+  "area": "integrations",
+  "summary": "QA records the review of a queued integration.",
+  "sample": {
+   "kind": "review_integration",
+   "integration_id": "i1",
+   "accepted": true,
+   "rationale": "diff and tests ok",
+   "evidence": []
+  }
+ },
+ {
+  "kind": "resolve_conflict",
+  "area": "integrations",
+  "summary": "The Owner resolves a cross-team conflict.",
+  "sample": {
+   "kind": "resolve_conflict",
+   "conflict_id": "conflict-i1-i2-pathoverlap",
+   "rationale": "i1 lands first"
+  }
+ },
+ {
+  "kind": "acknowledge_notice",
+  "area": "integrations",
+  "summary": "The receiving Lead acknowledges a change notice.",
+  "sample": {
+   "kind": "acknowledge_notice",
+   "notice_id": "notice-i2-alpha"
+  }
+ },
+ {
+  "kind": "cancel_integration",
+  "area": "integrations",
+  "summary": "Withdraw a queued integration.",
+  "sample": {
+   "kind": "cancel_integration",
+   "integration_id": "i1",
+   "reason": "superseded"
+  }
+ },
+ {
+  "kind": "begin_merge",
+  "area": "integrations",
+  "summary": "The Owner starts a merge, spending an exact approval. No force option.",
+  "sample": {
+   "kind": "begin_merge",
+   "integration_id": "i1",
+   "approval_id": "ap1"
+  }
+ },
+ {
+  "kind": "complete_merge",
+  "area": "integrations",
+  "summary": "The Owner records the merge that landed.",
+  "sample": {
+   "kind": "complete_merge",
+   "integration_id": "i1",
+   "merge_commit": "2222222222222222222222222222222222222222"
+  }
+ },
+ {
+  "kind": "abort_merge",
+  "area": "integrations",
+  "summary": "The Owner records that a merge did not land.",
+  "sample": {
+   "kind": "abort_merge",
+   "integration_id": "i1",
+   "reason": "did not land"
+  }
+ }
+]

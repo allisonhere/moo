@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use super::model::State;
 use super::{Error, Result};
 
-const STORE_FILE: &str = "teams-v1.json";
+pub(super) const STORE_FILE: &str = "teams-v1.json";
 const LOCK_FILE: &str = ".teams-v1.lock";
 const STORE_VERSION: u32 = 1;
 const MAX_STORE_BYTES: usize = 16 * 1024 * 1024;
@@ -64,6 +64,13 @@ impl Store {
     /// revision. If syncing the parent fails after replacement, this method
     /// reloads the target or poisons the store, then returns `commit_unknown`.
     pub fn commit(&mut self, candidate: State) -> Result<()> {
+        self.commit_steps(candidate, 1)
+    }
+
+    /// Like `commit`, for a state reached by `steps` commands applied together (a team launched
+    /// from a draft): each command still has its own revision and events, and all of them become
+    /// durable in one atomic replacement or none do.
+    pub fn commit_steps(&mut self, candidate: State, steps: u64) -> Result<()> {
         candidate.validate()?;
         validate_store_version(candidate.version)?;
 
@@ -74,7 +81,7 @@ impl Store {
                 "candidate state changes the Teams stream id".to_string(),
             ));
         }
-        let expected_revision = current.revision.checked_add(1).ok_or_else(|| {
+        let expected_revision = current.revision.checked_add(steps.max(1)).ok_or_else(|| {
             Error::new(
                 "revision_exhausted",
                 "Teams store revision is exhausted".to_string(),

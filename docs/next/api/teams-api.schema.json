@@ -1,0 +1,6433 @@
+{
+  "api_minor": 2,
+  "api_version": 1,
+  "command": {
+    "$defs": {
+      "Audience": {
+        "description": "Who a chat message is for. `Team` is the shared channel; the others are scoped: only the\nsender, the addressee and the Owner can read them.",
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "to": {
+                "const": "team",
+                "type": "string"
+              }
+            },
+            "required": [
+              "to"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "role": {
+                "$ref": "#/$defs/Role"
+              },
+              "to": {
+                "const": "role",
+                "type": "string"
+              }
+            },
+            "required": [
+              "to",
+              "role"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "actor_id": {
+                "type": "string"
+              },
+              "to": {
+                "const": "actor",
+                "type": "string"
+              }
+            },
+            "required": [
+              "to",
+              "actor_id"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "DispatchIntent": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt_id": {
+            "type": "string"
+          },
+          "content_digest": {
+            "type": "string"
+          },
+          "run_generation": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "attempt_id",
+          "run_generation",
+          "content_digest"
+        ],
+        "type": "object"
+      },
+      "DispatchReceiptKind": {
+        "enum": [
+          "attempted",
+          "submitted",
+          "acknowledged",
+          "accepted",
+          "rejected",
+          "completed",
+          "failed"
+        ],
+        "type": "string"
+      },
+      "Evidence": {
+        "additionalProperties": false,
+        "properties": {
+          "digest": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "$ref": "#/$defs/EvidenceKind"
+          },
+          "reference": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "reference"
+        ],
+        "type": "object"
+      },
+      "EvidenceKind": {
+        "enum": [
+          "commit",
+          "artifact",
+          "test",
+          "changed_path",
+          "note"
+        ],
+        "type": "string"
+      },
+      "KnowledgeScope": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "project_id": {
+                "type": "string"
+              },
+              "scope": {
+                "const": "project",
+                "type": "string"
+              }
+            },
+            "required": [
+              "scope",
+              "project_id"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "scope": {
+                "const": "team",
+                "type": "string"
+              },
+              "team_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "scope",
+              "team_id"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "ProtectedAction": {
+        "additionalProperties": false,
+        "description": "The exact action an approval authorizes. `parameters` are part of the bound digest.",
+        "properties": {
+          "kind": {
+            "$ref": "#/$defs/ProtectedActionKind"
+          },
+          "parameters": {
+            "default": null
+          },
+          "target": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "target"
+        ],
+        "type": "object"
+      },
+      "ProtectedActionKind": {
+        "enum": [
+          "scope_change",
+          "architecture_change",
+          "rights_escalation",
+          "budget_escalation",
+          "destructive_operation",
+          "protected_branch_integration",
+          "release"
+        ],
+        "type": "string"
+      },
+      "QaVerdict": {
+        "enum": [
+          "accept",
+          "rework"
+        ],
+        "type": "string"
+      },
+      "Role": {
+        "oneOf": [
+          {
+            "enum": [
+              "owner",
+              "lead",
+              "developer",
+              "qa"
+            ],
+            "type": "string"
+          },
+          {
+            "const": "specialist",
+            "description": "A recruited, temporary specialist; never enrolled through a team spec.",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "oneOf": [
+      {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "create_project",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "project_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "project_id",
+          "name"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "create_team_spec",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "project_id": {
+            "type": "string"
+          },
+          "spec_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "spec_id",
+          "project_id",
+          "name"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "actor_id": {
+            "type": "string"
+          },
+          "credential_digest": {
+            "type": "string"
+          },
+          "kind": {
+            "const": "enroll_actor",
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/$defs/Role"
+          },
+          "run_generation": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "spec_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "spec_id",
+          "actor_id",
+          "role",
+          "credential_digest",
+          "run_generation"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "launch_team",
+            "type": "string"
+          },
+          "spec_id": {
+            "type": "string"
+          },
+          "team_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "spec_id",
+          "team_id"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "assignment_message_id": {
+            "type": "string"
+          },
+          "dependencies": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "description": {
+            "type": "string"
+          },
+          "developer_id": {
+            "type": "string"
+          },
+          "dispatch": {
+            "$ref": "#/$defs/DispatchIntent"
+          },
+          "kind": {
+            "const": "create_task",
+            "type": "string"
+          },
+          "task_id": {
+            "type": "string"
+          },
+          "team_id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "team_id",
+          "task_id",
+          "title",
+          "description",
+          "developer_id",
+          "assignment_message_id",
+          "dispatch"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "dependencies": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "kind": {
+            "const": "set_task_dependencies",
+            "type": "string"
+          },
+          "task_id": {
+            "type": "string"
+          },
+          "team_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "team_id",
+          "task_id",
+          "dependencies"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "acceptance_id": {
+            "type": "string"
+          },
+          "kind": {
+            "const": "accept_task",
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "task_id": {
+            "type": "string"
+          },
+          "team_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "team_id",
+          "task_id",
+          "acceptance_id",
+          "note"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "dispatch": {
+            "$ref": "#/$defs/DispatchIntent"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/$defs/Evidence"
+            },
+            "type": "array"
+          },
+          "handoff_id": {
+            "type": "string"
+          },
+          "kind": {
+            "const": "submit_handoff",
+            "type": "string"
+          },
+          "message_id": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "task_id": {
+            "type": "string"
+          },
+          "team_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "team_id",
+          "task_id",
+          "handoff_id",
+          "message_id",
+          "summary",
+          "evidence",
+          "dispatch"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "decision_id": {
+            "type": "string"
+          },
+          "evidence": {
+            "default": [],
+            "items": {
+              "$ref": "#/$defs/Evidence"
+            },
+            "type": "array"
+          },
+          "handoff_id": {
+            "type": "string"
+          },
+          "kind": {
+            "const": "review_handoff",
+            "type": "string"
+          },
+          "message_id": {
+            "type": "string"
+          },
+          "rationale": {
+            "type": "string"
+          },
+          "rework_dispatch": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/DispatchIntent"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "task_id": {
+            "type": "string"
+          },
+          "team_id": {
+            "type": "string"
+          },
+          "verdict": {
+            "$ref": "#/$defs/QaVerdict"
+          }
+        },
+        "required": [
+          "kind",
+          "team_id",
+          "task_id",
+          "handoff_id",
+          "decision_id",
+          "message_id",
+          "verdict",
+          "rationale"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "decision_id": {
+            "type": "string"
+          },
+          "evidence": {
+            "default": [],
+            "items": {
+              "$ref": "#/$defs/Evidence"
+            },
+            "type": "array"
+          },
+          "kind": {
+            "const": "finalize_task",
+            "type": "string"
+          },
+          "message_id": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "task_id": {
+            "type": "string"
+          },
+          "team_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "team_id",
+          "task_id",
+          "decision_id",
+          "message_id",
+          "outcome"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "decision_id": {
+            "type": "string"
+          },
+          "kind": {
+            "const": "cancel_task",
+            "type": "string"
+          },
+          "message_id": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "task_id": {
+            "type": "string"
+          },
+          "team_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "team_id",
+          "task_id",
+          "decision_id",
+          "message_id",
+          "reason"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "audience": {
+            "$ref": "#/$defs/Audience",
+            "default": {
+              "to": "team"
+            },
+            "description": "Defaults to the whole team."
+          },
+          "body": {
+            "type": "string"
+          },
+          "kind": {
+            "const": "append_chat",
+            "type": "string"
+          },
+          "message_id": {
+            "type": "string"
+          },
+          "task_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "team_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "team_id",
+          "message_id",
+          "body"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "body": {
+            "type": "string"
+          },
+          "evidence": {
+            "default": [],
+            "items": {
+              "$ref": "#/$defs/Evidence"
+            },
+            "type": "array"
+          },
+          "kind": {
+            "const": "put_knowledge",
+            "type": "string"
+          },
+          "knowledge_id": {
+            "type": "string"
+          },
+          "scope": {
+            "$ref": "#/$defs/KnowledgeScope"
+          },
+          "team_id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "team_id",
+          "knowledge_id",
+          "scope",
+          "title",
+          "body"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "attempt_id": {
+            "type": "string"
+          },
+          "content_digest": {
+            "type": "string"
+          },
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "evidence": {
+            "default": [],
+            "items": {
+              "$ref": "#/$defs/Evidence"
+            },
+            "type": "array"
+          },
+          "kind": {
+            "const": "record_dispatch_receipt",
+            "type": "string"
+          },
+          "message_id": {
+            "type": "string"
+          },
+          "provider_session": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "receipt": {
+            "$ref": "#/$defs/DispatchReceiptKind"
+          },
+          "run_generation": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "task_id": {
+            "type": "string"
+          },
+          "team_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "team_id",
+          "attempt_id",
+          "task_id",
+          "message_id",
+          "run_generation",
+          "content_digest",
+          "receipt"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "dispatch": {
+            "$ref": "#/$defs/DispatchIntent"
+          },
+          "kind": {
+            "const": "retry_dispatch",
+            "type": "string"
+          },
+          "previous_attempt_id": {
+            "type": "string"
+          },
+          "team_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "team_id",
+          "previous_attempt_id",
+          "dispatch"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "description": "Ask the Owner to authorize one exact protected action. Chat can never do this.",
+        "properties": {
+          "action": {
+            "$ref": "#/$defs/ProtectedAction"
+          },
+          "alternatives": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "approval_id": {
+            "type": "string"
+          },
+          "justification": {
+            "type": "string"
+          },
+          "kind": {
+            "const": "request_approval",
+            "type": "string"
+          },
+          "risks": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "team_id": {
+            "type": "string"
+          },
+          "ttl_seconds": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "kind",
+          "approval_id",
+          "team_id",
+          "action",
+          "justification",
+          "ttl_seconds"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "approval_id": {
+            "type": "string"
+          },
+          "approve": {
+            "type": "boolean"
+          },
+          "kind": {
+            "const": "decide_approval",
+            "type": "string"
+          },
+          "rationale": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "approval_id",
+          "approve",
+          "rationale"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "approval_id": {
+            "type": "string"
+          },
+          "kind": {
+            "const": "revoke_approval",
+            "type": "string"
+          },
+          "rationale": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "approval_id",
+          "rationale"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "description": "Spend an approval, once, for exactly the action it was granted for.",
+        "properties": {
+          "action": {
+            "$ref": "#/$defs/ProtectedAction"
+          },
+          "approval_id": {
+            "type": "string"
+          },
+          "execution_id": {
+            "type": "string"
+          },
+          "kind": {
+            "const": "consume_approval",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "approval_id",
+          "execution_id",
+          "action"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "deliverable": {
+            "type": "string"
+          },
+          "dependencies": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "justification": {
+            "type": "string"
+          },
+          "kind": {
+            "const": "request_recruitment",
+            "type": "string"
+          },
+          "max_minutes": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "max_retries": {
+            "format": "uint8",
+            "maximum": 255,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "recruitment_id": {
+            "type": "string"
+          },
+          "specialty": {
+            "type": "string"
+          },
+          "stop_condition": {
+            "type": "string"
+          },
+          "team_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "recruitment_id",
+          "team_id",
+          "specialty",
+          "justification",
+          "deliverable",
+          "capabilities",
+          "stop_condition",
+          "max_retries",
+          "max_minutes"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "actor_id": {
+            "type": "string"
+          },
+          "credential_digest": {
+            "type": "string"
+          },
+          "kind": {
+            "const": "activate_recruitment",
+            "type": "string"
+          },
+          "recruitment_id": {
+            "type": "string"
+          },
+          "run_generation": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "kind",
+          "recruitment_id",
+          "actor_id",
+          "credential_digest",
+          "run_generation"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "evidence": {
+            "items": {
+              "$ref": "#/$defs/Evidence"
+            },
+            "type": "array"
+          },
+          "kind": {
+            "const": "submit_specialist_handoff",
+            "type": "string"
+          },
+          "recruitment_id": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "recruitment_id",
+          "summary",
+          "evidence"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "accepted": {
+            "type": "boolean"
+          },
+          "kind": {
+            "const": "verify_recruitment",
+            "type": "string"
+          },
+          "rationale": {
+            "type": "string"
+          },
+          "recruitment_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "recruitment_id",
+          "accepted",
+          "rationale"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "cancel_recruitment",
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "recruitment_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "recruitment_id",
+          "reason"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "description": "The team id never changes; only its label does.",
+        "properties": {
+          "kind": {
+            "const": "rename_team",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "team_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "team_id",
+          "name"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "suspend_team",
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "team_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "team_id",
+          "reason"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "resume_team",
+            "type": "string"
+          },
+          "team_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "team_id"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "cancel_team",
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "team_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "team_id",
+          "reason"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "description": "Name a public interface, schema or API by the paths that define it.",
+        "properties": {
+          "kind": {
+            "const": "register_surface",
+            "type": "string"
+          },
+          "path_prefixes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "project_id": {
+            "type": "string"
+          },
+          "surface_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "surface_id",
+          "project_id",
+          "path_prefixes"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "description": "Record that a team owns one worktree path and branch. The harness creates the worktree.",
+        "properties": {
+          "base_commit": {
+            "type": "string"
+          },
+          "branch": {
+            "type": "string"
+          },
+          "claim_id": {
+            "type": "string"
+          },
+          "kind": {
+            "const": "claim_worktree",
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "team_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "claim_id",
+          "team_id",
+          "path",
+          "branch",
+          "base_commit"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "claim_id": {
+            "type": "string"
+          },
+          "kind": {
+            "const": "release_worktree",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "claim_id"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "description": "Says whether a released, never-used worktree may be deleted. Teams never deletes it.",
+        "properties": {
+          "claim_id": {
+            "type": "string"
+          },
+          "kind": {
+            "const": "approve_worktree_cleanup",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "claim_id"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "changed_paths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "claim_id": {
+            "type": "string"
+          },
+          "commit": {
+            "type": "string"
+          },
+          "depends_on": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "integration_id": {
+            "type": "string"
+          },
+          "kind": {
+            "const": "submit_integration",
+            "type": "string"
+          },
+          "target_branch": {
+            "type": "string"
+          },
+          "team_id": {
+            "type": "string"
+          },
+          "tests": {
+            "items": {
+              "$ref": "#/$defs/Evidence"
+            },
+            "type": "array"
+          },
+          "touches": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind",
+          "integration_id",
+          "team_id",
+          "claim_id",
+          "target_branch",
+          "commit",
+          "changed_paths",
+          "tests"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "accepted": {
+            "type": "boolean"
+          },
+          "evidence": {
+            "default": [],
+            "items": {
+              "$ref": "#/$defs/Evidence"
+            },
+            "type": "array"
+          },
+          "integration_id": {
+            "type": "string"
+          },
+          "kind": {
+            "const": "review_integration",
+            "type": "string"
+          },
+          "rationale": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "integration_id",
+          "accepted",
+          "rationale"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "conflict_id": {
+            "type": "string"
+          },
+          "kind": {
+            "const": "resolve_conflict",
+            "type": "string"
+          },
+          "rationale": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "conflict_id",
+          "rationale"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "acknowledge_notice",
+            "type": "string"
+          },
+          "notice_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "notice_id"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "integration_id": {
+            "type": "string"
+          },
+          "kind": {
+            "const": "cancel_integration",
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "integration_id",
+          "reason"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "description": "Owner only; spends an approval naming this integration and commit. There is no force option.",
+        "properties": {
+          "approval_id": {
+            "type": "string"
+          },
+          "integration_id": {
+            "type": "string"
+          },
+          "kind": {
+            "const": "begin_merge",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "integration_id",
+          "approval_id"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "integration_id": {
+            "type": "string"
+          },
+          "kind": {
+            "const": "complete_merge",
+            "type": "string"
+          },
+          "merge_commit": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "integration_id",
+          "merge_commit"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "integration_id": {
+            "type": "string"
+          },
+          "kind": {
+            "const": "abort_merge",
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "integration_id",
+          "reason"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "description": "Record which Moo pane runs an agent, and with which provider CLI.",
+        "properties": {
+          "actor_id": {
+            "type": "string"
+          },
+          "kind": {
+            "const": "bind_agent_pane",
+            "type": "string"
+          },
+          "pane_id": {
+            "type": "string"
+          },
+          "provider": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "actor_id",
+          "pane_id"
+        ],
+        "type": "object"
+      },
+      {
+        "additionalProperties": false,
+        "properties": {
+          "actor_id": {
+            "type": "string"
+          },
+          "kind": {
+            "const": "unbind_agent_pane",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "actor_id"
+        ],
+        "type": "object"
+      }
+    ],
+    "title": "Command"
+  },
+  "draft": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "description": "What a client edits: the three roles and the project. Everything else is derived.",
+    "properties": {
+      "developer": {
+        "type": "string"
+      },
+      "lead": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "project_id": {
+        "default": "",
+        "description": "Empty means \"no project yet\": launching creates a default one.",
+        "type": "string"
+      },
+      "qa": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "name",
+      "lead",
+      "developer",
+      "qa"
+    ],
+    "title": "DraftInput",
+    "type": "object"
+  },
+  "errors": [
+    {
+      "code": "invalid_request",
+      "description": "The request envelope is malformed.",
+      "retryable": false
+    },
+    {
+      "code": "invalid_params",
+      "description": "A parameter is missing, malformed or out of range.",
+      "retryable": false
+    },
+    {
+      "code": "invalid_cursor",
+      "description": "A pagination cursor is not one this server issued.",
+      "retryable": false
+    },
+    {
+      "code": "unknown_method",
+      "description": "The server does not advertise this method; check capabilities.",
+      "retryable": false
+    },
+    {
+      "code": "unauthorized",
+      "description": "The credential is missing, invalid or revoked.",
+      "retryable": false
+    },
+    {
+      "code": "forbidden",
+      "description": "The actor's role or team does not allow this.",
+      "retryable": false
+    },
+    {
+      "code": "not_found",
+      "description": "The named record does not exist or is not visible to the actor.",
+      "retryable": false
+    },
+    {
+      "code": "already_exists",
+      "description": "A record with that id exists.",
+      "retryable": false
+    },
+    {
+      "code": "invalid_reference",
+      "description": "A record names something that does not belong to it.",
+      "retryable": false
+    },
+    {
+      "code": "invalid_state",
+      "description": "The record is not in a state that allows this.",
+      "retryable": false
+    },
+    {
+      "code": "revision_conflict",
+      "description": "Read a fresh snapshot, then retry with a new idempotency key.",
+      "retryable": true
+    },
+    {
+      "code": "idempotency_conflict",
+      "description": "The idempotency key was used for a different command.",
+      "retryable": false
+    },
+    {
+      "code": "rate_limited",
+      "description": "Too many requests; wait retry_after_ms.",
+      "retryable": true
+    },
+    {
+      "code": "too_many_subscriptions",
+      "description": "Too many open event waits; retry later or poll.",
+      "retryable": true
+    },
+    {
+      "code": "cursor_expired",
+      "description": "The cursor is older than the retained log; resync from a snapshot (details.retained_from, details.watermark).",
+      "retryable": false
+    },
+    {
+      "code": "capacity_exceeded",
+      "description": "A hard limit on records or items was reached.",
+      "retryable": false
+    },
+    {
+      "code": "project_capacity",
+      "description": "The project already runs its limit of teams or worktrees.",
+      "retryable": false
+    },
+    {
+      "code": "team_suspended",
+      "description": "The team is suspended; resume it first.",
+      "retryable": false
+    },
+    {
+      "code": "team_cancelled",
+      "description": "The team was cancelled.",
+      "retryable": false
+    },
+    {
+      "code": "not_approved",
+      "description": "No granted approval covers this action.",
+      "retryable": false
+    },
+    {
+      "code": "approval_expired",
+      "description": "The approval's time window has passed.",
+      "retryable": false
+    },
+    {
+      "code": "approval_used",
+      "description": "The approval was already spent.",
+      "retryable": false
+    },
+    {
+      "code": "approval_mismatch",
+      "description": "The action differs from the one approved.",
+      "retryable": false
+    },
+    {
+      "code": "escalation_required",
+      "description": "The request needs an Owner-approved rights escalation.",
+      "retryable": false
+    },
+    {
+      "code": "deadline_exceeded",
+      "description": "The engagement passed its time allocation.",
+      "retryable": false
+    },
+    {
+      "code": "dependency_blocked",
+      "description": "A task dependency is not finished.",
+      "retryable": false
+    },
+    {
+      "code": "dependency_cycle",
+      "description": "Task dependencies would form a cycle.",
+      "retryable": false
+    },
+    {
+      "code": "stale_handoff",
+      "description": "The decision names a handoff that is no longer the latest.",
+      "retryable": false
+    },
+    {
+      "code": "stale_dispatch",
+      "description": "A later dispatch attempt already exists.",
+      "retryable": false
+    },
+    {
+      "code": "stale_run",
+      "description": "The agent's run generation changed.",
+      "retryable": false
+    },
+    {
+      "code": "retry_exhausted",
+      "description": "The dispatch used all its attempts.",
+      "retryable": false
+    },
+    {
+      "code": "not_ready",
+      "description": "The integration needs an accepted review and no open conflict.",
+      "retryable": false
+    },
+    {
+      "code": "integration_open",
+      "description": "An open integration still uses this worktree.",
+      "retryable": false
+    },
+    {
+      "code": "worktree_conflict",
+      "description": "The worktree path or branch overlaps another claim.",
+      "retryable": false
+    },
+    {
+      "code": "worktree_in_use",
+      "description": "The worktree is still active.",
+      "retryable": false
+    },
+    {
+      "code": "worktree_has_work",
+      "description": "The worktree carried submitted work and is preserved.",
+      "retryable": false
+    },
+    {
+      "code": "unknown_surface",
+      "description": "The shared surface is not registered for the project.",
+      "retryable": false
+    },
+    {
+      "code": "draft_invalid",
+      "description": "The team draft has problems; see details.problems.",
+      "retryable": false
+    },
+    {
+      "code": "proposer_failed",
+      "description": "The configured goal proposer failed or timed out.",
+      "retryable": true
+    },
+    {
+      "code": "unsupported_platform",
+      "description": "Teams credentials are not supported on this platform.",
+      "retryable": false
+    },
+    {
+      "code": "entropy_unavailable",
+      "description": "The OS could not supply randomness for a credential.",
+      "retryable": true
+    },
+    {
+      "code": "invalid_credential_file",
+      "description": "The credential file is not a bounded private regular file.",
+      "retryable": false
+    },
+    {
+      "code": "store_unavailable",
+      "description": "The store is temporarily unavailable.",
+      "retryable": true
+    },
+    {
+      "code": "store_locked",
+      "description": "Another process holds the store.",
+      "retryable": true
+    },
+    {
+      "code": "store_full",
+      "description": "The store reached its size limit.",
+      "retryable": false
+    },
+    {
+      "code": "store_too_large",
+      "description": "The store file exceeds the size limit.",
+      "retryable": false
+    },
+    {
+      "code": "store_poisoned",
+      "description": "The store hit an internal error; retry or restart.",
+      "retryable": true
+    },
+    {
+      "code": "storage_unavailable",
+      "description": "A storage operation failed.",
+      "retryable": true
+    },
+    {
+      "code": "storage_error",
+      "description": "An I/O error occurred.",
+      "retryable": true
+    },
+    {
+      "code": "commit_unknown",
+      "description": "A write may or may not have been saved; read a snapshot before retrying.",
+      "retryable": false
+    },
+    {
+      "code": "corrupt_state",
+      "description": "Stored state failed validation.",
+      "retryable": false
+    },
+    {
+      "code": "not_initialized",
+      "description": "The session has no Teams store; run `moo teams init`.",
+      "retryable": false
+    },
+    {
+      "code": "already_initialized",
+      "description": "The store already exists with different contents.",
+      "retryable": false
+    },
+    {
+      "code": "invalid_store",
+      "description": "The store file is not valid.",
+      "retryable": false
+    },
+    {
+      "code": "invalid_store_lock",
+      "description": "The store lock file is not valid.",
+      "retryable": false
+    },
+    {
+      "code": "invalid_store_root",
+      "description": "The store directory is not valid.",
+      "retryable": false
+    },
+    {
+      "code": "invalid_store_state",
+      "description": "The stored state is not valid.",
+      "retryable": false
+    },
+    {
+      "code": "unsupported_store_version",
+      "description": "The store was written by a newer version.",
+      "retryable": false
+    },
+    {
+      "code": "revision_exhausted",
+      "description": "The revision counter is exhausted.",
+      "retryable": false
+    }
+  ],
+  "event": {
+    "$defs": {
+      "Authority": {
+        "description": "A: agents act on their own inside their scope. B: a Lead directs bounded work.\nC: only the Owner may authorize or perform it.",
+        "enum": [
+          "agent_autonomous",
+          "lead_authorized",
+          "owner_only"
+        ],
+        "type": "string"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "actor_id": {
+        "type": "string"
+      },
+      "at": {
+        "default": 0,
+        "description": "Server clock, unix seconds.",
+        "format": "uint64",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "authority": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/Authority"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "The authority class the command ran under; `None` for system events."
+      },
+      "hash": {
+        "default": "",
+        "type": "string"
+      },
+      "kind": {
+        "type": "string"
+      },
+      "payload": true,
+      "prev_hash": {
+        "default": "",
+        "description": "Hash chain: each event commits to the one before it, so edits to history are detectable.",
+        "type": "string"
+      },
+      "project_id": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "restricted_to": {
+        "description": "Set for events about scoped messages: who besides the Owner may see them at all.",
+        "items": {
+          "type": "string"
+        },
+        "type": [
+          "array",
+          "null"
+        ]
+      },
+      "revision": {
+        "format": "uint64",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "sequence": {
+        "format": "uint64",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "team_id": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "required": [
+      "sequence",
+      "revision",
+      "actor_id",
+      "kind",
+      "payload"
+    ],
+    "title": "Event",
+    "type": "object"
+  },
+  "limits": {
+    "default_page_size": 50,
+    "event_waits": {
+      "max_open": 64,
+      "max_open_per_actor": 4,
+      "max_timeout_ms": 25000
+    },
+    "events_retained_after_compaction": 2000,
+    "events_retained_max": 4000,
+    "idempotency_receipts_kept": 4000,
+    "max_event_page": 100,
+    "max_message_bytes": 16384,
+    "max_page_size": 100,
+    "max_records": 10000,
+    "max_store_bytes": 16777216,
+    "rate_limits": {
+      "read_burst": 200.0,
+      "read_per_second": 50.0,
+      "unauthenticated_burst": 20.0,
+      "unauthenticated_per_second": 5.0,
+      "write_burst": 60.0,
+      "write_per_second": 20.0
+    }
+  },
+  "method_catalog": [
+    {
+      "auth": false,
+      "name": "teams.capabilities.v1",
+      "owner_only": false,
+      "since_minor": 0,
+      "summary": "Discover methods, operations, limits and errors.",
+      "writes": false
+    },
+    {
+      "auth": true,
+      "name": "teams.validate.v1",
+      "owner_only": false,
+      "since_minor": 0,
+      "summary": "Dry-run one command; nothing is saved.",
+      "writes": false
+    },
+    {
+      "auth": true,
+      "name": "teams.snapshot.get.v1",
+      "owner_only": false,
+      "since_minor": 0,
+      "summary": "Everything the caller may see, with the event watermark.",
+      "writes": false
+    },
+    {
+      "auth": true,
+      "name": "teams.events.list.v1",
+      "owner_only": false,
+      "since_minor": 0,
+      "summary": "A page of events after a cursor.",
+      "writes": false
+    },
+    {
+      "auth": true,
+      "name": "teams.mutate.v1",
+      "owner_only": false,
+      "since_minor": 0,
+      "summary": "Apply one command, idempotently.",
+      "writes": true
+    },
+    {
+      "auth": true,
+      "name": "teams.list.v1",
+      "owner_only": false,
+      "since_minor": 1,
+      "summary": "One line per team the caller may see.",
+      "writes": false
+    },
+    {
+      "auth": true,
+      "name": "teams.get.v1",
+      "owner_only": false,
+      "since_minor": 1,
+      "summary": "A snapshot limited to one team.",
+      "writes": false
+    },
+    {
+      "auth": true,
+      "name": "teams.conflicts.list.v1",
+      "owner_only": false,
+      "since_minor": 1,
+      "summary": "Cross-team conflicts and change notices.",
+      "writes": false
+    },
+    {
+      "auth": true,
+      "name": "teams.integrations.list.v1",
+      "owner_only": false,
+      "since_minor": 1,
+      "summary": "Integration queue, worktrees, conflicts and notices.",
+      "writes": false
+    },
+    {
+      "auth": true,
+      "name": "teams.events.resume.v1",
+      "owner_only": false,
+      "since_minor": 1,
+      "summary": "Alias of events.list for resuming from a cursor.",
+      "writes": false
+    },
+    {
+      "auth": false,
+      "name": "teams.schema.v1",
+      "owner_only": false,
+      "since_minor": 2,
+      "summary": "The machine-readable schema of this API.",
+      "writes": false
+    },
+    {
+      "auth": true,
+      "name": "teams.events.wait.v1",
+      "owner_only": false,
+      "since_minor": 2,
+      "summary": "Like events.list, but holds the request open until there is something to return.",
+      "writes": false
+    },
+    {
+      "auth": true,
+      "name": "teams.messages.list.v1",
+      "owner_only": false,
+      "since_minor": 2,
+      "summary": "Chat messages the caller may read, with cursor pagination.",
+      "writes": false
+    },
+    {
+      "auth": true,
+      "name": "teams.tasks.list.v1",
+      "owner_only": false,
+      "since_minor": 2,
+      "summary": "Tasks with cursor pagination.",
+      "writes": false
+    },
+    {
+      "auth": true,
+      "name": "teams.approvals.list.v1",
+      "owner_only": false,
+      "since_minor": 2,
+      "summary": "Approvals with cursor pagination.",
+      "writes": false
+    },
+    {
+      "auth": true,
+      "name": "teams.decisions.list.v1",
+      "owner_only": false,
+      "since_minor": 2,
+      "summary": "Decision records with cursor pagination.",
+      "writes": false
+    },
+    {
+      "auth": true,
+      "name": "teams.audit.list.v1",
+      "owner_only": true,
+      "since_minor": 2,
+      "summary": "Recent refused requests (Owner only).",
+      "writes": false
+    },
+    {
+      "auth": true,
+      "name": "teams.drafts.propose.v1",
+      "owner_only": true,
+      "since_minor": 2,
+      "summary": "A team draft from a goal (Owner only).",
+      "writes": true
+    },
+    {
+      "auth": true,
+      "name": "teams.drafts.validate.v1",
+      "owner_only": true,
+      "since_minor": 2,
+      "summary": "Check a team draft and preview what launching would do (Owner only).",
+      "writes": false
+    },
+    {
+      "auth": true,
+      "name": "teams.drafts.launch.v1",
+      "owner_only": true,
+      "since_minor": 2,
+      "summary": "Create a team from a draft in one all-or-nothing step (Owner only).",
+      "writes": true
+    }
+  ],
+  "operations": [
+    {
+      "area": "projects",
+      "authority": "owner_only",
+      "kind": "create_project",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "owner"
+      ],
+      "sample": {
+        "kind": "create_project",
+        "name": "Moo",
+        "project_id": "moo"
+      },
+      "summary": "Create a project."
+    },
+    {
+      "area": "projects",
+      "authority": "owner_only",
+      "kind": "register_surface",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "owner"
+      ],
+      "sample": {
+        "kind": "register_surface",
+        "path_prefixes": [
+          "src/api"
+        ],
+        "project_id": "moo",
+        "surface_id": "plugin-api"
+      },
+      "summary": "Name a shared interface by the paths that define it."
+    },
+    {
+      "area": "teams",
+      "authority": "owner_only",
+      "kind": "create_team_spec",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "owner"
+      ],
+      "sample": {
+        "kind": "create_team_spec",
+        "name": "Alpha",
+        "project_id": "moo",
+        "spec_id": "alpha-spec"
+      },
+      "summary": "Start a team draft (a spec) in a project."
+    },
+    {
+      "area": "teams",
+      "authority": "owner_only",
+      "kind": "enroll_actor",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "owner"
+      ],
+      "sample": {
+        "actor_id": "alpha-lead",
+        "credential_digest": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        "kind": "enroll_actor",
+        "role": "lead",
+        "run_generation": 1,
+        "spec_id": "alpha-spec"
+      },
+      "summary": "Enroll the Lead, Developer or QA of a draft with a credential digest."
+    },
+    {
+      "area": "teams",
+      "authority": "owner_only",
+      "kind": "launch_team",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "owner"
+      ],
+      "sample": {
+        "kind": "launch_team",
+        "spec_id": "alpha-spec",
+        "team_id": "alpha"
+      },
+      "summary": "Launch a complete draft as a team."
+    },
+    {
+      "area": "teams",
+      "authority": "lead_authorized",
+      "kind": "rename_team",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "owner",
+        "lead"
+      ],
+      "sample": {
+        "kind": "rename_team",
+        "name": "Alpha Platform",
+        "team_id": "alpha"
+      },
+      "summary": "Change a team's name; its id stays."
+    },
+    {
+      "area": "teams",
+      "authority": "lead_authorized",
+      "kind": "suspend_team",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "owner",
+        "lead"
+      ],
+      "sample": {
+        "kind": "suspend_team",
+        "reason": "pause",
+        "team_id": "alpha"
+      },
+      "summary": "Pause a team: it cannot start or advance work until resumed."
+    },
+    {
+      "area": "teams",
+      "authority": "lead_authorized",
+      "kind": "resume_team",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "owner",
+        "lead"
+      ],
+      "sample": {
+        "kind": "resume_team",
+        "team_id": "alpha"
+      },
+      "summary": "Resume a suspended team."
+    },
+    {
+      "area": "teams",
+      "authority": "owner_only",
+      "kind": "cancel_team",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "owner"
+      ],
+      "sample": {
+        "kind": "cancel_team",
+        "reason": "descoped",
+        "team_id": "alpha"
+      },
+      "summary": "Stop a team for good, keeping its history."
+    },
+    {
+      "area": "agents",
+      "authority": "lead_authorized",
+      "kind": "bind_agent_pane",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "owner",
+        "lead"
+      ],
+      "sample": {
+        "actor_id": "alpha-dev",
+        "kind": "bind_agent_pane",
+        "pane_id": "w1:p1",
+        "provider": "claude"
+      },
+      "summary": "Record which Moo pane runs an agent, and with which provider."
+    },
+    {
+      "area": "agents",
+      "authority": "lead_authorized",
+      "kind": "unbind_agent_pane",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "owner",
+        "lead"
+      ],
+      "sample": {
+        "actor_id": "alpha-dev",
+        "kind": "unbind_agent_pane"
+      },
+      "summary": "Remove an agent's pane binding."
+    },
+    {
+      "area": "agents",
+      "authority": "lead_authorized",
+      "kind": "request_recruitment",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "lead"
+      ],
+      "sample": {
+        "capabilities": [
+          "review"
+        ],
+        "deliverable": "review notes",
+        "dependencies": [],
+        "justification": "audit",
+        "kind": "request_recruitment",
+        "max_minutes": 30,
+        "max_retries": 1,
+        "recruitment_id": "r1",
+        "specialty": "security",
+        "stop_condition": "notes delivered",
+        "team_id": "alpha"
+      },
+      "summary": "Ask for a temporary specialist, within bounds."
+    },
+    {
+      "area": "agents",
+      "authority": "owner_only",
+      "kind": "activate_recruitment",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "owner"
+      ],
+      "sample": {
+        "actor_id": "sec-1",
+        "credential_digest": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        "kind": "activate_recruitment",
+        "recruitment_id": "r1",
+        "run_generation": 1
+      },
+      "summary": "Start the specialist for an authorized recruitment."
+    },
+    {
+      "area": "agents",
+      "authority": "agent_autonomous",
+      "kind": "submit_specialist_handoff",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "specialist"
+      ],
+      "sample": {
+        "evidence": [
+          {
+            "kind": "test",
+            "reference": "cargo nextest run"
+          }
+        ],
+        "kind": "submit_specialist_handoff",
+        "recruitment_id": "r1",
+        "summary": "no blocking issues"
+      },
+      "summary": "The specialist hands off its deliverable with evidence."
+    },
+    {
+      "area": "agents",
+      "authority": "lead_authorized",
+      "kind": "verify_recruitment",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "lead"
+      ],
+      "sample": {
+        "accepted": true,
+        "kind": "verify_recruitment",
+        "rationale": "evidence ok",
+        "recruitment_id": "r1"
+      },
+      "summary": "The Lead accepts or rejects a specialist's handoff."
+    },
+    {
+      "area": "agents",
+      "authority": "lead_authorized",
+      "kind": "cancel_recruitment",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "owner",
+        "lead"
+      ],
+      "sample": {
+        "kind": "cancel_recruitment",
+        "reason": "no longer needed",
+        "recruitment_id": "r1"
+      },
+      "summary": "Cancel a specialist engagement."
+    },
+    {
+      "area": "chat",
+      "authority": "agent_autonomous",
+      "kind": "append_chat",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "owner",
+        "lead",
+        "developer",
+        "qa"
+      ],
+      "sample": {
+        "audience": {
+          "to": "team"
+        },
+        "body": "hello team",
+        "kind": "append_chat",
+        "message_id": "m1",
+        "team_id": "alpha"
+      },
+      "summary": "Post a message to the team, a role or one agent (the audience field)."
+    },
+    {
+      "area": "chat",
+      "authority": "lead_authorized",
+      "kind": "put_knowledge",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "owner",
+        "lead"
+      ],
+      "sample": {
+        "body": "use queues",
+        "evidence": [],
+        "kind": "put_knowledge",
+        "knowledge_id": "k1",
+        "scope": {
+          "scope": "team",
+          "team_id": "alpha"
+        },
+        "team_id": "alpha",
+        "title": "ADR-1"
+      },
+      "summary": "Record project or team knowledge."
+    },
+    {
+      "area": "tasks",
+      "authority": "lead_authorized",
+      "kind": "create_task",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "lead"
+      ],
+      "sample": {
+        "assignment_message_id": "m-t1",
+        "dependencies": [],
+        "description": "details",
+        "developer_id": "alpha-dev",
+        "dispatch": {
+          "attempt_id": "attempt-1",
+          "content_digest": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+          "run_generation": 1
+        },
+        "kind": "create_task",
+        "task_id": "t1",
+        "team_id": "alpha",
+        "title": "Build it"
+      },
+      "summary": "Assign a task to the team's Developer."
+    },
+    {
+      "area": "tasks",
+      "authority": "lead_authorized",
+      "kind": "set_task_dependencies",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "lead"
+      ],
+      "sample": {
+        "dependencies": [],
+        "kind": "set_task_dependencies",
+        "task_id": "t1",
+        "team_id": "alpha"
+      },
+      "summary": "Change which tasks a task waits for."
+    },
+    {
+      "area": "tasks",
+      "authority": "agent_autonomous",
+      "kind": "accept_task",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "developer"
+      ],
+      "sample": {
+        "acceptance_id": "acc1",
+        "kind": "accept_task",
+        "note": "starting",
+        "task_id": "t1",
+        "team_id": "alpha"
+      },
+      "summary": "The Developer accepts an assigned task."
+    },
+    {
+      "area": "tasks",
+      "authority": "agent_autonomous",
+      "kind": "submit_handoff",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "developer"
+      ],
+      "sample": {
+        "dispatch": {
+          "attempt_id": "attempt-2",
+          "content_digest": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+          "run_generation": 1
+        },
+        "evidence": [
+          {
+            "kind": "test",
+            "reference": "cargo nextest run"
+          }
+        ],
+        "handoff_id": "h1",
+        "kind": "submit_handoff",
+        "message_id": "m-h1",
+        "summary": "done",
+        "task_id": "t1",
+        "team_id": "alpha"
+      },
+      "summary": "The Developer hands a task to QA with evidence."
+    },
+    {
+      "area": "tasks",
+      "authority": "agent_autonomous",
+      "kind": "review_handoff",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "qa"
+      ],
+      "sample": {
+        "decision_id": "q1",
+        "evidence": [],
+        "handoff_id": "h1",
+        "kind": "review_handoff",
+        "message_id": "m-q1",
+        "rationale": "tests pass",
+        "task_id": "t1",
+        "team_id": "alpha",
+        "verdict": "accept"
+      },
+      "summary": "QA accepts or sends back a handoff (a decision record)."
+    },
+    {
+      "area": "tasks",
+      "authority": "lead_authorized",
+      "kind": "finalize_task",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "lead"
+      ],
+      "sample": {
+        "decision_id": "o1",
+        "evidence": [
+          {
+            "kind": "test",
+            "reference": "cargo nextest run"
+          }
+        ],
+        "kind": "finalize_task",
+        "message_id": "m-o1",
+        "outcome": "shipped",
+        "task_id": "t1",
+        "team_id": "alpha"
+      },
+      "summary": "The Lead finalizes a QA-accepted task (a decision record)."
+    },
+    {
+      "area": "tasks",
+      "authority": "lead_authorized",
+      "kind": "cancel_task",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "lead"
+      ],
+      "sample": {
+        "decision_id": "c1",
+        "kind": "cancel_task",
+        "message_id": "m-c1",
+        "reason": "descoped",
+        "task_id": "t1",
+        "team_id": "alpha"
+      },
+      "summary": "The Lead cancels a task (a decision record)."
+    },
+    {
+      "area": "tasks",
+      "authority": "owner_only",
+      "kind": "record_dispatch_receipt",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "owner"
+      ],
+      "sample": {
+        "attempt_id": "attempt-1",
+        "content_digest": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        "kind": "record_dispatch_receipt",
+        "message_id": "m-t1",
+        "receipt": "attempted",
+        "run_generation": 1,
+        "task_id": "t1",
+        "team_id": "alpha"
+      },
+      "summary": "The Owner records what happened to a dispatch attempt."
+    },
+    {
+      "area": "tasks",
+      "authority": "lead_authorized",
+      "kind": "retry_dispatch",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "lead"
+      ],
+      "sample": {
+        "dispatch": {
+          "attempt_id": "attempt-3",
+          "content_digest": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+          "run_generation": 1
+        },
+        "kind": "retry_dispatch",
+        "previous_attempt_id": "attempt-1",
+        "team_id": "alpha"
+      },
+      "summary": "The Lead retries a failed dispatch, within bounds."
+    },
+    {
+      "area": "approvals",
+      "authority": "agent_autonomous",
+      "kind": "request_approval",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "lead",
+        "developer",
+        "qa"
+      ],
+      "sample": {
+        "action": {
+          "kind": "protected_branch_integration",
+          "parameters": {
+            "commit": "1111111111111111111111111111111111111111",
+            "integration_id": "i1"
+          },
+          "target": "main"
+        },
+        "alternatives": [
+          "wait"
+        ],
+        "approval_id": "ap1",
+        "justification": "tests green",
+        "kind": "request_approval",
+        "risks": [
+          "touches the API"
+        ],
+        "team_id": "alpha",
+        "ttl_seconds": 3600
+      },
+      "summary": "Ask the Owner to authorize one exact protected action."
+    },
+    {
+      "area": "approvals",
+      "authority": "owner_only",
+      "kind": "decide_approval",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "owner"
+      ],
+      "sample": {
+        "approval_id": "ap1",
+        "approve": true,
+        "kind": "decide_approval",
+        "rationale": "reviewed"
+      },
+      "summary": "The Owner approves or denies. Never reachable through chat."
+    },
+    {
+      "area": "approvals",
+      "authority": "owner_only",
+      "kind": "revoke_approval",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "owner"
+      ],
+      "sample": {
+        "approval_id": "ap1",
+        "kind": "revoke_approval",
+        "rationale": "changed my mind"
+      },
+      "summary": "The Owner revokes a pending or unused approval."
+    },
+    {
+      "area": "approvals",
+      "authority": "agent_autonomous",
+      "kind": "consume_approval",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "owner",
+        "lead",
+        "developer",
+        "qa"
+      ],
+      "sample": {
+        "action": {
+          "kind": "protected_branch_integration",
+          "parameters": {
+            "commit": "1111111111111111111111111111111111111111",
+            "integration_id": "i1"
+          },
+          "target": "main"
+        },
+        "approval_id": "ap1",
+        "execution_id": "exec-1",
+        "kind": "consume_approval"
+      },
+      "summary": "Spend an approval once, for exactly the approved action."
+    },
+    {
+      "area": "worktrees",
+      "authority": "owner_only",
+      "kind": "claim_worktree",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "owner"
+      ],
+      "sample": {
+        "base_commit": "1111111111111111111111111111111111111111",
+        "branch": "alpha",
+        "claim_id": "w1",
+        "kind": "claim_worktree",
+        "path": "/work/alpha",
+        "team_id": "alpha"
+      },
+      "summary": "Record a team's exclusive worktree path and branch."
+    },
+    {
+      "area": "worktrees",
+      "authority": "lead_authorized",
+      "kind": "release_worktree",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "owner",
+        "lead"
+      ],
+      "sample": {
+        "claim_id": "w1",
+        "kind": "release_worktree"
+      },
+      "summary": "Release a worktree; it is never deleted by Teams."
+    },
+    {
+      "area": "worktrees",
+      "authority": "owner_only",
+      "kind": "approve_worktree_cleanup",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "owner"
+      ],
+      "sample": {
+        "claim_id": "w1",
+        "kind": "approve_worktree_cleanup"
+      },
+      "summary": "Say whether a released, never-used worktree is safe to delete."
+    },
+    {
+      "area": "integrations",
+      "authority": "agent_autonomous",
+      "kind": "submit_integration",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "developer",
+        "lead"
+      ],
+      "sample": {
+        "changed_paths": [
+          "src/a.rs"
+        ],
+        "claim_id": "w1",
+        "commit": "1111111111111111111111111111111111111111",
+        "depends_on": [],
+        "integration_id": "i1",
+        "kind": "submit_integration",
+        "target_branch": "main",
+        "team_id": "alpha",
+        "tests": [
+          {
+            "kind": "test",
+            "reference": "cargo nextest run"
+          }
+        ],
+        "touches": []
+      },
+      "summary": "Queue a branch for integration with its paths and test evidence."
+    },
+    {
+      "area": "integrations",
+      "authority": "agent_autonomous",
+      "kind": "review_integration",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "qa"
+      ],
+      "sample": {
+        "accepted": true,
+        "evidence": [],
+        "integration_id": "i1",
+        "kind": "review_integration",
+        "rationale": "diff and tests ok"
+      },
+      "summary": "QA records the review of a queued integration."
+    },
+    {
+      "area": "integrations",
+      "authority": "owner_only",
+      "kind": "resolve_conflict",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "owner"
+      ],
+      "sample": {
+        "conflict_id": "conflict-i1-i2-pathoverlap",
+        "kind": "resolve_conflict",
+        "rationale": "i1 lands first"
+      },
+      "summary": "The Owner resolves a cross-team conflict."
+    },
+    {
+      "area": "integrations",
+      "authority": "lead_authorized",
+      "kind": "acknowledge_notice",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "lead"
+      ],
+      "sample": {
+        "kind": "acknowledge_notice",
+        "notice_id": "notice-i2-alpha"
+      },
+      "summary": "The receiving Lead acknowledges a change notice."
+    },
+    {
+      "area": "integrations",
+      "authority": "lead_authorized",
+      "kind": "cancel_integration",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "owner",
+        "lead"
+      ],
+      "sample": {
+        "integration_id": "i1",
+        "kind": "cancel_integration",
+        "reason": "superseded"
+      },
+      "summary": "Withdraw a queued integration."
+    },
+    {
+      "area": "integrations",
+      "authority": "owner_only",
+      "kind": "begin_merge",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "owner"
+      ],
+      "sample": {
+        "approval_id": "ap1",
+        "integration_id": "i1",
+        "kind": "begin_merge"
+      },
+      "summary": "The Owner starts a merge, spending an exact approval. No force option."
+    },
+    {
+      "area": "integrations",
+      "authority": "owner_only",
+      "kind": "complete_merge",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "owner"
+      ],
+      "sample": {
+        "integration_id": "i1",
+        "kind": "complete_merge",
+        "merge_commit": "2222222222222222222222222222222222222222"
+      },
+      "summary": "The Owner records the merge that landed."
+    },
+    {
+      "area": "integrations",
+      "authority": "owner_only",
+      "kind": "abort_merge",
+      "method": "teams.mutate.v1",
+      "roles": [
+        "owner"
+      ],
+      "sample": {
+        "integration_id": "i1",
+        "kind": "abort_merge",
+        "reason": "did not land"
+      },
+      "summary": "The Owner records that a merge did not land."
+    }
+  ],
+  "params": {
+    "teams.approvals.list.v1": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "cursor": {
+          "default": null,
+          "description": "The `next_cursor` of the previous page; omit for the first page.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "limit": {
+          "default": null,
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "status": {
+          "default": null,
+          "description": "Tasks and approvals only: restrict to one status tag (e.g. `pending`).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "task_id": {
+          "default": null,
+          "description": "Messages only: restrict to one task's thread.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "team_id": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "title": "ListParams",
+      "type": "object"
+    },
+    "teams.audit.list.v1": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "limit": {
+          "default": null,
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "title": "AuditParams",
+      "type": "object"
+    },
+    "teams.conflicts.list.v1": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "team_id": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "title": "SnapshotParams",
+      "type": "object"
+    },
+    "teams.decisions.list.v1": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "cursor": {
+          "default": null,
+          "description": "The `next_cursor` of the previous page; omit for the first page.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "limit": {
+          "default": null,
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "status": {
+          "default": null,
+          "description": "Tasks and approvals only: restrict to one status tag (e.g. `pending`).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "task_id": {
+          "default": null,
+          "description": "Messages only: restrict to one task's thread.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "team_id": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "title": "ListParams",
+      "type": "object"
+    },
+    "teams.drafts.launch.v1": {
+      "$defs": {
+        "DraftInput": {
+          "additionalProperties": false,
+          "description": "What a client edits: the three roles and the project. Everything else is derived.",
+          "properties": {
+            "developer": {
+              "type": "string"
+            },
+            "lead": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "project_id": {
+              "default": "",
+              "description": "Empty means \"no project yet\": launching creates a default one.",
+              "type": "string"
+            },
+            "qa": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "lead",
+            "developer",
+            "qa"
+          ],
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "draft": {
+          "$ref": "#/$defs/DraftInput"
+        },
+        "expected_revision": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "idempotency_key": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "expected_revision",
+        "idempotency_key",
+        "draft"
+      ],
+      "title": "DraftLaunchParams",
+      "type": "object"
+    },
+    "teams.drafts.propose.v1": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "goal": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "goal"
+      ],
+      "title": "ProposeParams",
+      "type": "object"
+    },
+    "teams.drafts.validate.v1": {
+      "$defs": {
+        "DraftInput": {
+          "additionalProperties": false,
+          "description": "What a client edits: the three roles and the project. Everything else is derived.",
+          "properties": {
+            "developer": {
+              "type": "string"
+            },
+            "lead": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "project_id": {
+              "default": "",
+              "description": "Empty means \"no project yet\": launching creates a default one.",
+              "type": "string"
+            },
+            "qa": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "lead",
+            "developer",
+            "qa"
+          ],
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "draft": {
+          "$ref": "#/$defs/DraftInput"
+        }
+      },
+      "required": [
+        "draft"
+      ],
+      "title": "DraftParams",
+      "type": "object"
+    },
+    "teams.events.list.v1": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "after": {
+          "description": "The last sequence you have; you get events after it.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "limit": {
+          "default": 100,
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "stream_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "stream_id",
+        "after"
+      ],
+      "title": "EventsParams",
+      "type": "object"
+    },
+    "teams.events.resume.v1": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "after": {
+          "description": "The last sequence you have; you get events after it.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "limit": {
+          "default": 100,
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "stream_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "stream_id",
+        "after"
+      ],
+      "title": "EventsParams",
+      "type": "object"
+    },
+    "teams.events.wait.v1": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "after": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "limit": {
+          "default": 100,
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "stream_id": {
+          "type": "string"
+        },
+        "timeout_ms": {
+          "default": 20000,
+          "description": "How long to hold the request open waiting for an event. 0 polls; capped by the server.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "stream_id",
+        "after"
+      ],
+      "title": "WaitParams",
+      "type": "object"
+    },
+    "teams.get.v1": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "team_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "team_id"
+      ],
+      "title": "TeamRef",
+      "type": "object"
+    },
+    "teams.integrations.list.v1": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "team_id": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "title": "SnapshotParams",
+      "type": "object"
+    },
+    "teams.list.v1": {},
+    "teams.messages.list.v1": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "cursor": {
+          "default": null,
+          "description": "The `next_cursor` of the previous page; omit for the first page.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "limit": {
+          "default": null,
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "status": {
+          "default": null,
+          "description": "Tasks and approvals only: restrict to one status tag (e.g. `pending`).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "task_id": {
+          "default": null,
+          "description": "Messages only: restrict to one task's thread.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "team_id": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "title": "ListParams",
+      "type": "object"
+    },
+    "teams.mutate.v1": {
+      "$defs": {
+        "Audience": {
+          "description": "Who a chat message is for. `Team` is the shared channel; the others are scoped: only the\nsender, the addressee and the Owner can read them.",
+          "oneOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "to": {
+                  "const": "team",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "to"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "role": {
+                  "$ref": "#/$defs/Role"
+                },
+                "to": {
+                  "const": "role",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "to",
+                "role"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "actor_id": {
+                  "type": "string"
+                },
+                "to": {
+                  "const": "actor",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "to",
+                "actor_id"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "Command": {
+          "oneOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "create_project",
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "project_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "project_id",
+                "name"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "create_team_spec",
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "project_id": {
+                  "type": "string"
+                },
+                "spec_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "spec_id",
+                "project_id",
+                "name"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "actor_id": {
+                  "type": "string"
+                },
+                "credential_digest": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "enroll_actor",
+                  "type": "string"
+                },
+                "role": {
+                  "$ref": "#/$defs/Role"
+                },
+                "run_generation": {
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "spec_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "spec_id",
+                "actor_id",
+                "role",
+                "credential_digest",
+                "run_generation"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "launch_team",
+                  "type": "string"
+                },
+                "spec_id": {
+                  "type": "string"
+                },
+                "team_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "spec_id",
+                "team_id"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "assignment_message_id": {
+                  "type": "string"
+                },
+                "dependencies": {
+                  "default": [],
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "developer_id": {
+                  "type": "string"
+                },
+                "dispatch": {
+                  "$ref": "#/$defs/DispatchIntent"
+                },
+                "kind": {
+                  "const": "create_task",
+                  "type": "string"
+                },
+                "task_id": {
+                  "type": "string"
+                },
+                "team_id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "team_id",
+                "task_id",
+                "title",
+                "description",
+                "developer_id",
+                "assignment_message_id",
+                "dispatch"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "dependencies": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "kind": {
+                  "const": "set_task_dependencies",
+                  "type": "string"
+                },
+                "task_id": {
+                  "type": "string"
+                },
+                "team_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "team_id",
+                "task_id",
+                "dependencies"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "acceptance_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "accept_task",
+                  "type": "string"
+                },
+                "note": {
+                  "type": "string"
+                },
+                "task_id": {
+                  "type": "string"
+                },
+                "team_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "team_id",
+                "task_id",
+                "acceptance_id",
+                "note"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "dispatch": {
+                  "$ref": "#/$defs/DispatchIntent"
+                },
+                "evidence": {
+                  "items": {
+                    "$ref": "#/$defs/Evidence"
+                  },
+                  "type": "array"
+                },
+                "handoff_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "submit_handoff",
+                  "type": "string"
+                },
+                "message_id": {
+                  "type": "string"
+                },
+                "summary": {
+                  "type": "string"
+                },
+                "task_id": {
+                  "type": "string"
+                },
+                "team_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "team_id",
+                "task_id",
+                "handoff_id",
+                "message_id",
+                "summary",
+                "evidence",
+                "dispatch"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "decision_id": {
+                  "type": "string"
+                },
+                "evidence": {
+                  "default": [],
+                  "items": {
+                    "$ref": "#/$defs/Evidence"
+                  },
+                  "type": "array"
+                },
+                "handoff_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "review_handoff",
+                  "type": "string"
+                },
+                "message_id": {
+                  "type": "string"
+                },
+                "rationale": {
+                  "type": "string"
+                },
+                "rework_dispatch": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/DispatchIntent"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "task_id": {
+                  "type": "string"
+                },
+                "team_id": {
+                  "type": "string"
+                },
+                "verdict": {
+                  "$ref": "#/$defs/QaVerdict"
+                }
+              },
+              "required": [
+                "kind",
+                "team_id",
+                "task_id",
+                "handoff_id",
+                "decision_id",
+                "message_id",
+                "verdict",
+                "rationale"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "decision_id": {
+                  "type": "string"
+                },
+                "evidence": {
+                  "default": [],
+                  "items": {
+                    "$ref": "#/$defs/Evidence"
+                  },
+                  "type": "array"
+                },
+                "kind": {
+                  "const": "finalize_task",
+                  "type": "string"
+                },
+                "message_id": {
+                  "type": "string"
+                },
+                "outcome": {
+                  "type": "string"
+                },
+                "task_id": {
+                  "type": "string"
+                },
+                "team_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "team_id",
+                "task_id",
+                "decision_id",
+                "message_id",
+                "outcome"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "decision_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "cancel_task",
+                  "type": "string"
+                },
+                "message_id": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "task_id": {
+                  "type": "string"
+                },
+                "team_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "team_id",
+                "task_id",
+                "decision_id",
+                "message_id",
+                "reason"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "audience": {
+                  "$ref": "#/$defs/Audience",
+                  "default": {
+                    "to": "team"
+                  },
+                  "description": "Defaults to the whole team."
+                },
+                "body": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "append_chat",
+                  "type": "string"
+                },
+                "message_id": {
+                  "type": "string"
+                },
+                "task_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "team_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "team_id",
+                "message_id",
+                "body"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "body": {
+                  "type": "string"
+                },
+                "evidence": {
+                  "default": [],
+                  "items": {
+                    "$ref": "#/$defs/Evidence"
+                  },
+                  "type": "array"
+                },
+                "kind": {
+                  "const": "put_knowledge",
+                  "type": "string"
+                },
+                "knowledge_id": {
+                  "type": "string"
+                },
+                "scope": {
+                  "$ref": "#/$defs/KnowledgeScope"
+                },
+                "team_id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "team_id",
+                "knowledge_id",
+                "scope",
+                "title",
+                "body"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "attempt_id": {
+                  "type": "string"
+                },
+                "content_digest": {
+                  "type": "string"
+                },
+                "detail": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "evidence": {
+                  "default": [],
+                  "items": {
+                    "$ref": "#/$defs/Evidence"
+                  },
+                  "type": "array"
+                },
+                "kind": {
+                  "const": "record_dispatch_receipt",
+                  "type": "string"
+                },
+                "message_id": {
+                  "type": "string"
+                },
+                "provider_session": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "receipt": {
+                  "$ref": "#/$defs/DispatchReceiptKind"
+                },
+                "run_generation": {
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "task_id": {
+                  "type": "string"
+                },
+                "team_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "team_id",
+                "attempt_id",
+                "task_id",
+                "message_id",
+                "run_generation",
+                "content_digest",
+                "receipt"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "dispatch": {
+                  "$ref": "#/$defs/DispatchIntent"
+                },
+                "kind": {
+                  "const": "retry_dispatch",
+                  "type": "string"
+                },
+                "previous_attempt_id": {
+                  "type": "string"
+                },
+                "team_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "team_id",
+                "previous_attempt_id",
+                "dispatch"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "description": "Ask the Owner to authorize one exact protected action. Chat can never do this.",
+              "properties": {
+                "action": {
+                  "$ref": "#/$defs/ProtectedAction"
+                },
+                "alternatives": {
+                  "default": [],
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "approval_id": {
+                  "type": "string"
+                },
+                "justification": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "request_approval",
+                  "type": "string"
+                },
+                "risks": {
+                  "default": [],
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "team_id": {
+                  "type": "string"
+                },
+                "ttl_seconds": {
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "kind",
+                "approval_id",
+                "team_id",
+                "action",
+                "justification",
+                "ttl_seconds"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "approval_id": {
+                  "type": "string"
+                },
+                "approve": {
+                  "type": "boolean"
+                },
+                "kind": {
+                  "const": "decide_approval",
+                  "type": "string"
+                },
+                "rationale": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "approval_id",
+                "approve",
+                "rationale"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "approval_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "revoke_approval",
+                  "type": "string"
+                },
+                "rationale": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "approval_id",
+                "rationale"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "description": "Spend an approval, once, for exactly the action it was granted for.",
+              "properties": {
+                "action": {
+                  "$ref": "#/$defs/ProtectedAction"
+                },
+                "approval_id": {
+                  "type": "string"
+                },
+                "execution_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "consume_approval",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "approval_id",
+                "execution_id",
+                "action"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "capabilities": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "deliverable": {
+                  "type": "string"
+                },
+                "dependencies": {
+                  "default": [],
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "justification": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "request_recruitment",
+                  "type": "string"
+                },
+                "max_minutes": {
+                  "format": "uint32",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "max_retries": {
+                  "format": "uint8",
+                  "maximum": 255,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "recruitment_id": {
+                  "type": "string"
+                },
+                "specialty": {
+                  "type": "string"
+                },
+                "stop_condition": {
+                  "type": "string"
+                },
+                "team_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "recruitment_id",
+                "team_id",
+                "specialty",
+                "justification",
+                "deliverable",
+                "capabilities",
+                "stop_condition",
+                "max_retries",
+                "max_minutes"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "actor_id": {
+                  "type": "string"
+                },
+                "credential_digest": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "activate_recruitment",
+                  "type": "string"
+                },
+                "recruitment_id": {
+                  "type": "string"
+                },
+                "run_generation": {
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "kind",
+                "recruitment_id",
+                "actor_id",
+                "credential_digest",
+                "run_generation"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "evidence": {
+                  "items": {
+                    "$ref": "#/$defs/Evidence"
+                  },
+                  "type": "array"
+                },
+                "kind": {
+                  "const": "submit_specialist_handoff",
+                  "type": "string"
+                },
+                "recruitment_id": {
+                  "type": "string"
+                },
+                "summary": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "recruitment_id",
+                "summary",
+                "evidence"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "accepted": {
+                  "type": "boolean"
+                },
+                "kind": {
+                  "const": "verify_recruitment",
+                  "type": "string"
+                },
+                "rationale": {
+                  "type": "string"
+                },
+                "recruitment_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "recruitment_id",
+                "accepted",
+                "rationale"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "cancel_recruitment",
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "recruitment_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "recruitment_id",
+                "reason"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "description": "The team id never changes; only its label does.",
+              "properties": {
+                "kind": {
+                  "const": "rename_team",
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "team_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "team_id",
+                "name"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "suspend_team",
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "team_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "team_id",
+                "reason"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "resume_team",
+                  "type": "string"
+                },
+                "team_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "team_id"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "cancel_team",
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "team_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "team_id",
+                "reason"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "description": "Name a public interface, schema or API by the paths that define it.",
+              "properties": {
+                "kind": {
+                  "const": "register_surface",
+                  "type": "string"
+                },
+                "path_prefixes": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "project_id": {
+                  "type": "string"
+                },
+                "surface_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "surface_id",
+                "project_id",
+                "path_prefixes"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "description": "Record that a team owns one worktree path and branch. The harness creates the worktree.",
+              "properties": {
+                "base_commit": {
+                  "type": "string"
+                },
+                "branch": {
+                  "type": "string"
+                },
+                "claim_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "claim_worktree",
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "team_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "claim_id",
+                "team_id",
+                "path",
+                "branch",
+                "base_commit"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "claim_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "release_worktree",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "claim_id"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "description": "Says whether a released, never-used worktree may be deleted. Teams never deletes it.",
+              "properties": {
+                "claim_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "approve_worktree_cleanup",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "claim_id"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "changed_paths": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "claim_id": {
+                  "type": "string"
+                },
+                "commit": {
+                  "type": "string"
+                },
+                "depends_on": {
+                  "default": [],
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "integration_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "submit_integration",
+                  "type": "string"
+                },
+                "target_branch": {
+                  "type": "string"
+                },
+                "team_id": {
+                  "type": "string"
+                },
+                "tests": {
+                  "items": {
+                    "$ref": "#/$defs/Evidence"
+                  },
+                  "type": "array"
+                },
+                "touches": {
+                  "default": [],
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "kind",
+                "integration_id",
+                "team_id",
+                "claim_id",
+                "target_branch",
+                "commit",
+                "changed_paths",
+                "tests"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "accepted": {
+                  "type": "boolean"
+                },
+                "evidence": {
+                  "default": [],
+                  "items": {
+                    "$ref": "#/$defs/Evidence"
+                  },
+                  "type": "array"
+                },
+                "integration_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "review_integration",
+                  "type": "string"
+                },
+                "rationale": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "integration_id",
+                "accepted",
+                "rationale"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "conflict_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "resolve_conflict",
+                  "type": "string"
+                },
+                "rationale": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "conflict_id",
+                "rationale"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "acknowledge_notice",
+                  "type": "string"
+                },
+                "notice_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "notice_id"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "integration_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "cancel_integration",
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "integration_id",
+                "reason"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "description": "Owner only; spends an approval naming this integration and commit. There is no force option.",
+              "properties": {
+                "approval_id": {
+                  "type": "string"
+                },
+                "integration_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "begin_merge",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "integration_id",
+                "approval_id"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "integration_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "complete_merge",
+                  "type": "string"
+                },
+                "merge_commit": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "integration_id",
+                "merge_commit"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "integration_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "abort_merge",
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "integration_id",
+                "reason"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "description": "Record which Moo pane runs an agent, and with which provider CLI.",
+              "properties": {
+                "actor_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "bind_agent_pane",
+                  "type": "string"
+                },
+                "pane_id": {
+                  "type": "string"
+                },
+                "provider": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "kind",
+                "actor_id",
+                "pane_id"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "actor_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "unbind_agent_pane",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "actor_id"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "DispatchIntent": {
+          "additionalProperties": false,
+          "properties": {
+            "attempt_id": {
+              "type": "string"
+            },
+            "content_digest": {
+              "type": "string"
+            },
+            "run_generation": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "attempt_id",
+            "run_generation",
+            "content_digest"
+          ],
+          "type": "object"
+        },
+        "DispatchReceiptKind": {
+          "enum": [
+            "attempted",
+            "submitted",
+            "acknowledged",
+            "accepted",
+            "rejected",
+            "completed",
+            "failed"
+          ],
+          "type": "string"
+        },
+        "Evidence": {
+          "additionalProperties": false,
+          "properties": {
+            "digest": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "kind": {
+              "$ref": "#/$defs/EvidenceKind"
+            },
+            "reference": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "reference"
+          ],
+          "type": "object"
+        },
+        "EvidenceKind": {
+          "enum": [
+            "commit",
+            "artifact",
+            "test",
+            "changed_path",
+            "note"
+          ],
+          "type": "string"
+        },
+        "KnowledgeScope": {
+          "oneOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "project_id": {
+                  "type": "string"
+                },
+                "scope": {
+                  "const": "project",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "scope",
+                "project_id"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "scope": {
+                  "const": "team",
+                  "type": "string"
+                },
+                "team_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "scope",
+                "team_id"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "ProtectedAction": {
+          "additionalProperties": false,
+          "description": "The exact action an approval authorizes. `parameters` are part of the bound digest.",
+          "properties": {
+            "kind": {
+              "$ref": "#/$defs/ProtectedActionKind"
+            },
+            "parameters": {
+              "default": null
+            },
+            "target": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "target"
+          ],
+          "type": "object"
+        },
+        "ProtectedActionKind": {
+          "enum": [
+            "scope_change",
+            "architecture_change",
+            "rights_escalation",
+            "budget_escalation",
+            "destructive_operation",
+            "protected_branch_integration",
+            "release"
+          ],
+          "type": "string"
+        },
+        "QaVerdict": {
+          "enum": [
+            "accept",
+            "rework"
+          ],
+          "type": "string"
+        },
+        "Role": {
+          "oneOf": [
+            {
+              "enum": [
+                "owner",
+                "lead",
+                "developer",
+                "qa"
+              ],
+              "type": "string"
+            },
+            {
+              "const": "specialist",
+              "description": "A recruited, temporary specialist; never enrolled through a team spec.",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "$ref": "#/$defs/Command"
+        },
+        "expected_revision": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "idempotency_key": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "expected_revision",
+        "idempotency_key",
+        "command"
+      ],
+      "title": "MutationParams",
+      "type": "object"
+    },
+    "teams.snapshot.get.v1": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "team_id": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "title": "SnapshotParams",
+      "type": "object"
+    },
+    "teams.tasks.list.v1": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "cursor": {
+          "default": null,
+          "description": "The `next_cursor` of the previous page; omit for the first page.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "limit": {
+          "default": null,
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "status": {
+          "default": null,
+          "description": "Tasks and approvals only: restrict to one status tag (e.g. `pending`).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "task_id": {
+          "default": null,
+          "description": "Messages only: restrict to one task's thread.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "team_id": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "title": "ListParams",
+      "type": "object"
+    },
+    "teams.validate.v1": {
+      "$defs": {
+        "Audience": {
+          "description": "Who a chat message is for. `Team` is the shared channel; the others are scoped: only the\nsender, the addressee and the Owner can read them.",
+          "oneOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "to": {
+                  "const": "team",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "to"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "role": {
+                  "$ref": "#/$defs/Role"
+                },
+                "to": {
+                  "const": "role",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "to",
+                "role"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "actor_id": {
+                  "type": "string"
+                },
+                "to": {
+                  "const": "actor",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "to",
+                "actor_id"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "Command": {
+          "oneOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "create_project",
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "project_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "project_id",
+                "name"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "create_team_spec",
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "project_id": {
+                  "type": "string"
+                },
+                "spec_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "spec_id",
+                "project_id",
+                "name"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "actor_id": {
+                  "type": "string"
+                },
+                "credential_digest": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "enroll_actor",
+                  "type": "string"
+                },
+                "role": {
+                  "$ref": "#/$defs/Role"
+                },
+                "run_generation": {
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "spec_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "spec_id",
+                "actor_id",
+                "role",
+                "credential_digest",
+                "run_generation"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "launch_team",
+                  "type": "string"
+                },
+                "spec_id": {
+                  "type": "string"
+                },
+                "team_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "spec_id",
+                "team_id"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "assignment_message_id": {
+                  "type": "string"
+                },
+                "dependencies": {
+                  "default": [],
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "developer_id": {
+                  "type": "string"
+                },
+                "dispatch": {
+                  "$ref": "#/$defs/DispatchIntent"
+                },
+                "kind": {
+                  "const": "create_task",
+                  "type": "string"
+                },
+                "task_id": {
+                  "type": "string"
+                },
+                "team_id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "team_id",
+                "task_id",
+                "title",
+                "description",
+                "developer_id",
+                "assignment_message_id",
+                "dispatch"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "dependencies": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "kind": {
+                  "const": "set_task_dependencies",
+                  "type": "string"
+                },
+                "task_id": {
+                  "type": "string"
+                },
+                "team_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "team_id",
+                "task_id",
+                "dependencies"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "acceptance_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "accept_task",
+                  "type": "string"
+                },
+                "note": {
+                  "type": "string"
+                },
+                "task_id": {
+                  "type": "string"
+                },
+                "team_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "team_id",
+                "task_id",
+                "acceptance_id",
+                "note"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "dispatch": {
+                  "$ref": "#/$defs/DispatchIntent"
+                },
+                "evidence": {
+                  "items": {
+                    "$ref": "#/$defs/Evidence"
+                  },
+                  "type": "array"
+                },
+                "handoff_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "submit_handoff",
+                  "type": "string"
+                },
+                "message_id": {
+                  "type": "string"
+                },
+                "summary": {
+                  "type": "string"
+                },
+                "task_id": {
+                  "type": "string"
+                },
+                "team_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "team_id",
+                "task_id",
+                "handoff_id",
+                "message_id",
+                "summary",
+                "evidence",
+                "dispatch"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "decision_id": {
+                  "type": "string"
+                },
+                "evidence": {
+                  "default": [],
+                  "items": {
+                    "$ref": "#/$defs/Evidence"
+                  },
+                  "type": "array"
+                },
+                "handoff_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "review_handoff",
+                  "type": "string"
+                },
+                "message_id": {
+                  "type": "string"
+                },
+                "rationale": {
+                  "type": "string"
+                },
+                "rework_dispatch": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/DispatchIntent"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "task_id": {
+                  "type": "string"
+                },
+                "team_id": {
+                  "type": "string"
+                },
+                "verdict": {
+                  "$ref": "#/$defs/QaVerdict"
+                }
+              },
+              "required": [
+                "kind",
+                "team_id",
+                "task_id",
+                "handoff_id",
+                "decision_id",
+                "message_id",
+                "verdict",
+                "rationale"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "decision_id": {
+                  "type": "string"
+                },
+                "evidence": {
+                  "default": [],
+                  "items": {
+                    "$ref": "#/$defs/Evidence"
+                  },
+                  "type": "array"
+                },
+                "kind": {
+                  "const": "finalize_task",
+                  "type": "string"
+                },
+                "message_id": {
+                  "type": "string"
+                },
+                "outcome": {
+                  "type": "string"
+                },
+                "task_id": {
+                  "type": "string"
+                },
+                "team_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "team_id",
+                "task_id",
+                "decision_id",
+                "message_id",
+                "outcome"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "decision_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "cancel_task",
+                  "type": "string"
+                },
+                "message_id": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "task_id": {
+                  "type": "string"
+                },
+                "team_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "team_id",
+                "task_id",
+                "decision_id",
+                "message_id",
+                "reason"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "audience": {
+                  "$ref": "#/$defs/Audience",
+                  "default": {
+                    "to": "team"
+                  },
+                  "description": "Defaults to the whole team."
+                },
+                "body": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "append_chat",
+                  "type": "string"
+                },
+                "message_id": {
+                  "type": "string"
+                },
+                "task_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "team_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "team_id",
+                "message_id",
+                "body"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "body": {
+                  "type": "string"
+                },
+                "evidence": {
+                  "default": [],
+                  "items": {
+                    "$ref": "#/$defs/Evidence"
+                  },
+                  "type": "array"
+                },
+                "kind": {
+                  "const": "put_knowledge",
+                  "type": "string"
+                },
+                "knowledge_id": {
+                  "type": "string"
+                },
+                "scope": {
+                  "$ref": "#/$defs/KnowledgeScope"
+                },
+                "team_id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "team_id",
+                "knowledge_id",
+                "scope",
+                "title",
+                "body"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "attempt_id": {
+                  "type": "string"
+                },
+                "content_digest": {
+                  "type": "string"
+                },
+                "detail": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "evidence": {
+                  "default": [],
+                  "items": {
+                    "$ref": "#/$defs/Evidence"
+                  },
+                  "type": "array"
+                },
+                "kind": {
+                  "const": "record_dispatch_receipt",
+                  "type": "string"
+                },
+                "message_id": {
+                  "type": "string"
+                },
+                "provider_session": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "receipt": {
+                  "$ref": "#/$defs/DispatchReceiptKind"
+                },
+                "run_generation": {
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "task_id": {
+                  "type": "string"
+                },
+                "team_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "team_id",
+                "attempt_id",
+                "task_id",
+                "message_id",
+                "run_generation",
+                "content_digest",
+                "receipt"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "dispatch": {
+                  "$ref": "#/$defs/DispatchIntent"
+                },
+                "kind": {
+                  "const": "retry_dispatch",
+                  "type": "string"
+                },
+                "previous_attempt_id": {
+                  "type": "string"
+                },
+                "team_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "team_id",
+                "previous_attempt_id",
+                "dispatch"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "description": "Ask the Owner to authorize one exact protected action. Chat can never do this.",
+              "properties": {
+                "action": {
+                  "$ref": "#/$defs/ProtectedAction"
+                },
+                "alternatives": {
+                  "default": [],
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "approval_id": {
+                  "type": "string"
+                },
+                "justification": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "request_approval",
+                  "type": "string"
+                },
+                "risks": {
+                  "default": [],
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "team_id": {
+                  "type": "string"
+                },
+                "ttl_seconds": {
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "kind",
+                "approval_id",
+                "team_id",
+                "action",
+                "justification",
+                "ttl_seconds"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "approval_id": {
+                  "type": "string"
+                },
+                "approve": {
+                  "type": "boolean"
+                },
+                "kind": {
+                  "const": "decide_approval",
+                  "type": "string"
+                },
+                "rationale": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "approval_id",
+                "approve",
+                "rationale"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "approval_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "revoke_approval",
+                  "type": "string"
+                },
+                "rationale": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "approval_id",
+                "rationale"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "description": "Spend an approval, once, for exactly the action it was granted for.",
+              "properties": {
+                "action": {
+                  "$ref": "#/$defs/ProtectedAction"
+                },
+                "approval_id": {
+                  "type": "string"
+                },
+                "execution_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "consume_approval",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "approval_id",
+                "execution_id",
+                "action"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "capabilities": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "deliverable": {
+                  "type": "string"
+                },
+                "dependencies": {
+                  "default": [],
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "justification": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "request_recruitment",
+                  "type": "string"
+                },
+                "max_minutes": {
+                  "format": "uint32",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "max_retries": {
+                  "format": "uint8",
+                  "maximum": 255,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "recruitment_id": {
+                  "type": "string"
+                },
+                "specialty": {
+                  "type": "string"
+                },
+                "stop_condition": {
+                  "type": "string"
+                },
+                "team_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "recruitment_id",
+                "team_id",
+                "specialty",
+                "justification",
+                "deliverable",
+                "capabilities",
+                "stop_condition",
+                "max_retries",
+                "max_minutes"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "actor_id": {
+                  "type": "string"
+                },
+                "credential_digest": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "activate_recruitment",
+                  "type": "string"
+                },
+                "recruitment_id": {
+                  "type": "string"
+                },
+                "run_generation": {
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "kind",
+                "recruitment_id",
+                "actor_id",
+                "credential_digest",
+                "run_generation"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "evidence": {
+                  "items": {
+                    "$ref": "#/$defs/Evidence"
+                  },
+                  "type": "array"
+                },
+                "kind": {
+                  "const": "submit_specialist_handoff",
+                  "type": "string"
+                },
+                "recruitment_id": {
+                  "type": "string"
+                },
+                "summary": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "recruitment_id",
+                "summary",
+                "evidence"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "accepted": {
+                  "type": "boolean"
+                },
+                "kind": {
+                  "const": "verify_recruitment",
+                  "type": "string"
+                },
+                "rationale": {
+                  "type": "string"
+                },
+                "recruitment_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "recruitment_id",
+                "accepted",
+                "rationale"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "cancel_recruitment",
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "recruitment_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "recruitment_id",
+                "reason"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "description": "The team id never changes; only its label does.",
+              "properties": {
+                "kind": {
+                  "const": "rename_team",
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "team_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "team_id",
+                "name"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "suspend_team",
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "team_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "team_id",
+                "reason"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "resume_team",
+                  "type": "string"
+                },
+                "team_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "team_id"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "cancel_team",
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "team_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "team_id",
+                "reason"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "description": "Name a public interface, schema or API by the paths that define it.",
+              "properties": {
+                "kind": {
+                  "const": "register_surface",
+                  "type": "string"
+                },
+                "path_prefixes": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "project_id": {
+                  "type": "string"
+                },
+                "surface_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "surface_id",
+                "project_id",
+                "path_prefixes"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "description": "Record that a team owns one worktree path and branch. The harness creates the worktree.",
+              "properties": {
+                "base_commit": {
+                  "type": "string"
+                },
+                "branch": {
+                  "type": "string"
+                },
+                "claim_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "claim_worktree",
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "team_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "claim_id",
+                "team_id",
+                "path",
+                "branch",
+                "base_commit"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "claim_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "release_worktree",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "claim_id"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "description": "Says whether a released, never-used worktree may be deleted. Teams never deletes it.",
+              "properties": {
+                "claim_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "approve_worktree_cleanup",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "claim_id"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "changed_paths": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "claim_id": {
+                  "type": "string"
+                },
+                "commit": {
+                  "type": "string"
+                },
+                "depends_on": {
+                  "default": [],
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "integration_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "submit_integration",
+                  "type": "string"
+                },
+                "target_branch": {
+                  "type": "string"
+                },
+                "team_id": {
+                  "type": "string"
+                },
+                "tests": {
+                  "items": {
+                    "$ref": "#/$defs/Evidence"
+                  },
+                  "type": "array"
+                },
+                "touches": {
+                  "default": [],
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "kind",
+                "integration_id",
+                "team_id",
+                "claim_id",
+                "target_branch",
+                "commit",
+                "changed_paths",
+                "tests"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "accepted": {
+                  "type": "boolean"
+                },
+                "evidence": {
+                  "default": [],
+                  "items": {
+                    "$ref": "#/$defs/Evidence"
+                  },
+                  "type": "array"
+                },
+                "integration_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "review_integration",
+                  "type": "string"
+                },
+                "rationale": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "integration_id",
+                "accepted",
+                "rationale"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "conflict_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "resolve_conflict",
+                  "type": "string"
+                },
+                "rationale": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "conflict_id",
+                "rationale"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "acknowledge_notice",
+                  "type": "string"
+                },
+                "notice_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "notice_id"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "integration_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "cancel_integration",
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "integration_id",
+                "reason"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "description": "Owner only; spends an approval naming this integration and commit. There is no force option.",
+              "properties": {
+                "approval_id": {
+                  "type": "string"
+                },
+                "integration_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "begin_merge",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "integration_id",
+                "approval_id"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "integration_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "complete_merge",
+                  "type": "string"
+                },
+                "merge_commit": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "integration_id",
+                "merge_commit"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "integration_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "abort_merge",
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "integration_id",
+                "reason"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "description": "Record which Moo pane runs an agent, and with which provider CLI.",
+              "properties": {
+                "actor_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "bind_agent_pane",
+                  "type": "string"
+                },
+                "pane_id": {
+                  "type": "string"
+                },
+                "provider": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "kind",
+                "actor_id",
+                "pane_id"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "actor_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "unbind_agent_pane",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "actor_id"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "DispatchIntent": {
+          "additionalProperties": false,
+          "properties": {
+            "attempt_id": {
+              "type": "string"
+            },
+            "content_digest": {
+              "type": "string"
+            },
+            "run_generation": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "attempt_id",
+            "run_generation",
+            "content_digest"
+          ],
+          "type": "object"
+        },
+        "DispatchReceiptKind": {
+          "enum": [
+            "attempted",
+            "submitted",
+            "acknowledged",
+            "accepted",
+            "rejected",
+            "completed",
+            "failed"
+          ],
+          "type": "string"
+        },
+        "Evidence": {
+          "additionalProperties": false,
+          "properties": {
+            "digest": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "kind": {
+              "$ref": "#/$defs/EvidenceKind"
+            },
+            "reference": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "reference"
+          ],
+          "type": "object"
+        },
+        "EvidenceKind": {
+          "enum": [
+            "commit",
+            "artifact",
+            "test",
+            "changed_path",
+            "note"
+          ],
+          "type": "string"
+        },
+        "KnowledgeScope": {
+          "oneOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "project_id": {
+                  "type": "string"
+                },
+                "scope": {
+                  "const": "project",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "scope",
+                "project_id"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "scope": {
+                  "const": "team",
+                  "type": "string"
+                },
+                "team_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "scope",
+                "team_id"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "ProtectedAction": {
+          "additionalProperties": false,
+          "description": "The exact action an approval authorizes. `parameters` are part of the bound digest.",
+          "properties": {
+            "kind": {
+              "$ref": "#/$defs/ProtectedActionKind"
+            },
+            "parameters": {
+              "default": null
+            },
+            "target": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "target"
+          ],
+          "type": "object"
+        },
+        "ProtectedActionKind": {
+          "enum": [
+            "scope_change",
+            "architecture_change",
+            "rights_escalation",
+            "budget_escalation",
+            "destructive_operation",
+            "protected_branch_integration",
+            "release"
+          ],
+          "type": "string"
+        },
+        "QaVerdict": {
+          "enum": [
+            "accept",
+            "rework"
+          ],
+          "type": "string"
+        },
+        "Role": {
+          "oneOf": [
+            {
+              "enum": [
+                "owner",
+                "lead",
+                "developer",
+                "qa"
+              ],
+              "type": "string"
+            },
+            {
+              "const": "specialist",
+              "description": "A recruited, temporary specialist; never enrolled through a team spec.",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "$ref": "#/$defs/Command"
+        },
+        "expected_revision": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "idempotency_key": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "expected_revision",
+        "idempotency_key",
+        "command"
+      ],
+      "title": "MutationParams",
+      "type": "object"
+    }
+  },
+  "request_envelope": {
+    "auth": {
+      "bearer": "64 hex characters from a credential file; omit for open methods"
+    },
+    "id": "string, 1-128 bytes, echoed in the response",
+    "method": "one of method_catalog[].name",
+    "params": "object; see params[method]"
+  },
+  "response_envelope": {
+    "error": {
+      "error": {
+        "code": "see errors",
+        "details": "optional",
+        "message": "string",
+        "retry_after_ms": "optional",
+        "retryable": "bool"
+      },
+      "id": "echoed"
+    },
+    "success": {
+      "id": "echoed",
+      "result": "object with a `type` field"
+    }
+  },
+  "title": "Moo Teams local API",
+  "transport": "one JSON object per line over the local Moo API socket; one request, one response line"
+}
