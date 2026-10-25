@@ -41,6 +41,7 @@ mod platform;
 mod plugin_command;
 mod plugin_installations;
 mod plugin_paths;
+mod plugin_status;
 mod popup_size;
 mod product_announcements;
 mod product_identity;

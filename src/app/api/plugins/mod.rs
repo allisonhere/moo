@@ -107,6 +107,9 @@ impl App {
             .cloned()
             .collect::<Vec<_>>();
         plugins.sort_by(|a, b| a.plugin_id.cmp(&b.plugin_id));
+        for plugin in &mut plugins {
+            plugin.status = crate::plugin_status::read_plugin_status(&plugin.plugin_id);
+        }
         encode_success(id, ResponseResult::PluginList { plugins })
     }
 

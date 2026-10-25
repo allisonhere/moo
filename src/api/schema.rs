@@ -135,7 +135,7 @@ operations::define_operations! {
     IntegrationInstall(IntegrationInstallParams) => "integration.install", false, true;
     IntegrationUninstall(IntegrationUninstallParams) => "integration.uninstall", false, false;
     PluginLink(PluginLinkParams) => "plugin.link", false, false;
-    PluginList(PluginListParams) => "plugin.list", false, false;
+    PluginList(PluginListParams) => "plugin.list", false, true;
     PluginUnlink(PluginUnlinkParams) => "plugin.unlink", true, false;
     PluginEnable(PluginSetEnabledParams) => "plugin.enable", false, false;
     PluginDisable(PluginSetEnabledParams) => "plugin.disable", true, false;
