@@ -37,6 +37,7 @@ pub(super) fn command() -> Command {
         .subcommand(machine::command())
         .subcommand(server_command())
         .subcommand(api_command())
+        .subcommand(super::teams::command())
         .subcommand(workspace_command())
         .subcommand(worktree_command())
         .subcommand(tab_command())

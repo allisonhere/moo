@@ -91,6 +91,7 @@ fn start_server_inner(
     restrict_socket_permissions(&path)?;
     let identity = socket_file_identity(&path)?;
     info!(path = %path.display(), "api server listening");
+    let teams = Arc::new(crate::teams::Service::new(crate::session::data_dir()));
 
     #[cfg(unix)]
     let ssh_agents = match crate::platform::ssh_agent::SshAgentRegistry::new(
@@ -129,6 +130,7 @@ fn start_server_inner(
                 let event_hub = event_hub.clone();
                 let capabilities = capabilities.clone();
                 let server_stop = server_stop.clone();
+                let teams = Arc::clone(&teams);
                 let connection_running = Arc::clone(&listener_running);
                 #[cfg(unix)]
                 let ssh_agents = ssh_agents.clone();
@@ -140,8 +142,11 @@ fn start_server_inner(
                         &connection_running,
                         capabilities,
                         server_stop.as_ref(),
-                        #[cfg(unix)]
-                        ssh_agents.as_ref(),
+                        ConnectionExtensions {
+                            teams: Some(&teams),
+                            #[cfg(unix)]
+                            ssh_agents: ssh_agents.as_ref(),
+                        },
                     ) {
                         warn!(err = %err, "api connection failed");
                     }
@@ -320,9 +325,15 @@ fn handle_connection(
         running,
         capabilities,
         None,
-        #[cfg(unix)]
-        None,
+        ConnectionExtensions::default(),
     )
+}
+
+#[derive(Default)]
+struct ConnectionExtensions<'a> {
+    teams: Option<&'a crate::teams::Service>,
+    #[cfg(unix)]
+    ssh_agents: Option<&'a crate::platform::ssh_agent::SshAgentRegistry>,
 }
 
 fn handle_connection_with_stop(
@@ -332,7 +343,7 @@ fn handle_connection_with_stop(
     running: &Arc<AtomicBool>,
     capabilities: Option<ServerCapabilities>,
     server_stop: Option<&ServerStop>,
-    #[cfg(unix)] ssh_agents: Option<&crate::platform::ssh_agent::SshAgentRegistry>,
+    extensions: ConnectionExtensions<'_>,
 ) -> std::io::Result<()> {
     if let Err(err) = stream.set_send_timeout(Some(STREAM_WRITE_TIMEOUT)) {
         debug!(err = %err, "api connection write timeout unavailable");
@@ -345,6 +356,10 @@ fn handle_connection_with_stop(
     let line = line.trim();
     if line.is_empty() {
         return Ok(());
+    }
+
+    if let Some(response) = extensions.teams.and_then(|teams| teams.route(line)) {
+        return write_json_line_allow_disconnect(&mut stream, &response);
     }
 
     let request = match serde_json::from_str::<Request>(line) {
@@ -384,7 +399,8 @@ fn handle_connection_with_stop(
     match request.method {
         #[cfg(unix)]
         Method::ServerSshAgentRegister(params) => {
-            let lease = ssh_agents
+            let lease = extensions
+                .ssh_agents
                 .ok_or_else(|| io::Error::other("SSH agent registration is unavailable"))
                 .and_then(|registry| registry.register(PathBuf::from(params.socket_path)));
             let lease = match lease {
@@ -1085,6 +1101,58 @@ mod tests {
     }
 
     #[test]
+    fn teams_and_core_requests_share_the_existing_local_api_boundary() {
+        let root = unique_test_path("teams-data");
+        crate::teams::initialize(&root).unwrap();
+        let teams = crate::teams::Service::new(root.clone());
+        let (api_tx, mut api_rx) = mpsc::unbounded_channel();
+        for request in [
+            serde_json::json!({"id": "discover", "method": "teams.capabilities.v1", "params": {}}),
+            serde_json::json!({"id": "denied", "method": "teams.snapshot.get.v1", "auth": {"bearer": "1111111111111111111111111111111111111111111111111111111111111111"}, "params": {}}),
+            serde_json::json!({"id": "core", "method": "ping", "params": {}}),
+        ] {
+            let (mut client, server, path) = local_stream_pair("teams-api");
+            write_json_line(&mut client, &request).unwrap();
+            handle_connection_with_stop(
+                server,
+                &api_tx,
+                &EventHub::default(),
+                &Arc::new(AtomicBool::new(true)),
+                None,
+                None,
+                ConnectionExtensions {
+                    teams: Some(&teams),
+                    ssh_agents: None,
+                },
+            )
+            .unwrap();
+            let response = read_line(&mut client);
+            assert!(!response
+                .contains("1111111111111111111111111111111111111111111111111111111111111111"));
+            let response: serde_json::Value = serde_json::from_str(&response).unwrap();
+            assert_eq!(response["id"], request["id"]);
+            match request["id"].as_str().unwrap() {
+                "discover" => {
+                    assert!(response.get("error").is_none(), "{response}");
+                    assert!(response["result"]["methods"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .any(|method| method == "teams.mutate.v1"));
+                }
+                "denied" => assert_eq!(response["error"]["code"], "unauthorized"),
+                "core" => assert_eq!(response["result"]["type"], "pong"),
+                _ => unreachable!(),
+            }
+            assert!(api_rx.try_recv().is_err());
+            drop(client);
+            fs::remove_file(path).unwrap();
+        }
+        drop(teams);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn ssh_agent_registration_lasts_only_for_the_api_connection() {
         let directory = unique_test_path("agent-lease");
         fs::create_dir(&directory).unwrap();
@@ -1104,7 +1172,10 @@ mod tests {
                 &Arc::new(AtomicBool::new(true)),
                 None,
                 None,
-                Some(&worker_registry),
+                ConnectionExtensions {
+                    teams: None,
+                    ssh_agents: Some(&worker_registry),
+                },
             )
             .unwrap();
         });

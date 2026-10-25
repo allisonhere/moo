@@ -60,6 +60,50 @@ impl ApiClient {
         read_json_line(&mut reader)
     }
 
+    pub(crate) fn request_json_value(
+        &self,
+        request: &serde_json::Value,
+    ) -> Result<serde_json::Value, ApiClientError> {
+        const MAX_REQUEST_BYTES: usize = 1024 * 1024;
+        const MAX_RESPONSE_BYTES: u64 = 32 * 1024 * 1024;
+        const TIMEOUT: Duration = Duration::from_secs(5);
+
+        let encoded = serde_json::to_vec(request)?;
+        if encoded.len() > MAX_REQUEST_BYTES {
+            return Err(
+                io::Error::new(io::ErrorKind::InvalidInput, "JSON request exceeds 1 MiB").into(),
+            );
+        }
+        let mut stream = self.connect()?;
+        set_timeout_best_effort(&stream, TimeoutKind::Send, TIMEOUT)?;
+        stream.write_all(&encoded)?;
+        stream.write_all(b"\n")?;
+        stream.flush()?;
+        crate::ipc::set_local_stream_polling(&mut stream, true)?;
+        let reader = BufReader::new(DeadlineReader {
+            stream: &mut stream,
+            deadline: Instant::now() + TIMEOUT,
+        });
+        let mut line = Vec::new();
+        reader
+            .take(MAX_RESPONSE_BYTES + 1)
+            .read_until(b'\n', &mut line)?;
+        if line.len() as u64 > MAX_RESPONSE_BYTES {
+            return Err(
+                io::Error::new(io::ErrorKind::InvalidData, "JSON response exceeds 32 MiB").into(),
+            );
+        }
+        if line.is_empty() {
+            return Err(ApiClientError::EmptyResponse);
+        }
+        if line.last() != Some(&b'\n') {
+            return Err(
+                io::Error::new(io::ErrorKind::UnexpectedEof, "incomplete JSON response").into(),
+            );
+        }
+        serde_json::from_slice(&line).map_err(ApiClientError::Json)
+    }
+
     pub fn request_value_with_timeout(
         &self,
         request: &Request,
@@ -247,6 +291,48 @@ pub(crate) fn parse_response_value(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn raw_json_client_preserves_extension_response_without_core_enum_decoding() {
+        use interprocess::local_socket::traits::Listener as _;
+        let path =
+            std::env::temp_dir().join(format!("moo-json-client-{}.sock", std::process::id()));
+        let listener = crate::ipc::bind_private_local_listener(&path).unwrap();
+        let server = std::thread::spawn(move || {
+            let mut stream = listener.accept().unwrap();
+            let mut line = String::new();
+            BufReader::new(&mut stream).read_line(&mut line).unwrap();
+            let request: serde_json::Value = serde_json::from_str(&line).unwrap();
+            assert_eq!(request["method"], "teams.capabilities.v1");
+            stream
+                .write_all(b"{\"id\":\"teams\",\"result\":{\"methods\":[\"teams.mutate.v1\"]}}\n")
+                .unwrap();
+        });
+        let client = ApiClient::for_target(ConnectionTarget::SocketPath(path.clone()));
+        let response = client
+            .request_json_value(&serde_json::json!({
+                "id": "teams", "method": "teams.capabilities.v1", "params": {},
+            }))
+            .unwrap();
+        assert_eq!(
+            response["result"]["methods"],
+            serde_json::json!(["teams.mutate.v1"])
+        );
+        server.join().unwrap();
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn raw_json_client_rejects_oversized_request_before_connecting() {
+        let client =
+            ApiClient::for_target(ConnectionTarget::SocketPath(PathBuf::from("missing.sock")));
+        let error = client
+            .request_json_value(&serde_json::json!({"body": "x".repeat(1024 * 1024)}))
+            .unwrap_err();
+        assert!(
+            matches!(error, ApiClientError::Io(error) if error.kind() == io::ErrorKind::InvalidInput)
+        );
+    }
 
     #[test]
     fn local_session_target_resolves_named_session_socket() {

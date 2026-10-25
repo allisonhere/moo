@@ -30,6 +30,8 @@ default-members = [".", "crates/ghostty-vt"]
 
 [dependencies]
 ghostty-vt = { path = "crates/ghostty-vt" }
+# OS-backed entropy for scoped Teams credentials; already present in Cargo.lock.
+getrandom = "0.3.4"
 base64 = "0.22.1"
 bincode = { version = "2", features = ["serde"] }
 bytes = "1"

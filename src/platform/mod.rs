@@ -553,7 +553,10 @@ pub(crate) use unix_common::{
 };
 
 mod client_state;
-pub(crate) use client_state::{create_private_state_file, replace_file, sync_parent_directory};
+pub(crate) use client_state::{
+    create_private_state_file, private_credentials_supported, replace_file, sync_parent_directory,
+    validate_private_file,
+};
 
 #[cfg(not(unix))]
 pub(crate) fn begin_cli_output() {}
