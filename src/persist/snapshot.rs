@@ -264,6 +264,17 @@ fn first_pane_id_in_layout(layout: &LayoutSnapshot) -> Option<u32> {
 }
 
 /// Capture the current app state into a serializable snapshot.
+/// A temporary pane (a command the user opened over their work) that a saved session leaves out.
+/// Restoring brings back the panes that were under it, as they were before it opened.
+#[derive(Debug, Clone, Copy)]
+pub struct OverlayPane {
+    pub workspace_index: usize,
+    pub tab_index: usize,
+    pub pane_id: crate::layout::PaneId,
+    pub previous_focus: crate::layout::PaneId,
+    pub previous_zoomed: bool,
+}
+
 pub fn capture(
     workspaces: &[Workspace],
     terminals: &std::collections::HashMap<
@@ -274,11 +285,36 @@ pub fn capture(
     active: Option<usize>,
     selected: usize,
 ) -> SessionSnapshot {
+    capture_without_overlays(
+        workspaces,
+        terminals,
+        terminal_runtimes,
+        active,
+        selected,
+        &[],
+    )
+}
+
+/// Like `capture`, leaving out the temporary `overlays`.
+pub fn capture_without_overlays(
+    workspaces: &[Workspace],
+    terminals: &std::collections::HashMap<
+        crate::terminal::TerminalId,
+        crate::terminal::TerminalState,
+    >,
+    terminal_runtimes: &TerminalRuntimeRegistry,
+    active: Option<usize>,
+    selected: usize,
+    overlays: &[OverlayPane],
+) -> SessionSnapshot {
     SessionSnapshot {
         version: SNAPSHOT_VERSION,
         workspaces: workspaces
             .iter()
-            .map(|workspace| capture_workspace(workspace, terminals, terminal_runtimes))
+            .enumerate()
+            .map(|(index, workspace)| {
+                capture_workspace(workspace, index, terminals, terminal_runtimes, overlays)
+            })
             .collect(),
         active,
         selected,
@@ -290,16 +326,26 @@ pub fn capture(
 
 fn capture_workspace(
     ws: &Workspace,
+    workspace_index: usize,
     terminals: &std::collections::HashMap<
         crate::terminal::TerminalId,
         crate::terminal::TerminalState,
     >,
     terminal_runtimes: &TerminalRuntimeRegistry,
+    overlays: &[OverlayPane],
 ) -> WorkspaceSnapshot {
+    let skipped = |tab_index: usize| -> Vec<OverlayPane> {
+        overlays
+            .iter()
+            .filter(|o| o.workspace_index == workspace_index && o.tab_index == tab_index)
+            .copied()
+            .collect()
+    };
     let tabs: Vec<_> = ws
         .tabs
         .iter()
-        .map(|tab| capture_tab(tab, terminals, terminal_runtimes))
+        .enumerate()
+        .map(|(index, tab)| capture_tab(tab, terminals, terminal_runtimes, &skipped(index)))
         .collect();
     let identity_cwd = tabs
         .first()
@@ -314,6 +360,11 @@ fn capture_workspace(
         public_pane_numbers: ws
             .public_pane_numbers
             .iter()
+            .filter(|(pane_id, _)| {
+                !overlays
+                    .iter()
+                    .any(|o| o.workspace_index == workspace_index && o.pane_id == **pane_id)
+            })
             .map(|(pane_id, number)| (pane_id.raw(), *number))
             .collect(),
         next_public_pane_number: ws.next_public_pane_number,
@@ -331,9 +382,13 @@ fn capture_tab(
         crate::terminal::TerminalState,
     >,
     terminal_runtimes: &TerminalRuntimeRegistry,
+    overlays: &[OverlayPane],
 ) -> TabSnapshot {
     let mut panes = HashMap::new();
     for id in tab.panes.keys() {
+        if overlays.iter().any(|o| o.pane_id == *id) {
+            continue;
+        }
         let terminal_id = tab.terminal_id(*id);
         let terminal = terminal_id.and_then(|id| terminals.get(id));
         let cwd = terminal_id
@@ -395,14 +450,73 @@ fn capture_tab(
             },
         );
     }
+    let mut layout = capture_node(tab.layout.root());
+    let mut zoomed = tab.zoomed;
+    let mut focused = tab.layout.focused();
+    if let Some(first) = overlays.first() {
+        let hidden: Vec<u32> = overlays.iter().map(|o| o.pane_id.raw()).collect();
+        // A tab that is nothing but overlays keeps its layout; there is nothing to go back to.
+        if let Some(pruned) = prune_layout(layout_clone(&layout), &hidden) {
+            layout = pruned;
+            zoomed = first.previous_zoomed;
+            if overlays.iter().any(|o| o.pane_id == focused) {
+                focused = first.previous_focus;
+            }
+        } else {
+            return capture_tab(tab, terminals, terminal_runtimes, &[]);
+        }
+    }
     TabSnapshot {
         custom_name: tab.custom_name.clone(),
         color: tab.color.map(|color| color.name().to_string()),
-        layout: capture_node(tab.layout.root()),
+        layout,
         panes,
-        zoomed: tab.zoomed,
-        focused: Some(tab.layout.focused().raw()),
+        zoomed,
+        focused: Some(focused.raw()),
         root_pane: Some(tab.root_pane.raw()),
+    }
+}
+
+fn layout_clone(layout: &LayoutSnapshot) -> LayoutSnapshot {
+    match layout {
+        LayoutSnapshot::Pane(id) => LayoutSnapshot::Pane(*id),
+        LayoutSnapshot::Split {
+            direction,
+            ratio,
+            first,
+            second,
+        } => LayoutSnapshot::Split {
+            direction: match direction {
+                DirectionSnapshot::Horizontal => DirectionSnapshot::Horizontal,
+                DirectionSnapshot::Vertical => DirectionSnapshot::Vertical,
+            },
+            ratio: *ratio,
+            first: Box::new(layout_clone(first)),
+            second: Box::new(layout_clone(second)),
+        },
+    }
+}
+
+/// The layout without the `hidden` panes: a split that loses one side becomes the other side.
+/// `None` when nothing is left.
+fn prune_layout(layout: LayoutSnapshot, hidden: &[u32]) -> Option<LayoutSnapshot> {
+    match layout {
+        LayoutSnapshot::Pane(id) => (!hidden.contains(&id)).then_some(LayoutSnapshot::Pane(id)),
+        LayoutSnapshot::Split {
+            direction,
+            ratio,
+            first,
+            second,
+        } => match (prune_layout(*first, hidden), prune_layout(*second, hidden)) {
+            (Some(first), Some(second)) => Some(LayoutSnapshot::Split {
+                direction,
+                ratio,
+                first: Box::new(first),
+                second: Box::new(second),
+            }),
+            (Some(only), None) | (None, Some(only)) => Some(only),
+            (None, None) => None,
+        },
     }
 }
 
@@ -419,22 +533,41 @@ pub(super) fn layout_fingerprint(snapshot: &SessionSnapshot) -> Option<String> {
 }
 
 /// Capture pane screen history separately from the structural session snapshot.
+#[cfg(test)]
 pub fn capture_history(
     snapshot: &SessionSnapshot,
     workspaces: &[Workspace],
     terminal_runtimes: &TerminalRuntimeRegistry,
+) -> SessionHistorySnapshot {
+    capture_history_without_overlays(snapshot, workspaces, terminal_runtimes, &[])
+}
+
+/// Like `capture_history`, leaving out the temporary `overlays`.
+pub fn capture_history_without_overlays(
+    snapshot: &SessionSnapshot,
+    workspaces: &[Workspace],
+    terminal_runtimes: &TerminalRuntimeRegistry,
+    overlays: &[OverlayPane],
 ) -> SessionHistorySnapshot {
     SessionHistorySnapshot {
         version: SNAPSHOT_VERSION,
         layout_fingerprint: layout_fingerprint(snapshot),
         workspaces: workspaces
             .iter()
-            .map(|workspace| WorkspaceHistorySnapshot {
+            .enumerate()
+            .map(|(workspace_index, workspace)| WorkspaceHistorySnapshot {
                 tabs: workspace
                     .tabs
                     .iter()
-                    .map(|tab| TabHistorySnapshot {
-                        panes: capture_tab_history(tab, terminal_runtimes),
+                    .enumerate()
+                    .map(|(tab_index, tab)| TabHistorySnapshot {
+                        panes: capture_tab_history(tab, terminal_runtimes, &|id| {
+                            overlays.iter().any(|o| {
+                                o.workspace_index == workspace_index
+                                    && o.tab_index == tab_index
+                                    && o.pane_id == id
+                            })
+                        }),
                     })
                     .collect(),
             })
@@ -445,9 +578,13 @@ pub fn capture_history(
 fn capture_tab_history(
     tab: &crate::workspace::Tab,
     terminal_runtimes: &TerminalRuntimeRegistry,
+    skip: &dyn Fn(crate::layout::PaneId) -> bool,
 ) -> HashMap<u32, PaneHistorySnapshot> {
     let mut panes = HashMap::new();
     for (id, pane) in &tab.panes {
+        if skip(*id) {
+            continue;
+        }
         if let Some(history) = capture_pane_history(Some(pane), terminal_runtimes) {
             panes.insert(id.raw(), history);
         }
@@ -987,6 +1124,43 @@ mod tests {
             snapshot.workspaces[0].worktree_space,
             state.workspaces[0].worktree_space
         );
+    }
+
+    #[test]
+    fn a_temporary_overlay_pane_is_left_out_and_the_tab_comes_back_as_it_was() {
+        let mut state = state_with_workspaces(&["one"]);
+        let root = state.workspaces[0].tabs[0].root_pane;
+        let overlay = state.workspaces[0].test_split(Direction::Horizontal);
+        state.workspaces[0].tabs[0].layout.focus_pane(overlay);
+        state.workspaces[0].tabs[0].zoomed = true;
+        let overlays = [OverlayPane {
+            workspace_index: 0,
+            tab_index: 0,
+            pane_id: overlay,
+            previous_focus: root,
+            previous_zoomed: false,
+        }];
+        let terminal_runtimes = TerminalRuntimeRegistry::new();
+        let snapshot = capture_without_overlays(
+            &state.workspaces,
+            &state.terminals,
+            &terminal_runtimes,
+            state.active,
+            state.selected,
+            &overlays,
+        );
+        let tab = &snapshot.workspaces[0].tabs[0];
+        assert!(matches!(tab.layout, LayoutSnapshot::Pane(id) if id == root.raw()));
+        assert_eq!(tab.panes.keys().copied().collect::<Vec<_>>(), [root.raw()]);
+        assert_eq!((tab.zoomed, tab.focused), (false, Some(root.raw())));
+        assert!(!snapshot.workspaces[0]
+            .public_pane_numbers
+            .contains_key(&overlay.raw()));
+
+        // Without overlays nothing is left out.
+        let full = capture_from_state(&state);
+        assert_eq!(full.workspaces[0].tabs[0].panes.len(), 2);
+        assert!(full.workspaces[0].tabs[0].zoomed);
     }
 
     #[test]

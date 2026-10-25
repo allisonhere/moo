@@ -44,18 +44,33 @@ impl App {
         let job = if self.state.workspaces.is_empty() {
             SessionSaveJob::Clear
         } else {
-            let snapshot = crate::persist::capture(
+            // Commands opened over the user's work (the palette's pane commands) are temporary: a
+            // restart cannot bring their program back, so the saved session leaves them out.
+            let overlays: Vec<crate::persist::OverlayPane> = self
+                .overlay_panes
+                .iter()
+                .map(|(pane_id, overlay)| crate::persist::OverlayPane {
+                    workspace_index: overlay.ws_idx,
+                    tab_index: overlay.tab_idx,
+                    pane_id: *pane_id,
+                    previous_focus: overlay.previous_focus,
+                    previous_zoomed: overlay.previous_zoomed,
+                })
+                .collect();
+            let snapshot = crate::persist::capture_without_overlays(
                 &self.state.workspaces,
                 &self.state.terminals,
                 &self.terminal_runtimes,
                 self.state.active,
                 self.state.selected,
+                &overlays,
             );
             let history = self.persist_pane_history.then(|| {
-                crate::persist::capture_history(
+                crate::persist::capture_history_without_overlays(
                     &snapshot,
                     &self.state.workspaces,
                     &self.terminal_runtimes,
+                    &overlays,
                 )
             });
             SessionSaveJob::Save { snapshot, history }
