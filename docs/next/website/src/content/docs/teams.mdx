@@ -1,0 +1,155 @@
+---
+title: Teams
+description: How Moo Teams works and how to run it - from a goal to a reviewed plan, bounded work, selective memory, disagreements, costs and recovery - plus administration and upgrade notes.
+---
+
+Teams is an optional part of Moo for people who run several coding agents at once and want some order around them. If you only use Moo as a terminal multiplexer, you can ignore this page: Teams does nothing until you create a store, and it never changes how panes, tabs and workspaces behave.
+
+This page explains how Teams works and how to use it. The full list of requests, fields and errors is in the [Teams API](/docs/teams-api/); the screen is described under *Teams* in [Moo](/docs/moo/).
+
+## The idea in one minute
+
+A **team** is three agents with fixed jobs: a **Lead** who breaks work into tasks and signs off, a **Developer** who does them, and a **QA** who checks the result. **You are the Owner.** Nothing risky happens unless you approved that exact thing.
+
+Teams is a **record keeper and rule enforcer**, not an agent runner. It remembers who was asked to do what, what they handed back, what QA said, what you approved and what it cost. It does not start agents, run git or merge anything. Your agents (in Moo panes, or anywhere else on the machine) talk to it through a local JSON API, and the Teams screen is just another client of that API.
+
+Everything is kept in one store on your machine, as an append-only history that can be replayed. If the Moo server restarts, the store comes back exactly as it was.
+
+## Getting started
+
+```bash
+moo teams init       # creates the store and your private Owner credential
+moo teams ui         # opens the Teams screen
+```
+
+The store and the Owner credential live in Moo's config directory (`~/.config/moo`, or `~/.config/moo/sessions/<name>` for a named session). The credential file is private to you; keep it away from your agents. Run `moo server reload-config` if the server was already running, so the command palette learns about Teams.
+
+To leave Teams, press `q` in the screen. Your panes and workspaces are untouched. There is no switch that turns Teams off; the Teams commands appear in the palette only while the store exists.
+
+Teams works for local sessions on Linux and macOS. It is not available on Windows.
+
+## From a goal to a running team
+
+You rarely need to design a team by hand. Describe the goal and let Teams draft a plan you can read and change.
+
+1. **Declare your providers.** A provider is a coding agent service you use, such as a CLI agent with one or more models. You tell Teams what it can do (`code_edit`, `shell`, `review`, and so on), which models it has, and how it reports usage. Teams takes your word for it. It never tests a provider, and every provider shows as unverified. If a role needs something no provider you declared offers, the plan says so instead of guessing.
+2. **Say what you prefer.** You can prefer a provider and model per role. A preference only wins if that provider declares what the role needs.
+3. **Propose a plan.** Give Teams a goal in plain words. It returns a draft: a team, tasks in order with their dependencies, a provider for each role, and any specialist the goal calls for. Every choice comes with the words of your goal that caused it.
+4. **Review and edit.** Rename the team, add or drop tasks, change dependencies, drop a specialist, choose a different provider. Nothing exists yet, so nothing is at stake.
+5. **Launch.** One step creates the team, the credentials and the tasks together, or nothing at all. If something is wrong, you get the reason and no half-built team.
+
+### How the planner decides
+
+The planner is deliberately plain. It looks for known words in your goal (for example *oauth*, *token* or *password* for security; *api*, *schema* or *endpoint* for interfaces; *migrate* or *breaking* for migrations; *test* or *verify* for testing; *docs* or *readme* for documentation) and turns them into tasks and, where justified, one specialist. There is no model behind it, no randomness and no network call, so the same goal with the same providers gives the same plan, and you can always see why.
+
+Two rules keep it conservative:
+
+- **The core team is always the same three roles.** A specialist is proposed only when your goal names a skill the core team does not have, and the plan shows which words triggered it.
+- **A specialist is listed, never started.** The Lead asks for it after the task it belongs to, within the limits below, and it is released as soon as its work is handed off with evidence.
+
+If you would rather build a team yourself, you still can. Manual mode is complete: drafts, tasks and every control work without the planner.
+
+## What agents are told (and not told)
+
+Agents should not drown in history. When an agent is about to work, it can ask Teams for its **context**, and gets a small, labelled bundle:
+
+- the requirements and design decisions (ADRs) **you have accepted**,
+- the task itself,
+- the exact handoff from the Developer, with its evidence, and QA's review,
+- notes the Lead wrote for that task, if they are still valid.
+
+Each item says where it came from and at which revision. The bundle has a size budget (8 KiB by default, 32 KiB at most) and items are included whole or not at all; what did not fit is reported as omitted.
+
+Some things are never included: chat, private messages and transcripts. A requirement or ADR written by an agent stays *proposed* until you accept it, so a guess cannot quietly become truth.
+
+**Notes can go stale, on purpose.** A summary or a specialist's saved context must list what it was based on (one to eight sources) and how long it stays valid. When one of those sources changes, the note stops being served and is listed as stale with the reason. Treat a context bundle as a view of the record at one moment, and fetch it again when the record moves.
+
+## Disagreements
+
+Agents will disagree: QA thinks a test is wrong, the Developer thinks the spec is. Teams has a short, bounded way to handle it so it cannot turn into a loop.
+
+- Anyone on the team can raise a **dispute**, but it must cite at least two pieces of conflicting evidence, not just opinion.
+- At most two peers answer. That is three positions in total, and then it is decided.
+- The **Lead** settles an ordinary dispute. If it is an **architectural** question, or peer review did not settle it, it goes to **you**.
+- Once a question is decided, the same dispute cannot be reopened without new evidence.
+- A team can have at most six open disputes.
+
+## Costs and limits
+
+Teams is careful about what it claims to know about money.
+
+- **Metered** usage comes from a provider you declared as metered. This is the only figure Teams will enforce a limit on.
+- **Estimated** usage is an approximation from whoever reports it. It is shown, labelled as an estimate, and never used to stop work or to claim a bill.
+- If a provider has no metering, or its integration cannot cap spending, Teams says so in a warning. A limit on a provider that cannot stop spending only stops *new* work from starting.
+
+You can set a limit on metered cost and tokens for a team. When it is reached, new work is refused until you raise it.
+
+Work in flight is capped for every team, and these are hard limits:
+
+| What | Limit |
+|---|---|
+| Tasks in progress at once | 3 |
+| Open tasks | 40 |
+| Dispatches waiting | 20 |
+| How deep a chain of task dependencies can be | 6 |
+| Attempts to deliver one task to an agent | 3 |
+| Open disputes | 6 |
+| Specialists at once, per team / per project | 1 / 2 |
+| Teams running at once in one project | 4 |
+| Tasks in one plan | 12 |
+
+## The big picture across projects
+
+When you run more than one team, you need one place to see what wants you. The summary looks across every project and shows, per team:
+
+- approvals waiting for you,
+- disputes waiting for you,
+- stuck tasks (nothing has changed for 30 minutes by default),
+- each agent's state and the team's usage.
+
+Each stuck task comes with suggested next steps based on what is wrong, such as retrying a failed delivery. Teams only suggests. It never retries or restarts something on your behalf.
+
+## When something goes wrong
+
+| What happened | What to do |
+|---|---|
+| The Moo server restarted | Nothing. The store and the event history come back unchanged. A client resumes from the last event number it saw. |
+| An agent stopped responding | Mark it **idle**: it takes no new work, and you can bring it back when its process is up. If it should not run any more, **release** it: that also revokes its credential. |
+| A delivery to an agent failed | The Lead retries it (up to 3 attempts in all). The summary suggests exactly this. |
+| An approval expired | Ask again. An expired approval authorizes nothing, and an approval can be used only once, for exactly the action it named. |
+| A client got the same event twice | Ignore it. Events have a number; a consumer that remembers the last number it handled processes each event once. Repeating a write with the same key changes nothing the second time. |
+| Two teams touch the same files | Teams records the conflict and notifies the other team's Lead. You resolve it. Merging is always an explicit action you approve. |
+
+An agent cannot idle, release or re-activate itself. A Lead can idle or release their own team's agents but cannot bring a released agent back; only you can.
+
+## Safety, honestly
+
+Teams enforces its rules for anything that goes through the API. It is not a sandbox. Agents run as normal processes under your user, so a shell inside an agent could read a credential file or edit the store directly. Keep your Owner credential where agents cannot reach it, and treat Teams as the place where intentions and approvals are recorded and checked, not as a wall.
+
+Specifically, Teams does not start or stop agent processes, run git, merge, deploy or publish, or verify what a provider claims it can do. Approvals are bound to the exact action and parameters, expire, and are used once.
+
+## Administration
+
+- **Where things are.** `teams-v1.json` (the store), `teams-owner.key` (your credential) and a `teams-keys/` folder (one folder per team, credentials for its three roles) in the config directory. A specialist's credential lives wherever you choose to create it.
+- **Back it up.** Copy `teams-v1.json` while the server is stopped. The history is hash-chained, so a damaged file is detected on load instead of being used.
+- **Size.** The store is limited to 10,000 records and 16 MiB. When it is full, Teams says so and refuses new writes. Old events are compacted but never silently dropped from view: a client that fell behind is told to take a fresh snapshot.
+- **Credentials.** `moo teams keygen <file>` creates a private credential and prints its public digest. Only the digest is stored. Releasing an agent or finishing a specialist's engagement revokes its credential.
+- **Calling the API by hand.** `moo teams call --credential-file <file> '<json>'` sends one request without putting the credential on the command line.
+- **Remote access.** There is intentionally no network gateway. Use the API on the same machine, or over SSH.
+
+## Upgrading
+
+The Phase 6 features arrive as API 1.3. Everything from 1.0 to 1.2 is unchanged, and a client that does not use the new methods keeps working exactly as before.
+
+- **Existing stores load as they are.** Every new part of the store is optional on load. Requirements and notes written before kinds existed count as accepted, so nothing agents already relied on disappears. The store format version is still 1.
+- **Old history stays valid.** Events that carry no restriction keep exactly the hash they always had, so old logs verify.
+- **New files** are only created when you use the new features.
+- **Going back.** Opening a store with an older build is untested once it holds plans, providers, notes, disputes or usage. Keep a copy of `teams-v1.json` before you try.
+
+Check what your build supports with `moo teams schema` or the `teams.capabilities.v1` request.
+
+## Limitations
+
+- The Teams screen currently covers teams, chat, tasks, decisions and the new-team flow. Plans, providers, disputes, usage limits and the all-teams summary are used through the API (for example with `moo teams call`) and are not yet screens of their own.
+- Mock agents and scripted checks are not a measure of how real models behave. Provider capabilities, costs and metering are only as good as what you declared.
+- Teams does not make agents agree, write good code or stay inside their sandbox. It makes the handoffs, approvals and limits visible and checkable.

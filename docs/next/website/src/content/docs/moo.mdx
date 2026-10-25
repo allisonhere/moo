@@ -106,7 +106,7 @@ The screen adapts to the terminal: three areas from 100 columns, the side areas 
 - **Terminals**: `b` records which Moo pane runs an agent (and which provider), and Enter on a bound agent focuses that pane. Teams records the link; it does not start agents.
 - **New team** (`:` then *new team*) edits a draft, shows a review screen, and only then creates the credentials, the team spec and the team. *Propose a team from a goal* fills the same draft: the server runs the program named by `MOO_TEAMS_PROPOSER` in its own environment (goal on stdin, a JSON draft on stdout), or returns a plain template named from the goal. The screen only edits the draft; checking and creating the team are server methods any client can call, documented in the [Teams API](/docs/teams-api/).
 
-Teams commands work for local sessions only.
+Teams commands work for local sessions only. [Teams](/docs/teams/) explains how it all fits together: plans, providers, what agents are told, disagreements, costs and limits, recovery and upgrading.
 
 ### Agent names in the sidebar
 

@@ -46,6 +46,11 @@ The Teams API is the source of truth for Teams. The Teams screen (`moo teams ui`
 | `teams.drafts.propose.v1` | 1.2 | Owner, writes | A team draft from a goal (Owner only). |
 | `teams.drafts.validate.v1` | 1.2 | Owner | Check a team draft and preview what launching would do (Owner only). |
 | `teams.drafts.launch.v1` | 1.2 | Owner, writes | Create a team from a draft in one all-or-nothing step (Owner only). |
+| `teams.plans.launch.v1` | 1.3 | Owner, writes | Launch a reviewed plan: the team, its tasks and dependencies and role providers, all or nothing. |
+| `teams.plans.get.v1` | 1.3 | Owner | One plan with its tasks, specialists, provider choices and the reasons for each. |
+| `teams.plans.list.v1` | 1.3 | Owner | The plans, by id, goal and status. |
+| `teams.memory.retrieve.v1` | 1.3 | credential | A small, labelled context for an agent about to work on a task. |
+| `teams.summary.v1` | 1.3 | credential | One view across every project the caller can see: approvals waiting, stuck tasks, disputes, agent states and usage. |
 
 Reads (`snapshot`, `get`, the lists) return only what the caller may see; see [Privacy](#privacy). Every change goes through `teams.mutate.v1`, with the operations below.
 
@@ -89,7 +94,7 @@ Every change is one **command** sent in `teams.mutate.v1`: `{"expected_revision"
 | Command (`kind`) | Authority | Roles | Does |
 |---|---|---|---|
 | `append_chat` | agent | owner, lead, developer, qa | Post a message to the team, a role or one agent (the audience field). |
-| `put_knowledge` | lead | owner, lead | Record project or team knowledge. |
+| `put_knowledge` | lead | owner, lead | Record project or team knowledge. Requirements and ADRs (`knowledge_kind`) start as proposed and only reach agents once the Owner accepts them. |
 
 **tasks**
 
@@ -136,6 +141,50 @@ Every change is one **command** sent in `teams.mutate.v1`: `{"expected_revision"
 | `abort_merge` | owner | owner | The Owner records that a merge did not land. |
 
 
+**providers**
+
+| Command (`kind`) | Authority | Roles | Does |
+|---|---|---|---|
+| `declare_provider` | owner | owner | Declare a provider, its capabilities, models and how it meters usage. Declared, never verified. |
+| `set_role_preference` | owner | owner | Prefer a provider and model for a role (lead, developer, qa, specialist or specialist:<specialty>). |
+| `assign_role_provider` | owner | owner | Assign a declared provider to a team's role, if it offers what the role needs. |
+| `reassign_role_provider` | lead | lead | A Lead changes a role's provider mid-run, spending an Owner approval for exactly that change. |
+
+**plans**
+
+| Command (`kind`) | Authority | Roles | Does |
+|---|---|---|---|
+| `propose_plan` | owner | owner | Turn a goal into a reviewable plan: team draft, tasks and dependencies, justified specialists and provider choices, all explained. |
+| `edit_plan` | owner | owner | Change a draft plan before launch: tasks, dependencies, specialists, providers, team name. |
+| `discard_plan` | owner | owner | Discard a draft plan. |
+| `mark_plan_launched` | owner | owner | Record that a plan became a team (done by teams.plans.launch.v1). |
+
+**memory**
+
+| Command (`kind`) | Authority | Roles | Does |
+|---|---|---|---|
+| `put_context_note` | lead | owner, lead | Record a summary or a specialist's role context, with its sources and validity. |
+| `supersede_context_note` | lead | owner, lead | Replace a note with a newer one; the old one is no longer served. |
+| `accept_knowledge` | owner | owner | The Owner accepts a proposed requirement or ADR so agents are told about it. |
+| `supersede_knowledge` | owner | owner | The Owner replaces an accepted requirement or ADR with another entry. |
+
+**disputes**
+
+| Command (`kind`) | Authority | Roles | Does |
+|---|---|---|---|
+| `raise_dispute` | agent | lead, developer, qa | Raise a bounded disagreement with two pieces of conflicting evidence. |
+| `respond_dispute` | agent | lead, developer, qa | A peer gives their view (at most two peers). |
+| `resolve_dispute` | lead | lead | The Lead settles a non-architectural dispute after a peer has responded. |
+| `decide_dispute` | owner | owner | The Owner decides an escalated or architectural dispute. |
+
+**usage and agents**
+
+| Command (`kind`) | Authority | Roles | Does |
+|---|---|---|---|
+| `report_usage` | owner | owner | The Owner's harness reports usage; only a provider declared as metered may report it as metered. |
+| `set_team_limits` | owner | owner | Set a team's limits on reliably metered cost and tokens. Estimates never enforce. |
+| `set_agent_state` | lead | owner, lead | Idle, release or resume an agent: idle takes no new work, release also revokes its credential. |
+
 ### Team drafts, proposals, launch, pause and resume
 
 A team is built from a **draft**: a name, a project (empty means the default project), and ids for the Lead, Developer and QA. Three Owner-only methods handle it, so a script, the Teams screen and a person at a terminal do exactly the same thing:
@@ -145,6 +194,24 @@ A team is built from a **draft**: a name, a project (empty means the default pro
 3. `teams.drafts.launch.v1 {"expected_revision", "idempotency_key", "draft"}` creates the three private credential files and the team in one all-or-nothing commit, and returns their paths. Replaying the same key returns the same result and creates nothing twice.
 
 `suspend_team`, `resume_team` and `cancel_team` pause, continue and stop a team; a suspended team cannot start or advance work, and attaching or detaching a client never suspends anything.
+
+### Plans, providers, memory, disputes and limits (API 1.3)
+
+These arrived in API 1.3. Older clients keep working: nothing in 1.0 to 1.2 changed, and a client that never calls these methods never sees them.
+
+**Providers and plans.** The Owner declares providers with `declare_provider`: an id, a label, the capabilities it says it has, its models, how it meters usage (`metered`, `estimated` or `none`) and whether the integration can stop spending at a limit. Teams does not check any of it; every provider reads `verified: false`, and that never changes. `propose_plan {plan_id, goal}` turns a goal into a draft plan: a team draft, tasks with dependencies, any specialists the goal justifies, a provider for each role, and a list of `explanations`, each with the words of the goal that caused it. The planner is a fixed keyword table with no model and no randomness, so the same goal and the same declared providers give the same plan. `edit_plan` changes it before launch with ops: `rename_team`, `set_project`, `add_task`, `remove_task`, `restore_task`, `set_task_title`, `set_task_dependencies`, `drop_recruitment`, `restore_recruitment`, `set_role_provider`. `teams.plans.launch.v1 {expected_revision, idempotency_key, plan_id}` creates the team, its credentials and its tasks in one commit. Specialists come back as `pending_specialists`: the Lead requests them with `request_recruitment` after the task they are listed for, and nothing starts on its own.
+
+**Changing a role's provider mid-run.** `reassign_role_provider` is a Lead command, and it spends an Owner approval for exactly that change (a `rights_escalation` on `<team>:<role>` carrying the provider and model). Without a matching approval it is refused. Before launch, the Owner uses `assign_role_provider` or `edit_plan` instead.
+
+**Memory.** `teams.memory.retrieve.v1 {team_id?, task_id?, budget_bytes?}` returns what an agent should be told, within a byte budget (8 KiB by default, 32 KiB at most): accepted requirements and ADRs, the task, the latest handoff with its exact evidence, review decisions, and current context notes. Every item carries `provenance` (what it came from and at which revision), and items are included whole or not at all. Chat, scoped messages and transcripts are never included. A note made with `put_context_note` must name between one and eight sources and a validity window; once a source changes, the note is listed in `excluded_as_stale` with the reason instead of being served. The answer is a view at `as_of_revision`, not a standing instruction: fetch again when the revision moves. Requirements and ADRs start as `proposed`; `accept_knowledge` makes them visible to agents and `supersede_knowledge` replaces one.
+
+**Disputes.** `raise_dispute` needs a topic and at least two distinct pieces of conflicting evidence. At most two peers answer with `respond_dispute`, so a dispute has three positions at most. The Lead closes an ordinary dispute with `resolve_dispute`. A dispute marked `architectural`, or one where peer review has run its course without settling it, goes to the Owner (`escalated`) and only `decide_dispute` closes it. A question already decided cannot be reopened without new evidence (`dispute_settled`), and a team has at most 6 open disputes.
+
+**Usage and limits.** `report_usage` is the Owner's harness telling Teams what a provider consumed. Only a provider declared `metered` can report cost as metered; everything else is an estimate. Snapshots show the two apart: `reliable` (from metered providers) and `estimated` (approximations, never enforced, never to be read as a bill), plus `warnings`, which say so when a provider has no spend cap or no metering. `set_team_limits` sets a ceiling on metered cost and tokens; once reached, new work is refused with `usage_limit_reached` until the Owner raises it. Work in flight is capped too (see Limits).
+
+**Agent state.** `set_agent_state` puts a team's Lead, Developer or QA in `idle` (takes no new work), `released` (also revokes its credential and removes its pane binding) or back to `active`. A Lead controls only their own team and cannot bring a released agent back; an agent cannot idle or release itself.
+
+**Summary.** `teams.summary.v1 {stuck_after_seconds?}` lists, per project and team, approvals waiting, escalated disputes, agent states, usage and stuck tasks. A task counts as stuck when it has not changed for 30 minutes unless you say otherwise, and each stuck task carries `suggested_actions`, for example `retry_dispatch` for a failed dispatch. Teams only suggests; it never retries anything for you.
 
 ## Reading chat, tasks, approvals and decisions
 
@@ -176,6 +243,7 @@ Every committed change appends events to one durable, ordered log per store.
 ## Limits
 
 - Requests are rate limited per credential: 20 writes/s (burst 60) and 50 reads/s (burst 200). Failed authentications share one small bucket (5/s, burst 20), so guessing a credential is slow and cannot starve real users. A refusal is `rate_limited` with `retry_after_ms`: wait that long.
+- Work in flight, per team, is capped. These are hard limits, not advice: 3 tasks in progress (`concurrency_limit`), 40 open tasks, 20 queued dispatches, dependency chains 6 deep (`task_depth_limit`), 3 dispatch attempts per task (`retry_exhausted`), 6 open disputes. A plan has at most 12 tasks and 4 specialists, and a project at most 16 providers. `teams.capabilities.v1` reports all of them under `work_limits`.
 - A message body is at most 16 KiB; a page at most 100 items; the store at most 10000 records and 16 MiB.
 
 ## Privacy
