@@ -1057,17 +1057,19 @@ fn contains(rect: Rect, x: u16, y: u16) -> bool {
     x >= rect.x && x < rect.right() && y >= rect.y && y < rect.bottom()
 }
 
-/// The clickable tab strip across the top of the workspace.
+/// The clickable tab strip across the top of the workspace. Each tab is three rows tall (a rounded
+/// cap, the label and the line it sits on); the returned rectangle is the label row.
 pub fn view_tabs(main: Rect) -> Vec<(Rect, View)> {
     let mut x = main.x + 1;
     let mut tabs = Vec::new();
     for view in View::ALL.iter() {
-        let width = (view.label().len() + 4) as u16;
+        // "│ 1 Chat │": the digit, a space and the label, padded by a space and a border each side.
+        let width = (view.label().len() + 6) as u16;
         if x + width > main.right() {
             break;
         }
-        tabs.push((Rect::new(x, main.y + 1, width, 1), *view));
-        x += width + 1;
+        tabs.push((Rect::new(x, main.y + 2, width, 1), *view));
+        x += width;
     }
     tabs
 }

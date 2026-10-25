@@ -125,7 +125,7 @@ fn wide_layout_shows_navigator_workspace_and_inspector() {
         let s = screen(width, height, "owner");
         let t = text(&draw(&s));
         assert!(t.contains("teams"), "{width}: navigator");
-        assert!(t.contains("[1 terminals]"), "{width}: workspace tabs");
+        assert!(t.contains("│ 1 terminals │"), "{width}: workspace tabs");
         assert!(t.contains("blockers"), "{width}: inspector");
         assert!(
             t.contains("All teams") && t.contains("Moo"),
@@ -142,7 +142,7 @@ fn eighty_columns_collapse_the_side_areas_into_a_drawer() {
         !t.contains("blockers") && !t.contains("All teams"),
         "collapsed: {t}"
     );
-    assert!(t.contains("[1 terminals]"));
+    assert!(t.contains("│ 1 terminals │"));
     press(&mut s, "n");
     assert_eq!((s.active, s.focus), (Area::Navigator, Focus::Navigator));
     assert!(text(&draw(&s)).contains("All teams"));
@@ -890,4 +890,24 @@ fn agent_ids_are_not_cut_when_there_is_room_for_them() {
     s.snapshot.tasks[0].developer_id = "a-rather-long-agent-name".into();
     s.snapshot.teams[0].developer_id = "a-rather-long-agent-name".into();
     assert!(text(&draw(&s)).contains("a-rather-long-agent-name"));
+}
+
+#[test]
+fn the_active_view_is_a_rounded_tab_open_to_the_workspace_and_ascii_mode_has_no_unicode() {
+    let mut s = screen(100, 30, "owner");
+    let t = text(&draw(&s));
+    let rows: Vec<&str> = t.lines().collect();
+    let label = rows
+        .iter()
+        .position(|r| r.contains("│ 1 terminals │"))
+        .expect("tab label row");
+    assert!(rows[label - 1].contains('╭') && rows[label - 1].contains('╮'));
+    assert!(rows[label + 1].contains('┘') && rows[label + 1].contains('└'));
+    s.key(key(KeyCode::Char('A')));
+    let ascii = text(&draw(&s));
+    let tabs: String = ascii
+        .lines()
+        .filter(|r| r.contains("1 terminals") || r.contains("2 chat"))
+        .collect();
+    assert!(tabs.contains("| 1 terminals |"), "{tabs}");
 }

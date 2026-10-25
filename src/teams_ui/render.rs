@@ -497,36 +497,93 @@ fn draw_navigator(buf: &mut Buffer, rect: Rect, screen: &Screen, tide: &Tide) {
 
 // ---- main workspace -------------------------------------------------------------------------
 
+/// The view tabs: folder-style tabs with rounded tops. The active one is open at the bottom so it
+/// joins the workspace below it, and the others sit on a line that runs to the edge.
+fn draw_view_tabs(buf: &mut Buffer, rect: Rect, inner: Rect, screen: &Screen, tide: &Tide) {
+    let (tl, tr, side, bl, br, bar) = if tide.options.ascii {
+        ("+", "+", "|", "+", "+", "-")
+    } else {
+        ("╭", "╮", "│", "┘", "└", "─")
+    };
+    let line = Style::default().fg(tide.border);
+    let tabs = view_tabs(rect);
+    let Some(base_y) = tabs.first().map(|(r, _)| r.y + 1) else {
+        return;
+    };
+    if base_y >= inner.bottom() {
+        return;
+    }
+    // The line the tabs sit on, across the whole workspace.
+    for x in inner.x..inner.right() {
+        buf[(x, base_y)].set_symbol(bar).set_style(line);
+    }
+    // ...joined to the panel's side borders.
+    let (left_join, right_join) = if tide.options.ascii {
+        ("+", "+")
+    } else {
+        ("├", "┤")
+    };
+    buf[(rect.x, base_y)].set_symbol(left_join).set_style(line);
+    buf[(rect.right() - 1, base_y)]
+        .set_symbol(right_join)
+        .set_style(line);
+    for (n, (tab, view)) in tabs.iter().enumerate() {
+        let active = *view == screen.view;
+        let label = format!(" {} {} ", n + 1, view.label());
+        let label_width = label.chars().count() as u16;
+        if active {
+            let edge = Style::default().fg(tide.accent);
+            let cap_y = tab.y - 1;
+            buf[(tab.x, cap_y)].set_symbol(tl).set_style(edge);
+            for x in tab.x + 1..tab.right() - 1 {
+                buf[(x, cap_y)].set_symbol(bar).set_style(edge);
+            }
+            buf[(tab.right() - 1, cap_y)].set_symbol(tr).set_style(edge);
+            buf[(tab.x, tab.y)].set_symbol(side).set_style(edge);
+            buf[(tab.right() - 1, tab.y)]
+                .set_symbol(side)
+                .set_style(edge);
+            buf.set_stringn(
+                tab.x + 1,
+                tab.y,
+                &label,
+                label_width as usize,
+                Style::default()
+                    .fg(tide.accent)
+                    .add_modifier(Modifier::BOLD),
+            );
+            // Open at the bottom: the line turns up into the tab and back out.
+            buf[(tab.x, base_y)].set_symbol(bl).set_style(edge);
+            for x in tab.x + 1..tab.right() - 1 {
+                buf[(x, base_y)].set_symbol(" ").set_style(line);
+            }
+            buf[(tab.right() - 1, base_y)]
+                .set_symbol(br)
+                .set_style(edge);
+        } else {
+            buf.set_stringn(
+                tab.x + 1,
+                tab.y,
+                &label,
+                label_width as usize,
+                Style::default().fg(tide.muted),
+            );
+        }
+    }
+}
+
 fn draw_main(buf: &mut Buffer, rect: Rect, screen: &Screen, tide: &Tide) {
     let focused = matches!(screen.focus, Focus::Main | Focus::Composer);
     let inner = panel(buf, rect, &screen.scope_title(), focused, tide);
     if inner.width == 0 || inner.height == 0 {
         return;
     }
-    // Tab strip on the first inner row; `view_tabs` gives the same cells to mouse hit-testing.
-    let mut spans: Vec<Span> = vec![Span::raw(" ")];
-    for (n, (_, view)) in view_tabs(rect).iter().enumerate() {
-        let active = *view == screen.view;
-        let (open, close) = if active { ("[", "]") } else { (" ", " ") };
-        let style = if active {
-            Style::default()
-                .fg(tide.accent)
-                .add_modifier(Modifier::BOLD)
-        } else {
-            Style::default().fg(tide.muted)
-        };
-        spans.push(Span::styled(
-            format!("{open}{} {}{close}", n + 1, view.label()),
-            style,
-        ));
-        spans.push(Span::raw(" "));
-    }
-    put(buf, inner, 0, Line::from(spans));
+    draw_view_tabs(buf, rect, inner, screen, tide);
     let body = Rect::new(
         inner.x,
-        inner.y + 2,
+        inner.y + 3,
         inner.width,
-        inner.height.saturating_sub(2),
+        inner.height.saturating_sub(3),
     );
     if body.height == 0 {
         return;
@@ -543,7 +600,8 @@ fn draw_main(buf: &mut Buffer, rect: Rect, screen: &Screen, tide: &Tide) {
     if screen.snapshot.teams.is_empty() {
         let lines = [
             "no teams yet",
-            "create one with `moo teams call`: create_team_spec, enroll_actor, launch_team",
+            "press : and choose \"new team\" to build one, or describe a goal and let Teams propose one",
+            "? lists every key, q closes this screen",
         ];
         for (i, text) in lines.iter().enumerate() {
             put(

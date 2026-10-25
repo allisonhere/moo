@@ -49,34 +49,34 @@ impl EndpointCommandRegistry {
 
 impl EndpointCommandRegistry {
     /// Adds the Teams commands to what the command palette lists, where Teams is available. They run
-    /// the Teams screen in a popup like any other custom command.
+    /// the Teams screen in a pane like any other custom command.
     pub(super) fn with_teams(mut self, enabled: bool) -> Self {
         if !enabled {
             return self;
         }
         let namespace = new_command_namespace();
-        let popup =
+        let pane =
             |label: &str, args: &str, description: &str| crate::config::CustomCommandKeybind {
                 bindings: crate::config::ActionKeybinds::default(),
                 label: label.to_owned(),
                 command: format!("\"$MOO_BIN_PATH\" teams ui{args}"),
-                action: crate::config::CustomCommandAction::Popup,
+                action: crate::config::CustomCommandAction::Pane,
                 description: Some(description.to_owned()),
-                width: Some(crate::popup_size::PopupSize::Percent(92)),
-                height: Some(crate::popup_size::PopupSize::Percent(90)),
+                width: None,
+                height: None,
             };
         let commands = [
-            popup(
+            pane(
                 "teams: open screen",
                 "",
                 "navigator, chat, tasks and decisions for your teams",
             ),
-            popup(
+            pane(
                 "teams: decisions",
                 " --view decisions",
                 "approvals and conflicts waiting for a decision",
             ),
-            popup(
+            pane(
                 "teams: new team",
                 " --start builder",
                 "build a team, or propose one from a goal",
@@ -841,7 +841,7 @@ mod tests {
             ["teams: open screen", "teams: decisions", "teams: new team"]
         );
         assert!(registry.entries.iter().all(|e| {
-            e.binding.action == crate::config::CustomCommandAction::Popup
+            e.binding.action == crate::config::CustomCommandAction::Pane
                 && e.binding.command.starts_with("\"$MOO_BIN_PATH\" teams ui")
                 && e.id.contains("_teams_")
         }));
