@@ -37,24 +37,6 @@ pub(super) fn command() -> Command {
                 ),
         )
         .subcommand(
-            Command::new("tab")
-                .about("Open the Teams screen in its own tab, or focus that tab if it is open")
-                .arg(
-                    Arg::new("view")
-                        .long("view")
-                        .value_name("VIEW")
-                        .value_parser(["terminals", "chat", "tasks", "decisions"])
-                        .help("Open on this view"),
-                )
-                .arg(
-                    Arg::new("start")
-                        .long("start")
-                        .value_name("WHAT")
-                        .value_parser(["builder"])
-                        .help("Start straight in the team builder"),
-                ),
-        )
-        .subcommand(
             Command::new("schema")
                 .about("Print this build's machine-readable Teams API schema (no server needed)"),
         )
@@ -131,7 +113,6 @@ pub(super) fn run(args: &[String]) -> io::Result<i32> {
             )?;
             Ok(0)
         }
-        Some(("tab", args)) => open_in_tab(args),
         Some(("keygen", args)) => {
             let path = required_path(args, "path")?;
             let digest = crate::teams::create_credential(path).map_err(io::Error::other)?;
@@ -153,71 +134,6 @@ pub(super) fn run(args: &[String]) -> io::Result<i32> {
             "unknown Teams command",
         )),
     }
-}
-
-/// Runs `moo <args>` and returns its JSON `result`.
-fn moo_json(args: &[&str]) -> io::Result<Value> {
-    let output = std::process::Command::new(std::env::current_exe()?)
-        .args(args)
-        .output()?;
-    let value: Value = serde_json::from_slice(&output.stdout).map_err(io::Error::other)?;
-    match value.get("result") {
-        Some(result) if output.status.success() => Ok(result.clone()),
-        _ => Err(io::Error::other(format!(
-            "moo {} failed: {}",
-            args.join(" "),
-            value
-        ))),
-    }
-}
-
-/// Focuses the Teams tab of the current workspace, or makes one that runs the Teams screen.
-fn open_in_tab(args: &clap::ArgMatches) -> io::Result<i32> {
-    let workspace = std::env::var("MOO_ACTIVE_WORKSPACE_ID").ok();
-    let mut list = vec!["tab", "list"];
-    if let Some(workspace) = workspace.as_deref() {
-        list.extend(["--workspace", workspace]);
-    }
-    let existing = moo_json(&list)?;
-    let open = existing["tabs"].as_array().and_then(|tabs| {
-        tabs.iter().find_map(|tab| {
-            (tab["label"] == crate::teams::TAB_LABEL)
-                .then(|| tab["tab_id"].as_str().map(str::to_owned))
-                .flatten()
-        })
-    });
-    if let Some(tab_id) = open {
-        moo_json(&["tab", "focus", &tab_id])?;
-        return Ok(0);
-    }
-    let mut create = vec![
-        "tab",
-        "create",
-        "--label",
-        crate::teams::TAB_LABEL,
-        "--focus",
-    ];
-    if let Some(workspace) = workspace.as_deref() {
-        create.extend(["--workspace", workspace]);
-    }
-    let created = moo_json(&create)?;
-    let pane = created["root_pane"]["pane_id"]
-        .as_str()
-        .ok_or_else(|| io::Error::other("the new tab has no pane"))?;
-    // `exec` makes quitting the screen close the tab instead of leaving a shell behind.
-    let exe = std::env::current_exe()?;
-    let mut command = format!(
-        "exec '{}' teams ui",
-        exe.display().to_string().replace('\'', "'\\''")
-    );
-    if let Some(view) = args.get_one::<String>("view") {
-        command.push_str(&format!(" --view {view}"));
-    }
-    if args.get_one::<String>("start").is_some() {
-        command.push_str(" --start builder");
-    }
-    moo_json(&["pane", "run", pane, &command])?;
-    Ok(0)
 }
 
 fn required_path<'a>(args: &'a clap::ArgMatches, name: &str) -> io::Result<&'a Path> {
