@@ -31,19 +31,14 @@ pub enum KnowledgeKind {
     Adr,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum KnowledgeStatus {
     Proposed,
+    /// Entries written before kinds existed were plain notes and count as accepted.
+    #[default]
     Accepted,
     Superseded,
-}
-
-impl Default for KnowledgeStatus {
-    fn default() -> Self {
-        // Entries written before kinds existed were plain notes and count as accepted.
-        Self::Accepted
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]

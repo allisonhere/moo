@@ -17,7 +17,7 @@ use super::{Error, Result};
 pub use bindings::PaneBinding;
 use governance::RecruitmentRequest;
 pub use governance::{Approval, Authority, ProtectedAction, Recruitment};
-use memory::{ContextNote, KnowledgeKind, KnowledgeStatus, NoteKind, SourceKind, SourceRef};
+use memory::{ContextNote, KnowledgeKind, KnowledgeStatus, NoteKind, SourceRef};
 pub use memory::{DEFAULT_BUDGET, MAX_BUDGET};
 use oversight::{AgentRunState, AgentState, Dispute, TeamLimits, TeamUsage, UsageBasis};
 pub use oversight::{
@@ -4069,6 +4069,7 @@ fn validate_evidence(evidence: &[Evidence], required: bool) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use memory::SourceKind;
 
     fn digest(seed: char) -> String {
         seed.to_string().repeat(64)
@@ -6680,15 +6681,13 @@ mod tests {
             )
             .unwrap();
         let pref = plan_for(&state, "Add OAuth tests");
-        assert_eq!(
-            pref.roles
-                .iter()
-                .find(|r| r.role_key == "developer")
-                .unwrap()
-                .rationale
-                .contains("your preference"),
-            true
-        );
+        assert!(pref
+            .roles
+            .iter()
+            .find(|r| r.role_key == "developer")
+            .unwrap()
+            .rationale
+            .contains("your preference"));
         // ...and is ignored, with the fallback explained, when it is not.
         state
             .execute(

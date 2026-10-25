@@ -668,7 +668,7 @@ impl Service {
                 .map(|r| {
                     json!({
                         "key": r.key, "specialty": r.specialty, "deliverable": r.deliverable,
-                        "request_after_task": r.after_task.as_deref().map(|k| id_of(k)),
+                        "request_after_task": r.after_task.as_deref().map(id_of),
                         "capabilities": r.capabilities, "because": r.because,
                         "provider_id": r.provider_id, "model_id": r.model_id,
                     })

@@ -7746,6 +7746,13 @@
             "plugin_root": {
               "type": "string"
             },
+            "settings": {
+              "description": "Settings the plugin offers, each a set of options that run one of its actions.",
+              "items": {
+                "$ref": "#/schemas/success_response/$defs/PluginManifestSetting"
+              },
+              "type": "array"
+            },
             "source": {
               "$ref": "#/schemas/success_response/$defs/PluginSourceInfo",
               "default": {
@@ -7757,6 +7764,13 @@
                 "$ref": "#/schemas/success_response/$defs/PluginManifestStartup"
               },
               "type": "array"
+            },
+            "status": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "What the plugin last reported about itself in its `status.json`, by key (a setting's id gives\nthat setting's current option value). Filled in by plugin.list; empty when it reports nothing.",
+              "type": "object"
             },
             "version": {
               "type": "string"
@@ -9216,6 +9230,35 @@
           ],
           "type": "object"
         },
+        "PluginManifestSetting": {
+          "description": "A setting a plugin offers for clients to show and change: a titled set of options, none of which\ntakes effect except by running its action.",
+          "properties": {
+            "description": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "id": {
+              "type": "string"
+            },
+            "options": {
+              "items": {
+                "$ref": "#/schemas/success_response/$defs/PluginSettingOption"
+              },
+              "type": "array"
+            },
+            "title": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "title",
+            "options"
+          ],
+          "type": "object"
+        },
         "PluginManifestStartup": {
           "properties": {
             "command": {
@@ -9275,6 +9318,26 @@
             "windows"
           ],
           "type": "string"
+        },
+        "PluginSettingOption": {
+          "description": "One choice of a plugin setting: selecting it runs `action`, and the plugin reports `value` in\nits status once that is the current choice.",
+          "properties": {
+            "action": {
+              "type": "string"
+            },
+            "label": {
+              "type": "string"
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "value",
+            "label",
+            "action"
+          ],
+          "type": "object"
         },
         "PluginSourceInfo": {
           "properties": {
