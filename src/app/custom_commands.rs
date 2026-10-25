@@ -47,6 +47,52 @@ impl EndpointCommandRegistry {
     }
 }
 
+impl EndpointCommandRegistry {
+    /// Adds the Teams commands to what the command palette lists. They appear only when the session
+    /// has a Teams store, and run the Teams screen in a popup like any other custom command.
+    pub(super) fn with_teams(mut self, enabled: bool) -> Self {
+        if !enabled {
+            return self;
+        }
+        let namespace = new_command_namespace();
+        let popup =
+            |label: &str, args: &str, description: &str| crate::config::CustomCommandKeybind {
+                bindings: crate::config::ActionKeybinds::default(),
+                label: label.to_owned(),
+                command: format!("\"$MOO_BIN_PATH\" teams ui{args}"),
+                action: crate::config::CustomCommandAction::Popup,
+                description: Some(description.to_owned()),
+                width: Some(crate::popup_size::PopupSize::Percent(92)),
+                height: Some(crate::popup_size::PopupSize::Percent(90)),
+            };
+        let commands = [
+            popup(
+                "teams: open screen",
+                "",
+                "navigator, chat, tasks and decisions for your teams",
+            ),
+            popup(
+                "teams: decisions",
+                " --view decisions",
+                "approvals and conflicts waiting for a decision",
+            ),
+            popup(
+                "teams: new team",
+                " --start builder",
+                "build a team, or propose one from a goal",
+            ),
+        ];
+        for (index, binding) in commands.into_iter().enumerate() {
+            self.entries.push(EndpointCommand {
+                action: binding.action.into(),
+                id: format!("cmd_{namespace}_teams_{index}"),
+                binding,
+            });
+        }
+        self
+    }
+}
+
 impl App {
     pub(crate) fn client_shell_keybindings_profile(&self) -> Option<&str> {
         self.client_shell_keybindings_profile.as_deref()
@@ -778,5 +824,39 @@ mod tests {
             crate::protocol::ClientShellCommandAction::Popup
         );
         assert!(!format!("{manifest:?}").contains("secret-command"));
+    }
+
+    #[test]
+    fn teams_commands_join_the_palette_only_when_a_teams_store_exists() {
+        let none = super::EndpointCommandRegistry::new(&[]);
+        assert!(none.with_teams(false).entries.is_empty());
+        let registry = super::EndpointCommandRegistry::new(&[]).with_teams(true);
+        let labels: Vec<&str> = registry
+            .entries
+            .iter()
+            .map(|e| e.binding.label.as_str())
+            .collect();
+        assert_eq!(
+            labels,
+            ["teams: open screen", "teams: decisions", "teams: new team"]
+        );
+        assert!(registry.entries.iter().all(|e| {
+            e.binding.action == crate::config::CustomCommandAction::Popup
+                && e.binding.command.starts_with("\"$MOO_BIN_PATH\" teams ui")
+                && e.id.contains("_teams_")
+        }));
+        // User commands keep their place at the front.
+        let user = crate::config::CustomCommandKeybind {
+            bindings: crate::config::ActionKeybinds::default(),
+            label: "mine".into(),
+            command: "true".into(),
+            action: crate::config::CustomCommandAction::Shell,
+            description: None,
+            width: None,
+            height: None,
+        };
+        let mixed = super::EndpointCommandRegistry::new(&[user]).with_teams(true);
+        assert_eq!(mixed.entries.len(), 4);
+        assert_eq!(mixed.entries[0].binding.label, "mine");
     }
 }

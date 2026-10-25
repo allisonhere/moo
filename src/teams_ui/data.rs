@@ -33,6 +33,8 @@ pub struct Snapshot {
     #[serde(default)]
     pub notices: Vec<Notice>,
     #[serde(default)]
+    pub bindings: Vec<Binding>,
+    #[serde(default)]
     pub attention: Attention,
 }
 
@@ -40,6 +42,14 @@ pub struct Snapshot {
 pub struct Viewer {
     #[serde(default)]
     pub role: String,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct Binding {
+    pub actor_id: String,
+    pub pane_id: String,
+    #[serde(default)]
+    pub provider: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -137,6 +147,8 @@ pub struct Message {
     #[serde(default)]
     pub kind: Value,
     #[serde(default)]
+    pub audience: Value,
+    #[serde(default)]
     pub body: String,
 }
 
@@ -163,6 +175,10 @@ pub struct Approval {
     pub action_digest: String,
     #[serde(default)]
     pub justification: String,
+    #[serde(default)]
+    pub alternatives: Vec<String>,
+    #[serde(default)]
+    pub risks: Vec<String>,
     #[serde(default)]
     pub ttl_seconds: u64,
     #[serde(default)]
@@ -248,6 +264,30 @@ impl Snapshot {
 
     pub fn actor(&self, id: &str) -> Option<&Actor> {
         self.actors.iter().find(|actor| actor.id == id)
+    }
+
+    pub fn binding(&self, actor_id: &str) -> Option<&Binding> {
+        self.bindings
+            .iter()
+            .find(|binding| binding.actor_id == actor_id)
+    }
+
+    /// "to developers" / "to qa1 (direct)" for a scoped message; `None` for the shared channel.
+    pub fn audience_label(&self, audience: &Value) -> Option<String> {
+        match audience.get("to").and_then(Value::as_str)? {
+            "role" => Some(format!(
+                "to {}s",
+                audience.get("role").and_then(Value::as_str).unwrap_or("?")
+            )),
+            "actor" => Some(format!(
+                "to {} (direct)",
+                audience
+                    .get("actor_id")
+                    .and_then(Value::as_str)
+                    .unwrap_or("?")
+            )),
+            _ => None,
+        }
     }
 
     pub fn team_label(&self, id: &str) -> String {

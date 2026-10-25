@@ -95,6 +95,19 @@ Moo tags panes it launches with `MOO_PRODUCT_ID=moo`. If it inherits a socket fr
 
 Press `prefix+space` to open the command palette. Type to filter with fuzzy matching, use Up/Down or `j/k` to move, Enter to run the highlighted action, and Esc to close. Built-in actions show their keybindings, and the palette also lists commands advertised by the server, plugins, and popups. The narrow-terminal switcher exposes the same commands in a scrollable menu.
 
+### Teams
+
+`moo teams init` creates a Teams store for the session (an owner credential and a durable event log), and `moo teams ui` opens a keyboard-first screen over it: a navigator (All teams, then Projects, Teams and Agents), a workspace with Terminals, Chat, Tasks and Decisions views, and an inspector for the selected team or agent. Once a store exists and the config is loaded, the command palette lists **teams: open screen**, **teams: decisions** and **teams: new team**, each opening the screen in a popup. `moo server reload-config` picks up a store created while the server was running.
+
+The screen adapts to the terminal: three areas from 100 columns, the side areas collapsing (`n` and `i` dock them) at 61 to 99, and one area at a time (Tab to switch) at 60 and below. `:` opens its own command palette with the commands that apply to what is selected, `?` lists the keys, `D` switches density, `A` uses ASCII glyphs, `H` makes focus high-contrast and `t` previews the built-in themes. It follows your configured theme.
+
+- **Decisions** shows approvals and conflicts. `a`, `d`, `v` and `x` open a confirmation with the exact scope before anything is sent, and only the Owner can decide. Text typed in chat is never an approval.
+- **Chat** messages start with `@lead`, `@dev`, `@qa` or `@agent-id` to address a role or one agent. The audience is sent as a field and enforced by the server, so scoped messages are readable only by the sender, the addressee and the Owner.
+- **Terminals**: `b` records which Moo pane runs an agent (and which provider), and Enter on a bound agent focuses that pane. Teams records the link; it does not start agents.
+- **New team** (`:` then *new team*) edits a draft, shows a review screen, and only then creates the credentials, the team spec and the team. *Propose a team from a goal* fills the same draft: the server runs the program named by `MOO_TEAMS_PROPOSER` in its own environment (goal on stdin, a JSON draft on stdout), or returns a plain template named from the goal. The screen only edits the draft; checking and creating the team are server methods any client can call, documented in the [Teams API](/docs/teams-api/).
+
+Teams commands work for local sessions only.
+
 ### Agent names in the sidebar
 
 The lower-left agents panel shows the agent name you assigned, then integration-provided display metadata, then the detected agent kind.

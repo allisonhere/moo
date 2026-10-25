@@ -4,6 +4,7 @@
 //! terminal pane renderer, PTY parsing and detection are not touched, so standalone terminals and
 //! detachable sessions behave exactly as before.
 
+mod builder;
 mod data;
 mod layout;
 mod render;
@@ -11,7 +12,7 @@ mod run;
 mod state;
 mod theme;
 
-pub(crate) use run::run;
+pub(crate) use run::{run, Start};
 
 #[cfg(test)]
 mod tests;

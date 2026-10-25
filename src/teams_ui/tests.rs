@@ -36,13 +36,16 @@ fn fixture(viewer_role: &str) -> Snapshot {
         "messages": [
             {"id": "m1", "team_id": "alpha", "sender_id": "lead1", "task_id": null, "kind": {"kind": "text"}, "body": "@dev1 please start on t1"},
             {"id": "m2", "team_id": "alpha", "sender_id": "dev1", "task_id": "t1", "kind": {"kind": "text"}, "body": "on it"},
+            {"id": "m4", "team_id": "alpha", "sender_id": "lead1", "task_id": null, "kind": {"kind": "text"}, "audience": {"to": "role", "role": "developer"}, "body": "keep this between developers"},
+            {"id": "m5", "team_id": "alpha", "sender_id": "qa1", "task_id": null, "kind": {"kind": "text"}, "audience": {"to": "actor", "actor_id": "lead1"}, "body": "a private word"},
             {"id": "m3", "team_id": "beta", "sender_id": "dev2", "task_id": "t3", "kind": {"kind": "handoff", "task_id": "t3", "handoff_id": "h1"}, "body": "done, see tests"}
         ],
         "approvals": [
-            {"id": "ap-1", "team_id": "alpha", "requested_by": "lead1", "action": {"kind": "protected_branch_integration", "target": "main", "parameters": {"commit": "abc", "squash": true}}, "action_digest": "0123456789abcdef0123", "justification": "tests green", "ttl_seconds": 3600, "status": {"status": "pending"}},
+            {"id": "ap-1", "team_id": "alpha", "requested_by": "lead1", "action": {"kind": "protected_branch_integration", "target": "main", "parameters": {"commit": "abc", "squash": true}}, "action_digest": "0123456789abcdef0123", "justification": "tests green", "alternatives": ["wait for the next release"], "risks": ["touches the public API"], "ttl_seconds": 3600, "status": {"status": "pending"}},
             {"id": "ap-0", "team_id": "alpha", "requested_by": "lead1", "action": {"kind": "release", "target": "v1", "parameters": null}, "action_digest": "ff", "justification": "old", "ttl_seconds": 60, "status": {"status": "used", "execution_id": "x", "consumed_by": "owner", "at": 1}}
         ],
         "recruitments": [], "integrations": [],
+        "bindings": [{"actor_id": "dev1", "pane_id": "pane-7", "provider": "claude"}],
         "conflicts": [{"id": "c1", "kind": "dependency_impact", "team_ids": ["alpha", "beta"], "integration_ids": ["i1", "i2"], "detail": ["plugin-api"], "status": {"status": "open"}}],
         "notices": [],
         "attention": {"pending_approvals": ["ap-1"], "queued_recruitments": [], "open_conflicts": ["c1"], "open_notices": [], "merge_unknown": []}
@@ -252,7 +255,8 @@ fn selecting_an_agent_focuses_it_and_asks_for_its_pane() {
     assert_eq!(
         effects,
         vec![Effect::FocusAgent {
-            actor_id: "dev1".into()
+            actor_id: "dev1".into(),
+            pane_id: Some("pane-7".into())
         }]
     );
     assert_eq!(
@@ -501,6 +505,389 @@ fn ui_subcommand_parses_with_an_optional_credential_file() {
         .try_get_matches_from(["teams", "ui", "--credential-file", "k"])
         .is_ok());
     assert!(command
+        .clone()
+        .try_get_matches_from(["teams", "ui", "--view", "decisions", "--start", "builder"])
+        .is_ok());
+    assert!(command
+        .clone()
+        .try_get_matches_from(["teams", "ui", "--view", "nope"])
+        .is_err());
+    assert!(command
         .try_get_matches_from(["teams", "ui", "--token", "secret"])
         .is_err());
+}
+
+#[test]
+fn selecting_an_agent_without_a_bound_pane_says_so_instead_of_guessing() {
+    let mut s = screen(160, 45, "owner");
+    s.nav_cursor = s
+        .nav_rows()
+        .iter()
+        .position(|r| matches!(&r.node, super::state::NavNode::Agent { id, .. } if id == "lead1"))
+        .unwrap();
+    assert_eq!(
+        s.key(key(KeyCode::Enter)),
+        vec![Effect::FocusAgent {
+            actor_id: "lead1".into(),
+            pane_id: None
+        }]
+    );
+}
+
+#[test]
+fn leading_mentions_choose_the_audience_and_the_server_gets_it_explicitly() {
+    let mut s = screen(160, 45, "owner");
+    s.scope = Scope::Team("alpha".into());
+    s.focus = Focus::Main;
+    let cases = [
+        ("@lead please look", json!({"to": "role", "role": "lead"})),
+        (
+            "@dev, a question",
+            json!({"to": "role", "role": "developer"}),
+        ),
+        ("@qa1 only you", json!({"to": "actor", "actor_id": "qa1"})),
+        (
+            "@owner heads up",
+            json!({"to": "actor", "actor_id": "owner"}),
+        ),
+        ("hello @lead in the middle", json!({"to": "team"})),
+        ("@nobody", json!({"to": "team"})),
+        ("plain", json!({"to": "team"})),
+    ];
+    for (text, audience) in cases {
+        s.composer = text.into();
+        assert_eq!(s.composer_audience(), audience, "{text}");
+    }
+    press(&mut s, "2c");
+    s.composer.clear();
+    press(&mut s, "@qa1 ready?");
+    assert!(
+        text(&draw(&s)).contains("to qa1 (direct)"),
+        "the composer says who will read it"
+    );
+    let effects = s.key(key(KeyCode::Enter));
+    let Effect::Mutate { command } = &effects[0] else {
+        panic!()
+    };
+    assert_eq!(
+        command["audience"],
+        json!({"to": "actor", "actor_id": "qa1"})
+    );
+    assert_eq!(command["body"], "@qa1 ready?", "the text is sent as typed");
+    // All-teams chat has no single channel, so everything it would send is team-wide.
+    s.scope = Scope::All;
+    s.composer = "@lead x".into();
+    assert_eq!(s.composer_audience(), json!({"to": "team"}));
+}
+
+#[test]
+fn scoped_messages_are_labelled_in_the_log() {
+    let mut s = screen(160, 45, "owner");
+    s.scope = Scope::Team("alpha".into());
+    s.focus = Focus::Main;
+    press(&mut s, "2");
+    let t = text(&draw(&s));
+    assert!(
+        t.contains("to developers") && t.contains("keep this between developers"),
+        "{t}"
+    );
+    assert!(
+        t.contains("to lead1 (direct)") && t.contains("a private word"),
+        "{t}"
+    );
+}
+
+#[test]
+fn approval_cards_and_the_confirmation_show_alternatives_and_risks() {
+    let mut s = screen(160, 45, "owner");
+    s.focus = Focus::Main;
+    press(&mut s, "4");
+    let t = text(&draw(&s));
+    assert!(
+        t.contains("else") && t.contains("wait for the next release"),
+        "{t}"
+    );
+    assert!(
+        t.contains("risk") && t.contains("touches the public API"),
+        "{t}"
+    );
+}
+
+#[test]
+fn the_inspector_shows_the_provider_and_pane_of_a_bound_agent() {
+    let mut s = screen(160, 45, "owner");
+    s.agent = Some("dev1".into());
+    let t = text(&draw(&s));
+    assert!(t.contains("claude") && t.contains("pane-7"), "{t}");
+    s.agent = Some("lead1".into());
+    assert!(text(&draw(&s)).contains("none bound"));
+}
+
+#[test]
+fn a_pane_is_bound_and_unbound_from_the_keyboard() {
+    let mut s = screen(160, 45, "owner");
+    s.scope = Scope::Team("alpha".into());
+    s.focus = Focus::Main;
+    s.view = View::Terminals;
+    press(&mut s, "j");
+    assert_eq!(s.selected_agent_id().as_deref(), Some("dev1"));
+    press(&mut s, "b");
+    let modal = s.modal.clone().unwrap();
+    assert_eq!(
+        modal.input, "pane-7",
+        "the current binding is offered for editing"
+    );
+    s.modal.as_mut().unwrap().input.clear();
+    press(&mut s, "pane-9 my provider");
+    let effects = s.key(key(KeyCode::Enter));
+    let Effect::Mutate { command } = &effects[0] else {
+        panic!("{effects:?}")
+    };
+    assert_eq!(command["kind"], "bind_agent_pane");
+    assert_eq!(
+        (command["pane_id"].as_str(), command["provider"].as_str()),
+        (Some("pane-9"), Some("my provider"))
+    );
+    let effects = press(&mut s, "B");
+    assert!(
+        matches!(&effects[0], Effect::Mutate { command } if command["kind"] == "unbind_agent_pane")
+    );
+}
+
+#[test]
+fn the_command_palette_offers_what_applies_here_and_runs_it() {
+    let mut s = screen(160, 45, "owner");
+    press(&mut s, ":");
+    assert!(text(&draw(&s)).contains("commands") && s.palette.is_some());
+    let labels: Vec<String> = s.palette_matches().into_iter().map(|(l, _)| l).collect();
+    assert!(
+        labels.iter().any(|l| l == "go to chat")
+            && labels.iter().any(|l| l == "new team (manual builder)")
+    );
+    assert!(
+        !labels.iter().any(|l| l.contains("approve")),
+        "nothing to approve in terminals"
+    );
+    s.key(key(KeyCode::Esc));
+    assert!(s.palette.is_none());
+    // In decisions with a pending approval selected, approve and deny appear and approve opens the confirmation.
+    s.focus = Focus::Main;
+    press(&mut s, "4:approve");
+    let matches = s.palette_matches();
+    assert_eq!(matches.len(), 1, "{matches:?}");
+    s.key(key(KeyCode::Enter));
+    assert_eq!(s.modal.as_ref().unwrap().id, "ap-1");
+    s.key(key(KeyCode::Esc));
+    // A Lead is not offered owner-only commands, but may rename their own team.
+    let mut lead = screen(160, 45, "lead");
+    lead.scope = Scope::Team("alpha".into());
+    let labels: Vec<String> = lead.palette_items().into_iter().map(|(l, _)| l).collect();
+    assert!(!labels
+        .iter()
+        .any(|l| l.contains("new team") || l.contains("propose")));
+    assert!(
+        labels.iter().any(|l| l == "rename team Alpha")
+            && labels.iter().any(|l| l == "suspend team Alpha")
+    );
+    // Suspended teams offer resume instead.
+    lead.scope = Scope::Team("beta".into());
+    let labels: Vec<String> = lead
+        .palette_items()
+        .into_iter()
+        .map(|(l, _)| l.to_string())
+        .collect();
+    assert!(
+        labels.iter().any(|l| l.starts_with("resume team"))
+            && !labels.iter().any(|l| l.starts_with("suspend team"))
+    );
+}
+
+#[test]
+fn the_manual_builder_has_the_server_check_the_draft_and_reviews_before_anything_is_created() {
+    use super::builder::Preview;
+    use super::state::BuilderStep;
+    let mut s = screen(160, 45, "owner");
+    press(&mut s, ":new team");
+    s.key(key(KeyCode::Enter));
+    assert_eq!(s.builder.as_ref().unwrap().draft.source, "manual");
+    press(&mut s, "Docs team");
+    // The form walks the fields; only the Enter on the last one asks the server to check the draft.
+    for _ in 0..4 {
+        assert!(s.key(key(KeyCode::Enter)).is_empty());
+    }
+    let effects = s.key(key(KeyCode::Enter));
+    let [Effect::ValidateDraft { draft }] = effects.as_slice() else {
+        panic!("{effects:?}")
+    };
+    assert_eq!(
+        (draft.name.as_str(), draft.lead.as_str()),
+        ("Docs team", "docs-team-lead")
+    );
+    assert!(s.builder.as_ref().unwrap().checking);
+    assert!(
+        text(&draw(&s)).contains("asking the server"),
+        "the screen says it is waiting"
+    );
+    assert!(
+        s.key(key(KeyCode::Enter)).is_empty(),
+        "no second request while one is out"
+    );
+    // A draft the server refuses stays in edit mode and says why.
+    s.apply_draft_check(Ok(Preview {
+        valid: false,
+        problems: vec!["lead id 'docs-team-lead' is already taken".into()],
+        team_id: "docs-team".into(),
+        credential_dir: "teams-keys/docs-team".into(),
+    }));
+    assert_eq!(s.builder.as_ref().unwrap().step, BuilderStep::Edit);
+    assert!(s.toast.as_deref().unwrap().contains("already taken"));
+    assert!(text(&draw(&s)).contains("already taken"));
+    assert!(!s.builder.as_ref().unwrap().checking);
+    // Editing clears the stale verdict; a valid check moves to review, which sends nothing yet.
+    press(&mut s, "x");
+    assert!(s.builder.as_ref().unwrap().preview.is_none());
+    s.builder.as_mut().unwrap().field = 4;
+    assert!(matches!(
+        s.key(key(KeyCode::Enter)).as_slice(),
+        [Effect::ValidateDraft { .. }]
+    ));
+    s.apply_draft_check(Ok(Preview {
+        valid: true,
+        problems: vec![],
+        team_id: "docs-team".into(),
+        credential_dir: "teams-keys/docs-team".into(),
+    }));
+    assert_eq!(s.builder.as_ref().unwrap().step, BuilderStep::Review);
+    let review = text(&draw(&s));
+    assert!(review.contains("nothing is created until you launch") && review.contains("docs-team"));
+    assert!(
+        review.contains("teams-keys/docs-team"),
+        "the server says where the keys go"
+    );
+    // Back to edit sends nothing; launching sends exactly the reviewed draft to the server.
+    s.key(key(KeyCode::Char('e')));
+    assert_eq!(s.builder.as_ref().unwrap().step, BuilderStep::Edit);
+    s.builder.as_mut().unwrap().step = BuilderStep::Review;
+    let effects = s.key(key(KeyCode::Enter));
+    let [Effect::LaunchDraft { draft }] = effects.as_slice() else {
+        panic!("{effects:?}")
+    };
+    assert!(draft.name.starts_with("Docs team"));
+    assert!(s.builder.is_none());
+    // Escape abandons a draft.
+    press(&mut s, ":new team");
+    s.key(key(KeyCode::Enter));
+    assert!(s.key(key(KeyCode::Esc)).is_empty() && s.builder.is_none());
+}
+
+#[test]
+fn a_goal_proposal_comes_from_the_server_and_lands_in_the_same_editable_builder() {
+    use super::state::BuilderStep;
+    let mut s = screen(160, 45, "owner");
+    press(&mut s, ":propose");
+    s.key(key(KeyCode::Enter));
+    assert_eq!(
+        s.modal.as_ref().unwrap().title,
+        "propose a team from a goal"
+    );
+    assert!(
+        s.key(key(KeyCode::Enter)).is_empty(),
+        "an empty goal is not sent"
+    );
+    press(&mut s, "Ship the plugin settings");
+    let effects = s.key(key(KeyCode::Enter));
+    assert_eq!(
+        effects,
+        vec![Effect::Propose {
+            goal: "Ship the plugin settings".into()
+        }]
+    );
+    // The server's proposal arrives: it opens for editing, never straight into launch.
+    let reply = json!({"source": "template", "draft": {"name": "Ship the plugin settings", "project_id": "moo",
+        "lead": "ship-lead", "developer": "ship-dev", "qa": "ship-qa"}});
+    s.open_builder(super::builder::Draft::from_proposal(&reply).unwrap());
+    let builder = s.builder.as_ref().unwrap();
+    assert_eq!(builder.step, BuilderStep::Edit);
+    assert_eq!(
+        (builder.draft.source.as_str(), builder.draft.lead.as_str()),
+        ("template", "ship-lead")
+    );
+    assert!(text(&draw(&s)).contains("source: template"));
+    // Editing the team name does not rewrite the proposer's agent ids.
+    press(&mut s, "!");
+    assert_eq!(s.builder.as_ref().unwrap().draft.lead, "ship-lead");
+}
+
+#[test]
+fn themes_preview_live_follow_the_config_and_are_remembered() {
+    let mut s = screen(160, 45, "owner");
+    let configured = Palette::catppuccin();
+    assert_eq!(super::render::resolve_palette(&s, &configured), configured);
+    press(&mut s, "t");
+    assert_eq!(s.theme.as_deref(), Some("catppuccin"));
+    press(&mut s, "t");
+    let second = s.theme.clone().unwrap();
+    assert_ne!(second, "catppuccin");
+    let buf = {
+        let area = Rect::new(0, 0, 160, 45);
+        let mut buf = Buffer::empty(area);
+        render(
+            &mut buf,
+            area,
+            &s,
+            &super::render::resolve_palette(&s, &configured),
+        );
+        buf
+    };
+    assert!(text(&buf).contains(&format!("theme {second}")));
+    let saved = s.memory_snapshot();
+    let mut fresh = Screen::new(Rect::new(0, 0, 160, 45));
+    fresh.restore_memory(&saved);
+    assert_eq!(fresh.theme.as_deref(), Some(second.as_str()));
+    press(&mut s, "T");
+    assert!(s.theme.is_none());
+    // Every built-in theme draws every view without panicking.
+    for name in crate::config::THEME_NAMES {
+        s.theme = Some((*name).to_owned());
+        for view in View::ALL {
+            s.view = view;
+            let area = Rect::new(0, 0, 100, 30);
+            let mut buf = Buffer::empty(area);
+            render(
+                &mut buf,
+                area,
+                &s,
+                &super::render::resolve_palette(&s, &configured),
+            );
+        }
+    }
+}
+
+#[test]
+fn enter_walks_every_field_and_only_the_last_one_asks_the_server() {
+    let mut s = screen(160, 45, "owner");
+    press(&mut s, ":new team");
+    s.key(key(KeyCode::Enter));
+    press(&mut s, "Docs team");
+    for expected in 1..=4 {
+        assert!(s.key(key(KeyCode::Enter)).is_empty());
+        let builder = s.builder.as_ref().unwrap();
+        assert_eq!(
+            (builder.field, builder.step),
+            (expected, super::state::BuilderStep::Edit)
+        );
+    }
+    assert!(matches!(
+        s.key(key(KeyCode::Enter)).as_slice(),
+        [Effect::ValidateDraft { .. }]
+    ));
+}
+
+#[test]
+fn agent_ids_are_not_cut_when_there_is_room_for_them() {
+    let mut s = screen(160, 45, "owner");
+    s.snapshot.actors[1].id = "a-rather-long-agent-name".into();
+    s.snapshot.tasks[0].developer_id = "a-rather-long-agent-name".into();
+    s.snapshot.teams[0].developer_id = "a-rather-long-agent-name".into();
+    assert!(text(&draw(&s)).contains("a-rather-long-agent-name"));
 }

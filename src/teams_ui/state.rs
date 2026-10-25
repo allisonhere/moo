@@ -8,6 +8,7 @@ use ratatui::layout::Rect;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
+use super::builder::{Draft, Preview};
 use super::data::{tag, Snapshot};
 use super::layout::{self, Area, Frame, Mode, Visibility};
 use super::theme::{Density, Options};
@@ -105,6 +106,11 @@ pub enum Action {
     Deny,
     Revoke,
     Resolve,
+    /// Text prompts: the modal's input is the answer.
+    Bind,
+    Rename,
+    Suspend,
+    Goal,
 }
 
 /// A confirmation that shows the exact scope before anything is sent.
@@ -124,10 +130,71 @@ pub enum Effect {
     Mutate {
         command: Value,
     },
-    /// Show the agent's terminal pane, when the host can.
+    /// Show the agent's terminal pane; `pane_id` is the bound pane, when there is one.
     FocusAgent {
         actor_id: String,
+        pane_id: Option<String>,
     },
+    /// Ask the server whether the draft is valid and what launching it would do.
+    ValidateDraft {
+        draft: Draft,
+    },
+    /// Create the reviewed team through the server.
+    LaunchDraft {
+        draft: Draft,
+    },
+    /// Ask the proposer for a draft from a goal.
+    Propose {
+        goal: String,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BuilderStep {
+    Edit,
+    Review,
+}
+
+pub const BUILDER_FIELDS: [&str; 5] = ["team name", "project", "lead id", "developer id", "qa id"];
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Builder {
+    pub draft: Draft,
+    pub step: BuilderStep,
+    pub field: usize,
+    /// What the server said about this draft, once asked.
+    pub preview: Option<Preview>,
+    /// A validation request is out; the screen waits instead of asking twice.
+    pub checking: bool,
+}
+
+/// What a command-palette entry does.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Intent {
+    View(View),
+    ToggleNavigator,
+    ToggleInspector,
+    Density,
+    Ascii,
+    Contrast,
+    CycleTheme,
+    Refresh,
+    Help,
+    Quit,
+    Decide(Action),
+    NewTeam,
+    ProposeTeam,
+    BindPane,
+    UnbindPane,
+    RenameTeam,
+    SuspendTeam,
+    ResumeTeam,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct PaletteState {
+    pub query: String,
+    pub cursor: usize,
 }
 
 /// A card in the decisions view.
@@ -154,6 +221,10 @@ pub struct Screen {
     pub active: Area,
     pub composer: String,
     pub modal: Option<Modal>,
+    pub builder: Option<Builder>,
+    pub palette: Option<PaletteState>,
+    /// A built-in theme chosen for this session; `None` follows the configured one.
+    pub theme: Option<String>,
     pub help: bool,
     pub toast: Option<String>,
     pub options: Options,
@@ -186,6 +257,9 @@ impl Screen {
             active: Area::Main,
             composer: String::new(),
             modal: None,
+            builder: None,
+            palette: None,
+            theme: None,
             help: false,
             toast: None,
             options: Options::default(),
@@ -320,6 +394,7 @@ impl Screen {
         self.remember();
         json!({
             "scope": self.scope.key(),
+            "theme": self.theme,
             "options": { "ascii": self.options.ascii, "compact": self.options.density == Density::Compact,
                 "high_contrast": self.options.high_contrast },
             "memory": self.memory,
@@ -342,6 +417,10 @@ impl Screen {
                 Density::Comfortable
             };
         }
+        self.theme = saved["theme"]
+            .as_str()
+            .filter(|name| crate::config::THEME_NAMES.contains(name))
+            .map(str::to_owned);
         let key = saved["scope"].as_str().unwrap_or("all");
         let scope = if let Some(id) = key.strip_prefix("team:") {
             Scope::Team(id.to_owned())
@@ -436,7 +515,7 @@ impl Screen {
                 self.view = View::Terminals;
                 self.focus = Focus::Main;
                 self.close_drawer();
-                return vec![Effect::FocusAgent { actor_id: id }];
+                return vec![self.focus_effect(id)];
             }
         }
         self.close_drawer();
@@ -545,6 +624,12 @@ impl Screen {
         if self.modal.is_some() {
             return self.modal_key(key);
         }
+        if self.builder.is_some() {
+            return self.builder_key(key);
+        }
+        if self.palette.is_some() {
+            return self.palette_key(key);
+        }
         if self.help {
             self.help = false;
             return Vec::new();
@@ -556,6 +641,7 @@ impl Screen {
         let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
         match key.code {
             KeyCode::Char('c') if ctrl => return vec![Effect::Quit],
+            KeyCode::Char('p') if ctrl => self.palette = Some(PaletteState::default()),
             KeyCode::Char('q') => return vec![Effect::Quit],
             KeyCode::Char('?') => self.help = true,
             KeyCode::Char('r') => return vec![Effect::Refresh],
@@ -566,6 +652,9 @@ impl Screen {
                 };
             }
             KeyCode::Char('A') => self.options.ascii = !self.options.ascii,
+            KeyCode::Char('t') => self.cycle_theme(),
+            KeyCode::Char('T') => self.theme = None,
+            KeyCode::Char(':') => self.palette = Some(PaletteState::default()),
             KeyCode::Char('H') => self.options.high_contrast = !self.options.high_contrast,
             KeyCode::Char('n') => self.toggle(Area::Navigator),
             KeyCode::Char('i') => self.toggle(Area::Inspector),
@@ -716,10 +805,14 @@ impl Screen {
                     };
                     self.cursor.insert(self.view, last);
                 }
+                (View::Terminals, KeyCode::Char('b')) => return self.run_intent(Intent::BindPane),
+                (View::Terminals, KeyCode::Char('B')) => {
+                    return self.run_intent(Intent::UnbindPane)
+                }
                 (View::Terminals, KeyCode::Enter) => {
                     if let Some(id) = self.agent_at(self.cursor_of(View::Terminals)) {
                         self.agent = Some(id.clone());
-                        return vec![Effect::FocusAgent { actor_id: id }];
+                        return vec![self.focus_effect(id)];
                     }
                 }
                 (View::Chat, KeyCode::Enter | KeyCode::Char('c')) => {
@@ -845,22 +938,39 @@ impl Screen {
                     self.toast = Some("a reason is required".into());
                     return Vec::new();
                 }
-                let command = match modal.action {
-                    Action::Approve => {
-                        json!({"kind": "decide_approval", "approval_id": modal.id, "approve": true, "rationale": rationale})
+                let effect = match modal.action {
+                    Action::Approve => Effect::Mutate {
+                        command: json!({"kind": "decide_approval", "approval_id": modal.id, "approve": true, "rationale": rationale}),
+                    },
+                    Action::Deny => Effect::Mutate {
+                        command: json!({"kind": "decide_approval", "approval_id": modal.id, "approve": false, "rationale": rationale}),
+                    },
+                    Action::Revoke => Effect::Mutate {
+                        command: json!({"kind": "revoke_approval", "approval_id": modal.id, "rationale": rationale}),
+                    },
+                    Action::Resolve => Effect::Mutate {
+                        command: json!({"kind": "resolve_conflict", "conflict_id": modal.id, "rationale": rationale}),
+                    },
+                    Action::Bind => {
+                        let mut parts = rationale.split_whitespace();
+                        let pane = parts.next().unwrap_or_default().to_owned();
+                        let provider: Vec<&str> = parts.collect();
+                        let mut command = json!({"kind": "bind_agent_pane", "actor_id": modal.id, "pane_id": pane});
+                        if !provider.is_empty() {
+                            command["provider"] = json!(provider.join(" "));
+                        }
+                        Effect::Mutate { command }
                     }
-                    Action::Deny => {
-                        json!({"kind": "decide_approval", "approval_id": modal.id, "approve": false, "rationale": rationale})
-                    }
-                    Action::Revoke => {
-                        json!({"kind": "revoke_approval", "approval_id": modal.id, "rationale": rationale})
-                    }
-                    Action::Resolve => {
-                        json!({"kind": "resolve_conflict", "conflict_id": modal.id, "rationale": rationale})
-                    }
+                    Action::Rename => Effect::Mutate {
+                        command: json!({"kind": "rename_team", "team_id": modal.id, "name": rationale}),
+                    },
+                    Action::Suspend => Effect::Mutate {
+                        command: json!({"kind": "suspend_team", "team_id": modal.id, "reason": rationale}),
+                    },
+                    Action::Goal => Effect::Propose { goal: rationale },
                 };
                 self.modal = None;
-                return vec![Effect::Mutate { command }];
+                return vec![effect];
             }
             _ => {}
         }
@@ -886,11 +996,12 @@ impl Screen {
                 if body.is_empty() {
                     return Vec::new();
                 }
+                let audience = self.composer_audience();
                 self.composer.clear();
                 self.next_message += 1;
                 self.scroll.insert(View::Chat, 0);
                 return vec![Effect::Mutate {
-                    command: json!({"kind": "append_chat", "team_id": team_id,
+                    command: json!({"kind": "append_chat", "team_id": team_id, "audience": audience,
                         "message_id": format!("ui-{}-{}", std::process::id(), self.next_message), "body": body}),
                 }];
             }
@@ -965,5 +1076,457 @@ pub fn compact_json(value: &Value) -> String {
     match value {
         Value::Null => "-".into(),
         other => serde_json::to_string(other).unwrap_or_default(),
+    }
+}
+
+const ROLE_ALIASES: [(&str, &str); 4] = [
+    ("lead", "lead"),
+    ("dev", "developer"),
+    ("developer", "developer"),
+    ("qa", "qa"),
+];
+
+impl Screen {
+    /// The Effect for choosing an agent: its bound pane, when one was recorded.
+    fn focus_effect(&self, actor_id: String) -> Effect {
+        let pane_id = self.snapshot.binding(&actor_id).map(|b| b.pane_id.clone());
+        Effect::FocusAgent { actor_id, pane_id }
+    }
+
+    /// Who the composer text is for. A leading `@lead`, `@dev`, `@qa` or `@<agent id>` addresses
+    /// that role or agent; this only chooses the audience field, the server enforces it, and the
+    /// text itself is never read as a command.
+    pub fn composer_audience(&self) -> Value {
+        let team = match &self.scope {
+            Scope::Team(id) => id.as_str(),
+            _ => return json!({"to": "team"}),
+        };
+        let Some(word) = self
+            .composer
+            .split_whitespace()
+            .next()
+            .and_then(|w| w.strip_prefix('@'))
+        else {
+            return json!({"to": "team"});
+        };
+        let word = word.trim_end_matches([',', ':', '.']);
+        if let Some((_, role)) = ROLE_ALIASES.iter().find(|(alias, _)| *alias == word) {
+            return json!({"to": "role", "role": role});
+        }
+        if word == "owner" || self.snapshot.team_agents(team).iter().any(|a| a.id == word) {
+            return json!({"to": "actor", "actor_id": word});
+        }
+        json!({"to": "team"})
+    }
+
+    pub fn composer_audience_label(&self) -> Option<String> {
+        self.snapshot.audience_label(&self.composer_audience())
+    }
+
+    pub fn view_named(name: &str) -> Option<View> {
+        View::ALL.into_iter().find(|view| view.label() == name)
+    }
+
+    /// Opens on `view` across all teams, where waiting decisions are all visible.
+    pub fn open_at(&mut self, view: View) {
+        self.view = view;
+        self.focus = Focus::Main;
+        if view == View::Decisions {
+            self.scope = Scope::All;
+        }
+    }
+
+    pub fn palette_override(&self) -> Option<&str> {
+        self.theme.as_deref()
+    }
+
+    fn cycle_theme(&mut self) {
+        let names = crate::config::THEME_NAMES;
+        let next = match self
+            .theme
+            .as_deref()
+            .and_then(|t| names.iter().position(|n| *n == t))
+        {
+            Some(i) => (i + 1) % names.len(),
+            None => 0,
+        };
+        self.theme = Some(names[next].to_owned());
+    }
+
+    // ---- command palette --------------------------------------------------------------------
+
+    /// The commands that make sense right now, each with the label shown for it.
+    pub fn palette_items(&self) -> Vec<(String, Intent)> {
+        let mut items: Vec<(String, Intent)> = Vec::new();
+        let owner = self.is_owner();
+        let lead = self.snapshot.viewer.role == "lead";
+        for view in View::ALL {
+            items.push((format!("go to {}", view.label()), Intent::View(view)));
+        }
+        if self.view == View::Decisions {
+            let cards = self.cards();
+            match cards.get(self.cursor_of(View::Decisions)) {
+                Some(Card::Approval(i)) => match tag(&self.snapshot.approvals[*i].status) {
+                    "pending" => {
+                        items.push((
+                            "approve the selected approval".into(),
+                            Intent::Decide(Action::Approve),
+                        ));
+                        items.push((
+                            "deny the selected approval".into(),
+                            Intent::Decide(Action::Deny),
+                        ));
+                    }
+                    "approved" => items.push((
+                        "revoke the selected approval".into(),
+                        Intent::Decide(Action::Revoke),
+                    )),
+                    _ => {}
+                },
+                Some(Card::Conflict(_)) => items.push((
+                    "resolve the selected conflict".into(),
+                    Intent::Decide(Action::Resolve),
+                )),
+                _ => {}
+            }
+        }
+        if self.view == View::Terminals {
+            if let Some(agent) = self.agent.as_deref().or_else(|| {
+                self.agent_at(self.cursor_of(View::Terminals))
+                    .as_deref()
+                    .map(|_| "")
+            }) {
+                let _ = agent;
+            }
+            if let Some(id) = self.selected_agent_id() {
+                items.push((format!("bind a pane to {id}"), Intent::BindPane));
+                if self.snapshot.binding(&id).is_some() {
+                    items.push((format!("unbind the pane of {id}"), Intent::UnbindPane));
+                }
+            }
+        }
+        if let Scope::Team(id) = &self.scope {
+            if let Some(team) = self.snapshot.team(id) {
+                if owner || lead {
+                    items.push((format!("rename team {}", team.name), Intent::RenameTeam));
+                    match tag(&team.status) {
+                        "active" => {
+                            items.push((format!("suspend team {}", team.name), Intent::SuspendTeam))
+                        }
+                        "suspended" => {
+                            items.push((format!("resume team {}", team.name), Intent::ResumeTeam))
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+        if owner {
+            items.push(("new team (manual builder)".into(), Intent::NewTeam));
+            items.push(("propose a team from a goal".into(), Intent::ProposeTeam));
+        }
+        items.extend([
+            ("toggle navigator".into(), Intent::ToggleNavigator),
+            ("toggle inspector".into(), Intent::ToggleInspector),
+            ("switch density".into(), Intent::Density),
+            ("toggle ascii glyphs".into(), Intent::Ascii),
+            ("toggle high-contrast focus".into(), Intent::Contrast),
+            ("next theme (preview)".into(), Intent::CycleTheme),
+            ("refresh".into(), Intent::Refresh),
+            ("help".into(), Intent::Help),
+            ("quit".into(), Intent::Quit),
+        ]);
+        items
+    }
+
+    pub fn palette_matches(&self) -> Vec<(String, Intent)> {
+        let query = self
+            .palette
+            .as_ref()
+            .map(|p| p.query.to_lowercase())
+            .unwrap_or_default();
+        self.palette_items()
+            .into_iter()
+            .filter(|(label, _)| {
+                query
+                    .split_whitespace()
+                    .all(|word| label.to_lowercase().contains(word))
+            })
+            .collect()
+    }
+
+    fn palette_key(&mut self, key: KeyEvent) -> Vec<Effect> {
+        let matches = self.palette_matches();
+        let Some(state) = self.palette.as_mut() else {
+            return Vec::new();
+        };
+        match key.code {
+            KeyCode::Esc => self.palette = None,
+            KeyCode::Up => state.cursor = state.cursor.saturating_sub(1),
+            KeyCode::Down => state.cursor = (state.cursor + 1).min(matches.len().saturating_sub(1)),
+            KeyCode::Backspace => {
+                state.query.pop();
+                state.cursor = 0;
+            }
+            KeyCode::Char(c) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
+                state.query.push(c);
+                state.cursor = 0;
+            }
+            KeyCode::Enter => {
+                let chosen = matches
+                    .get(state.cursor.min(matches.len().saturating_sub(1)))
+                    .map(|(_, i)| i.clone());
+                self.palette = None;
+                if let Some(intent) = chosen {
+                    return self.run_intent(intent);
+                }
+            }
+            _ => {}
+        }
+        Vec::new()
+    }
+
+    pub fn selected_agent_id(&self) -> Option<String> {
+        if self.view == View::Terminals {
+            self.agent_at(self.cursor_of(View::Terminals))
+        } else {
+            self.agent.clone()
+        }
+    }
+
+    pub fn run_intent(&mut self, intent: Intent) -> Vec<Effect> {
+        match intent {
+            Intent::View(view) => {
+                self.view = view;
+                self.focus = Focus::Main;
+            }
+            Intent::ToggleNavigator => self.toggle(Area::Navigator),
+            Intent::ToggleInspector => self.toggle(Area::Inspector),
+            Intent::Density => {
+                self.options.density = match self.options.density {
+                    Density::Compact => Density::Comfortable,
+                    Density::Comfortable => Density::Compact,
+                };
+            }
+            Intent::Ascii => self.options.ascii = !self.options.ascii,
+            Intent::Contrast => self.options.high_contrast = !self.options.high_contrast,
+            Intent::CycleTheme => self.cycle_theme(),
+            Intent::Refresh => return vec![Effect::Refresh],
+            Intent::Help => self.help = true,
+            Intent::Quit => return vec![Effect::Quit],
+            Intent::Decide(action) => return self.open_modal(action),
+            Intent::NewTeam => {
+                self.builder = Some(Builder {
+                    draft: Draft::blank(&self.snapshot),
+                    step: BuilderStep::Edit,
+                    field: 0,
+                    preview: None,
+                    checking: false,
+                });
+            }
+            Intent::ProposeTeam => {
+                self.modal = Some(Modal {
+                    action: Action::Goal,
+                    id: String::new(),
+                    title: "propose a team from a goal".into(),
+                    lines: vec![
+                        "Describe what the team should achieve. You review and edit the".into(),
+                        "proposal before anything is created.".into(),
+                    ],
+                    input: String::new(),
+                });
+            }
+            Intent::BindPane => {
+                let Some(id) = self.selected_agent_id() else {
+                    return Vec::new();
+                };
+                let current = self
+                    .snapshot
+                    .binding(&id)
+                    .map(|b| b.pane_id.clone())
+                    .unwrap_or_default();
+                self.modal = Some(Modal {
+                    action: Action::Bind,
+                    id: id.clone(),
+                    title: format!("bind a pane to {id}"),
+                    lines: vec![
+                        "Pane id, then the provider if you want it shown: `pane-7 claude`.".into(),
+                    ],
+                    input: current,
+                });
+            }
+            Intent::UnbindPane => {
+                if let Some(id) = self.selected_agent_id() {
+                    if self.snapshot.binding(&id).is_some() {
+                        return vec![Effect::Mutate {
+                            command: json!({"kind": "unbind_agent_pane", "actor_id": id}),
+                        }];
+                    }
+                    self.toast = Some(format!("{id} has no bound pane"));
+                }
+            }
+            Intent::RenameTeam => {
+                if let Scope::Team(id) = self.scope.clone() {
+                    self.modal = Some(Modal {
+                        action: Action::Rename,
+                        title: format!("rename {id}"),
+                        lines: vec!["The team id stays the same; only its name changes.".into()],
+                        input: self.snapshot.team_label(&id),
+                        id,
+                    });
+                }
+            }
+            Intent::SuspendTeam => {
+                if let Scope::Team(id) = self.scope.clone() {
+                    self.modal = Some(Modal {
+                        action: Action::Suspend,
+                        title: format!("suspend {id}"),
+                        lines: vec!["Agents keep running; the team cannot start or advance work until resumed.".into()],
+                        input: String::new(),
+                        id,
+                    });
+                }
+            }
+            Intent::ResumeTeam => {
+                if let Scope::Team(id) = &self.scope {
+                    return vec![Effect::Mutate {
+                        command: json!({"kind": "resume_team", "team_id": id}),
+                    }];
+                }
+            }
+        }
+        Vec::new()
+    }
+
+    // ---- team builder -----------------------------------------------------------------------
+
+    /// Opens the builder on a draft that came from a proposal. It starts in edit mode: a proposal
+    /// is a suggestion to review and change, never something launched.
+    pub fn open_builder(&mut self, draft: Draft) {
+        self.builder = Some(Builder {
+            draft,
+            step: BuilderStep::Edit,
+            field: 0,
+            preview: None,
+            checking: false,
+        });
+    }
+
+    /// The server's answer to `ValidateDraft`: review if the draft is valid, else say why not.
+    pub fn apply_draft_check(&mut self, result: Result<Preview, String>) {
+        let Some(builder) = self.builder.as_mut() else {
+            return;
+        };
+        builder.checking = false;
+        match result {
+            Ok(preview) if preview.valid => {
+                builder.preview = Some(preview);
+                builder.step = BuilderStep::Review;
+            }
+            Ok(preview) => {
+                self.toast = preview.problems.first().cloned();
+                builder.preview = Some(preview);
+            }
+            Err(message) => self.toast = Some(message),
+        }
+    }
+
+    fn builder_key(&mut self, key: KeyEvent) -> Vec<Effect> {
+        let projects: Vec<String> = self
+            .snapshot
+            .projects
+            .iter()
+            .map(|p| p.id.clone())
+            .collect();
+        let Some(builder) = self.builder.as_mut() else {
+            return Vec::new();
+        };
+        match builder.step {
+            BuilderStep::Review => match key.code {
+                KeyCode::Enter => {
+                    let draft = builder.draft.clone();
+                    self.builder = None;
+                    return vec![Effect::LaunchDraft { draft }];
+                }
+                KeyCode::Esc | KeyCode::Char('e') => builder.step = BuilderStep::Edit,
+                _ => {}
+            },
+            BuilderStep::Edit => {
+                let count = BUILDER_FIELDS.len();
+                match key.code {
+                    KeyCode::Esc => self.builder = None,
+                    KeyCode::Tab | KeyCode::Down => builder.field = (builder.field + 1) % count,
+                    KeyCode::BackTab | KeyCode::Up => {
+                        builder.field = (builder.field + count - 1) % count
+                    }
+                    KeyCode::Left | KeyCode::Right if builder.field == 1 => {
+                        let mut options = projects;
+                        options.insert(0, String::new());
+                        let at = options
+                            .iter()
+                            .position(|p| *p == builder.draft.project_id)
+                            .unwrap_or(0);
+                        let forward = key.code == KeyCode::Right;
+                        let next =
+                            (at + if forward { 1 } else { options.len() - 1 }) % options.len();
+                        builder.draft.project_id = options[next].clone();
+                    }
+                    KeyCode::Backspace => {
+                        builder.preview = None;
+                        if builder.field == 0 {
+                            let mut name = builder.draft.name.clone();
+                            name.pop();
+                            builder.draft.set_name(&name, &self.snapshot);
+                        } else if let Some(text) =
+                            Self::draft_text(&mut builder.draft, builder.field)
+                        {
+                            text.pop();
+                            builder.draft.auto_ids = false;
+                        }
+                    }
+                    KeyCode::Char(c) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
+                        builder.preview = None;
+                        if builder.field == 0 {
+                            if builder.draft.name.len() < 128 {
+                                let name = format!("{}{c}", builder.draft.name);
+                                builder.draft.set_name(&name, &self.snapshot);
+                            }
+                        } else if let Some(text) =
+                            Self::draft_text(&mut builder.draft, builder.field)
+                        {
+                            if text.len() < 128 {
+                                text.push(c);
+                                builder.draft.auto_ids = false;
+                            }
+                        }
+                    }
+                    KeyCode::Enter => {
+                        if builder.field + 1 < count {
+                            builder.field += 1;
+                        } else {
+                            // Only the Enter pressed on the last field asks the server to check it.
+                            if !builder.checking {
+                                builder.checking = true;
+                                return vec![Effect::ValidateDraft {
+                                    draft: builder.draft.clone(),
+                                }];
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        Vec::new()
+    }
+
+    fn draft_text(draft: &mut Draft, field: usize) -> Option<&mut String> {
+        match field {
+            0 => Some(&mut draft.name),
+            2 => Some(&mut draft.lead),
+            3 => Some(&mut draft.developer),
+            4 => Some(&mut draft.qa),
+            _ => None,
+        }
     }
 }

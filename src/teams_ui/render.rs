@@ -28,13 +28,22 @@ const ASCII_BORDER: border::Set = border::Set {
     horizontal_bottom: "-",
 };
 
+/// The palette to draw with: a theme picked in this session, else the configured one.
+pub fn resolve_palette(screen: &Screen, configured: &Palette) -> Palette {
+    screen
+        .palette_override()
+        .and_then(Palette::from_name)
+        .unwrap_or_else(|| configured.clone())
+}
+
 pub fn render(buf: &mut Buffer, area: Rect, screen: &Screen, palette: &Palette) {
     let tide = Tide::from_palette(palette, screen.options);
     Clear.render(area, buf);
     buf.set_style(area, Style::default().bg(tide.bg).fg(tide.text));
-    let frame = screen.frame();
+    // Lay out the area we were given, so drawing never depends on a stale remembered size.
+    let frame = super::layout::compute(area, screen.visibility());
     if let Some(header) = frame.header {
-        draw_header(buf, header, screen, &tide);
+        draw_header(buf, header, screen, &tide, frame.mode);
     }
     if frame.mode != Mode::Single || screen.active == Area::Main {
         draw_main(buf, frame.main, screen, &tide);
@@ -53,6 +62,12 @@ pub fn render(buf: &mut Buffer, area: Rect, screen: &Screen, palette: &Palette) 
     }
     if screen.help {
         draw_help(buf, area, &tide);
+    }
+    if let Some(builder) = &screen.builder {
+        draw_builder(buf, area, builder, &tide);
+    }
+    if screen.palette.is_some() {
+        draw_palette(buf, area, screen, &tide);
     }
     if screen.modal.is_some() {
         draw_modal(buf, area, screen, &tide);
@@ -197,7 +212,7 @@ fn highlight_mentions<'a>(text: &str, base: Style, mention: Style) -> Vec<Span<'
 
 // ---- header and footer ----------------------------------------------------------------------
 
-fn draw_header(buf: &mut Buffer, rect: Rect, screen: &Screen, tide: &Tide) {
+fn draw_header(buf: &mut Buffer, rect: Rect, screen: &Screen, tide: &Tide, mode: Mode) {
     let snap = &screen.snapshot;
     let mut right: Vec<Span> = Vec::new();
     let pending = snap.attention.pending_approvals.len();
@@ -226,8 +241,14 @@ fn draw_header(buf: &mut Buffer, rect: Rect, screen: &Screen, tide: &Tide) {
         Link::Live => (format!("live  rev {}", snap.revision), tide.good),
         Link::Reconnecting(why) => (format!("reconnecting - {why}"), tide.warn),
     };
+    if let Some(theme) = screen.palette_override() {
+        right.push(Span::styled(
+            format!("theme {theme}  "),
+            Style::default().fg(tide.muted),
+        ));
+    }
     right.push(Span::styled(state, Style::default().fg(color)));
-    let left = if screen.frame().mode == Mode::Single {
+    let left = if mode == Mode::Single {
         // One area at a time: say which, and what the others are called.
         let tab = |name: &str, area: Area| {
             if screen.active == area {
@@ -272,13 +293,34 @@ fn draw_footer(buf: &mut Buffer, rect: Rect, screen: &Screen, tide: &Tide) {
     let mut hints: Vec<(&str, &str)> = Vec::new();
     if screen.modal.is_some() {
         hints.extend([("enter", "confirm"), ("esc", "cancel")]);
+    } else if let Some(builder) = &screen.builder {
+        match builder.step {
+            super::state::BuilderStep::Edit => {
+                hints.extend([
+                    ("tab", "next field"),
+                    ("enter", "next / review"),
+                    ("esc", "cancel"),
+                ]);
+            }
+            super::state::BuilderStep::Review => {
+                hints.extend([
+                    ("enter", "create and launch"),
+                    ("e", "edit"),
+                    ("esc", "edit"),
+                ]);
+            }
+        }
+    } else if screen.palette.is_some() {
+        hints.extend([("enter", "run"), ("up/down", "choose"), ("esc", "close")]);
     } else if screen.focus == Focus::Composer {
         hints.extend([("enter", "send"), ("esc", "back")]);
     } else {
         match screen.focus {
             Focus::Navigator => hints.extend([("j/k", "move"), ("enter", "open"), ("h/l", "fold")]),
             _ => match screen.view {
-                View::Terminals => hints.extend([("j/k", "move"), ("enter", "focus pane")]),
+                View::Terminals => {
+                    hints.extend([("j/k", "move"), ("enter", "focus pane"), ("b", "bind pane")]);
+                }
                 View::Chat => hints.extend([("j/k", "scroll"), ("c", "write")]),
                 View::Tasks => hints.extend([("j/k", "move")]),
                 View::Decisions => hints.extend([
@@ -294,6 +336,7 @@ fn draw_footer(buf: &mut Buffer, rect: Rect, screen: &Screen, tide: &Tide) {
             ("1-4", "view"),
             ("n", "nav"),
             ("i", "info"),
+            (":", "commands"),
             ("?", "help"),
             ("q", "quit"),
         ]);
@@ -544,6 +587,15 @@ fn row_style(selected: bool, tide: &Tide) -> Style {
 
 fn draw_terminals(buf: &mut Buffer, body: Rect, screen: &Screen, tide: &Tide) {
     let snap = &screen.snapshot;
+    // Wide enough for the longest agent id here, within reason, so ids are not cut for no cause.
+    let id_width = screen
+        .scope_team_ids()
+        .iter()
+        .flat_map(|team| snap.team_agents(team))
+        .map(|actor| actor.id.width())
+        .max()
+        .unwrap_or(8)
+        .clamp(8, 24);
     let cursor = screen.cursor_of(View::Terminals);
     let mut row = 0u16;
     let mut index = 0usize;
@@ -584,9 +636,9 @@ fn draw_terminals(buf: &mut Buffer, body: Rect, screen: &Screen, tide: &Tide) {
                 " "
             };
             let fixed = format!(
-                "{rail}{} {:<10} {:<9} {:<9} ",
+                "{rail}{} {:<id_width$} {:<9} {:<9} ",
                 tide.status_glyph(status),
-                fit(&actor.id, 10, tide.glyphs.ellipsis),
+                fit(&actor.id, id_width, tide.glyphs.ellipsis),
                 actor.role,
                 status.word()
             );
@@ -656,6 +708,11 @@ fn draw_chat(buf: &mut Buffer, body: Rect, screen: &Screen, tide: &Tide) {
             "cancellation" => " cancelled".to_owned(),
             other => format!(" {other}"),
         };
+        let label = match snap.audience_label(&message.audience) {
+            Some(audience) => format!("{label}  {} {audience}", tide.glyphs.rail),
+            None => label,
+        };
+        let scoped = snap.audience_label(&message.audience).is_some();
         let mut lines = vec![Line::from(vec![
             Span::styled(
                 format!(" {}", message.sender_id),
@@ -665,7 +722,9 @@ fn draw_chat(buf: &mut Buffer, body: Rect, screen: &Screen, tide: &Tide) {
             ),
             Span::styled(
                 label,
-                Style::default().fg(if kind == "text" {
+                Style::default().fg(if scoped {
+                    tide.accent
+                } else if kind == "text" {
                     tide.muted
                 } else {
                     tide.warn
@@ -773,7 +832,14 @@ fn draw_chat(buf: &mut Buffer, body: Rect, screen: &Screen, tide: &Tide) {
         let inner = panel(
             buf,
             composer,
-            &format!("write to {}", screen.scope_title()),
+            &format!(
+                "write to {}{}",
+                screen.scope_title(),
+                screen
+                    .composer_audience_label()
+                    .map(|audience| format!("  {} {audience}", tide.glyphs.rail))
+                    .unwrap_or_default()
+            ),
             screen.focus == Focus::Composer,
             tide,
         );
@@ -793,7 +859,8 @@ fn draw_chat(buf: &mut Buffer, body: Rect, screen: &Screen, tide: &Tide) {
             };
             let (hint, color) = if text.is_empty() && screen.focus != Focus::Composer {
                 (
-                    "press c to write, @role to address a role".to_owned(),
+                    "press c to write; start with @lead, @dev, @qa or @agent-id to address one"
+                        .to_owned(),
                     tide.dim,
                 )
             } else {
@@ -1014,6 +1081,17 @@ fn draw_decisions(buf: &mut Buffer, body: Rect, screen: &Screen, tide: &Tide) {
                     format!("   why     {}  (by {})", a.justification, a.requested_by),
                     Style::default().fg(tide.muted),
                 ));
+                for (what, items, color) in [
+                    ("else", &a.alternatives, tide.muted),
+                    ("risk", &a.risks, tide.warn),
+                ] {
+                    for item in items {
+                        lines.push(Line::styled(
+                            format!("   {what:<6}  {item}"),
+                            Style::default().fg(color),
+                        ));
+                    }
+                }
                 if state == "pending" && selected {
                     let (style, note) = if owner {
                         (Style::default().fg(tide.accent), "")
@@ -1134,9 +1212,9 @@ fn draw_inspector(buf: &mut Buffer, rect: Rect, screen: &Screen, tide: &Tide) {
     let mut lines: Vec<Line> = Vec::new();
     let kv = |k: &str, v: String, color| {
         Line::from(vec![
-            Span::styled(format!("{k:<9}"), Style::default().fg(tide.dim)),
+            Span::styled(format!("{k:<11}"), Style::default().fg(tide.dim)),
             Span::styled(
-                fit(&v, width.saturating_sub(9), tide.glyphs.ellipsis),
+                fit(&v, width.saturating_sub(11), tide.glyphs.ellipsis),
                 Style::default().fg(color),
             ),
         ])
@@ -1149,7 +1227,23 @@ fn draw_inspector(buf: &mut Buffer, rect: Rect, screen: &Screen, tide: &Tide) {
             format!("{} {}", tide.status_glyph(status), status.word()),
             tide.status_color(status),
         ));
-        lines.push(kv("provider", "not reported".into(), tide.dim));
+        match snap.binding(&actor.id) {
+            Some(binding) => {
+                lines.push(kv(
+                    "provider",
+                    binding
+                        .provider
+                        .clone()
+                        .unwrap_or_else(|| "not reported".into()),
+                    tide.text,
+                ));
+                lines.push(kv("pane", binding.pane_id.clone(), tide.text));
+            }
+            None => {
+                lines.push(kv("provider", "not reported".into(), tide.dim));
+                lines.push(kv("pane", "none bound (b)".into(), tide.dim));
+            }
+        }
         lines.push(kv(
             "run",
             actor.run_generation.map_or("-".into(), |g| format!("#{g}")),
@@ -1218,7 +1312,7 @@ fn draw_inspector(buf: &mut Buffer, rect: Rect, screen: &Screen, tide: &Tide) {
                         .actor(who)
                         .map_or(AgentStatus::Idle, |a| snap.agent_status(a));
                     lines.push(Line::from(vec![
-                        Span::styled(format!("{role:<10}"), Style::default().fg(tide.dim)),
+                        Span::styled(format!("{role:<11}"), Style::default().fg(tide.dim)),
                         Span::styled(
                             format!("{} ", tide.status_glyph(status)),
                             Style::default().fg(tide.status_color(status)),
@@ -1347,16 +1441,11 @@ fn draw_modal(buf: &mut Buffer, area: Rect, screen: &Screen, tide: &Tide) {
         }
     }
     row += 1;
-    let label = if matches!(
-        modal.action,
-        super::state::Action::Approve
-            | super::state::Action::Deny
-            | super::state::Action::Revoke
-            | super::state::Action::Resolve
-    ) {
-        "reason"
-    } else {
-        ""
+    let label = match modal.action {
+        super::state::Action::Bind => "pane",
+        super::state::Action::Rename => "name",
+        super::state::Action::Goal => "goal",
+        _ => "reason",
     };
     let cursor = if tide.options.ascii { "_" } else { "▏" };
     put(
@@ -1453,4 +1542,205 @@ fn draw_toast(buf: &mut Buffer, area: Rect, text: &str, tide: &Tide) {
             Style::default().fg(tide.bg).bg(tide.warn),
         ),
     );
+}
+
+fn draw_builder(buf: &mut Buffer, area: Rect, builder: &super::state::Builder, tide: &Tide) {
+    use super::state::{BuilderStep, BUILDER_FIELDS};
+    let draft = &builder.draft;
+    let rect = centered(area, 78.min(area.width), 17.min(area.height));
+    Clear.render(rect, buf);
+    let title = match builder.step {
+        BuilderStep::Edit => "new team",
+        BuilderStep::Review => "review team - nothing is created until you launch",
+    };
+    let inner = panel(buf, rect, title, true, tide);
+    if inner.width == 0 {
+        return;
+    }
+    let width = inner.width as usize;
+    let cursor = if tide.options.ascii { "_" } else { "▏" };
+    put(
+        buf,
+        inner,
+        0,
+        Line::styled(
+            format!("source: {}", draft.source),
+            Style::default().fg(tide.dim),
+        ),
+    );
+    match builder.step {
+        BuilderStep::Edit => {
+            let values = [
+                draft.name.clone(),
+                if draft.project_id.is_empty() {
+                    "< a new default project >".to_owned()
+                } else {
+                    format!("< {} >", draft.project_id)
+                },
+                draft.lead.clone(),
+                draft.developer.clone(),
+                draft.qa.clone(),
+            ];
+            for (index, (label, value)) in BUILDER_FIELDS.iter().zip(values).enumerate() {
+                let selected = index == builder.field;
+                let rail = if selected { tide.glyphs.rail } else { " " };
+                let shown = if selected && index != 1 {
+                    format!("{value}{cursor}")
+                } else {
+                    value
+                };
+                let line = Line::from(vec![
+                    Span::styled(
+                        format!("{rail} {label:<13}"),
+                        Style::default().fg(if selected { tide.accent } else { tide.muted }),
+                    ),
+                    Span::styled(
+                        fit(&shown, width.saturating_sub(16), tide.glyphs.ellipsis),
+                        Style::default().fg(tide.text),
+                    ),
+                ])
+                .style(row_style(selected, tide));
+                put(buf, inner, 2 + index as u16, line);
+            }
+            let (text, color) = match (&builder.preview, builder.checking) {
+                (_, true) => (
+                    "asking the server to check the draft...".to_owned(),
+                    tide.muted,
+                ),
+                (Some(preview), false) if !preview.valid => (
+                    preview
+                        .problems
+                        .first()
+                        .cloned()
+                        .unwrap_or_else(|| "the draft is not valid".to_owned()),
+                    tide.warn,
+                ),
+                _ => (
+                    "enter on the last field has the server check it".to_owned(),
+                    tide.dim,
+                ),
+            };
+            put(
+                buf,
+                inner,
+                8,
+                Line::styled(
+                    fit(&text, width, tide.glyphs.ellipsis),
+                    Style::default().fg(color),
+                ),
+            );
+            put(
+                buf,
+                inner,
+                10,
+                Line::styled(
+                    "left/right changes the project",
+                    Style::default().fg(tide.dim),
+                ),
+            );
+        }
+        BuilderStep::Review => {
+            let team_id = builder
+                .preview
+                .as_ref()
+                .map_or_else(String::new, |p| p.team_id.clone());
+            let credential_dir = builder
+                .preview
+                .as_ref()
+                .map_or_else(String::new, |p| p.credential_dir.clone());
+            let rows = [
+                ("name", draft.name.clone()),
+                ("team id", team_id.clone()),
+                (
+                    "project",
+                    if draft.project_id.is_empty() {
+                        "default (created)".to_owned()
+                    } else {
+                        draft.project_id.clone()
+                    },
+                ),
+                ("lead", draft.lead.clone()),
+                ("developer", draft.developer.clone()),
+                ("qa", draft.qa.clone()),
+                (
+                    "keys",
+                    format!("{credential_dir}/ in the session data dir, mode 0700"),
+                ),
+            ];
+            for (index, (label, value)) in rows.iter().enumerate() {
+                put(
+                    buf,
+                    inner,
+                    2 + index as u16,
+                    Line::from(vec![
+                        Span::styled(format!("  {label:<10}"), Style::default().fg(tide.dim)),
+                        Span::styled(
+                            fit(value, width.saturating_sub(12), tide.glyphs.ellipsis),
+                            Style::default().fg(tide.text),
+                        ),
+                    ]),
+                );
+            }
+            let note = "Launching creates 3 credentials, the team spec, enrolls the agents and starts the team.";
+            for (offset, part) in wrap(note, width).into_iter().enumerate() {
+                put(
+                    buf,
+                    inner,
+                    10 + offset as u16,
+                    Line::styled(part, Style::default().fg(tide.muted)),
+                );
+            }
+        }
+    }
+}
+
+fn draw_palette(buf: &mut Buffer, area: Rect, screen: &Screen, tide: &Tide) {
+    let Some(state) = &screen.palette else { return };
+    let matches = screen.palette_matches();
+    let rows = matches.len().min(12);
+    let rect = centered(area, 64.min(area.width), (rows as u16 + 5).min(area.height));
+    Clear.render(rect, buf);
+    let inner = panel(buf, rect, "commands", true, tide);
+    if inner.width == 0 {
+        return;
+    }
+    let cursor = if tide.options.ascii { "_" } else { "▏" };
+    put(
+        buf,
+        inner,
+        0,
+        Line::from(vec![
+            Span::styled("> ", Style::default().fg(tide.accent)),
+            Span::styled(
+                format!("{}{cursor}", state.query),
+                Style::default().fg(tide.text),
+            ),
+        ]),
+    );
+    if matches.is_empty() {
+        put(
+            buf,
+            inner,
+            2,
+            Line::styled("no command matches", Style::default().fg(tide.muted)),
+        );
+        return;
+    }
+    let selected = state.cursor.min(matches.len() - 1);
+    // Keep the highlighted row on screen when there are more matches than rows.
+    let first = selected.saturating_sub(rows.saturating_sub(1));
+    for (offset, (label, _)) in matches.iter().skip(first).take(rows).enumerate() {
+        let is_selected = first + offset == selected;
+        let rail = if is_selected { tide.glyphs.rail } else { " " };
+        let line = Line::styled(
+            fit(
+                &format!("{rail} {label}"),
+                inner.width as usize,
+                tide.glyphs.ellipsis,
+            ),
+            Style::default().fg(if is_selected { tide.text } else { tide.muted }),
+        )
+        .style(row_style(is_selected, tide));
+        put(buf, inner, 2 + offset as u16, line);
+    }
 }

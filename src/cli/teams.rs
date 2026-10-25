@@ -15,12 +15,30 @@ pub(super) fn command() -> Command {
             Command::new("ui")
                 .about("Open the Teams screen: navigator, chat, tasks and decisions")
                 .arg(
+                    Arg::new("view")
+                        .long("view")
+                        .value_name("VIEW")
+                        .value_parser(["terminals", "chat", "tasks", "decisions"])
+                        .help("Open on this view"),
+                )
+                .arg(
+                    Arg::new("start")
+                        .long("start")
+                        .value_name("WHAT")
+                        .value_parser(["builder"])
+                        .help("Start straight in the team builder"),
+                )
+                .arg(
                     Arg::new("credential-file")
                         .long("credential-file")
                         .value_name("PATH")
                         .help("Credential to act as; defaults to the session's owner credential")
                         .value_parser(clap::value_parser!(PathBuf)),
                 ),
+        )
+        .subcommand(
+            Command::new("schema")
+                .about("Print this build's machine-readable Teams API schema (no server needed)"),
         )
         .subcommand(Command::new("init").about("Create the session's private owner credential"))
         .subcommand(
@@ -63,6 +81,12 @@ pub(super) fn run(args: &[String]) -> io::Result<i32> {
         ));
     }
     match matches.subcommand() {
+        Some(("schema", _)) => {
+            let schema = serde_json::to_string_pretty(&crate::teams::schema_document())
+                .map_err(io::Error::other)?;
+            println!("{schema}");
+            Ok(0)
+        }
         Some(("init", _)) => {
             let path =
                 crate::teams::initialize(&crate::session::data_dir()).map_err(io::Error::other)?;
@@ -75,10 +99,15 @@ pub(super) fn run(args: &[String]) -> io::Result<i32> {
                 .unwrap_or_else(|| crate::session::data_dir().join("teams-owner.key"));
             let token = crate::teams::read_credential(&credential).map_err(io::Error::other)?;
             let client = super::target::api_client()?;
+            let start = crate::teams_ui::Start {
+                view: args.get_one::<String>("view").cloned(),
+                builder: args.get_one::<String>("start").is_some(),
+            };
             crate::teams_ui::run(
                 client,
                 token,
                 crate::session::data_dir().join("teams-ui-state.json"),
+                start,
             )?;
             Ok(0)
         }
