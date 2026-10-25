@@ -1113,20 +1113,27 @@ mod tests {
         ] {
             let (mut client, server, path) = local_stream_pair("teams-api");
             write_json_line(&mut client, &request).unwrap();
-            handle_connection_with_stop(
-                server,
-                &api_tx,
-                &EventHub::default(),
-                &Arc::new(AtomicBool::new(true)),
-                None,
-                None,
-                ConnectionExtensions {
-                    teams: Some(&teams),
-                    ssh_agents: None,
-                },
-            )
-            .unwrap();
-            let response = read_line(&mut client);
+            // The capabilities reply is larger than a small socket buffer (macOS), so the client has to
+            // read while the server writes.
+            let response = std::thread::scope(|scope| {
+                let handler = scope.spawn(|| {
+                    handle_connection_with_stop(
+                        server,
+                        &api_tx,
+                        &EventHub::default(),
+                        &Arc::new(AtomicBool::new(true)),
+                        None,
+                        None,
+                        ConnectionExtensions {
+                            teams: Some(&teams),
+                            ssh_agents: None,
+                        },
+                    )
+                });
+                let response = read_line(&mut client);
+                handler.join().unwrap().unwrap();
+                response
+            });
             assert!(!response
                 .contains("1111111111111111111111111111111111111111111111111111111111111111"));
             let response: serde_json::Value = serde_json::from_str(&response).unwrap();

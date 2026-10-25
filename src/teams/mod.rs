@@ -958,7 +958,8 @@ pub(crate) fn initialize(root: &Path) -> Result<PathBuf> {
     Ok(path)
 }
 
-#[cfg(test)]
+// These tests use private credential files, which Teams supports on Unix only.
+#[cfg(all(test, unix))]
 mod api_tests;
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod tests;
