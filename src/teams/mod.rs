@@ -47,6 +47,11 @@ const METHODS: &[&str] = &[
     "teams.snapshot.get.v1",
     "teams.events.list.v1",
     "teams.mutate.v1",
+    "teams.list.v1",
+    "teams.get.v1",
+    "teams.conflicts.list.v1",
+    "teams.integrations.list.v1",
+    "teams.events.resume.v1",
 ];
 
 pub(crate) struct Service {
@@ -84,6 +89,12 @@ struct Mutation {
 struct Snapshot {
     #[serde(default)]
     team_id: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TeamRef {
+    team_id: String,
 }
 
 #[derive(Deserialize)]
@@ -150,6 +161,8 @@ impl Service {
                 "adapters": {"structured_manual": true, "automatic_dispatch": false,
                     "verified_provider_receipts": false, "goal_proposals": false},
                 "command_schema": schemars::schema_for!(model::Command),
+                "enforcement": {"api_authorization": true, "os_isolation": false,
+                    "credential_broker": false, "worktree_confinement": false},
                 "security": "API authorization only; unrestricted same-user shells are not isolated"
             }));
         }
@@ -178,7 +191,27 @@ impl Service {
                 let params: Snapshot = decode(envelope.params)?;
                 store.state()?.snapshot(&actor, params.team_id.as_deref())
             }
-            "teams.events.list.v1" => {
+            "teams.list.v1" => store.state()?.list_teams(&actor),
+            "teams.get.v1" => {
+                let params: TeamRef = decode(envelope.params)?;
+                store.state()?.snapshot(&actor, Some(&params.team_id))
+            }
+            "teams.conflicts.list.v1" | "teams.integrations.list.v1" => {
+                let params: Snapshot = decode(envelope.params)?;
+                let view = store.state()?.snapshot(&actor, params.team_id.as_deref())?;
+                let keys: &[&str] = if envelope.method == "teams.conflicts.list.v1" {
+                    &["conflicts", "notices"]
+                } else {
+                    &["integrations", "worktrees", "conflicts", "notices"]
+                };
+                Ok(json!({
+                    "revision": view["revision"],
+                    "stream_id": view["stream_id"],
+                    "last_event_sequence": view["last_event_sequence"],
+                    "data": keys.iter().map(|key| (key.to_string(), view[*key].clone())).collect::<serde_json::Map<_, _>>(),
+                }))
+            }
+            "teams.events.list.v1" | "teams.events.resume.v1" => {
                 let params: Events = decode(envelope.params)?;
                 if !(1..=100).contains(&params.limit) {
                     return Err(Error::new(
@@ -224,7 +257,10 @@ impl Service {
                     ));
                 }
                 let mut candidate = store.state()?.clone();
-                let outcome = candidate.execute(&actor, params.command)?;
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map_or(0, |elapsed| elapsed.as_secs());
+                let outcome = candidate.execute_at(&actor, params.command, now)?;
                 let result = json!({"type": "teams_mutation", "revision": candidate.revision,
                     "stream_id": candidate.stream_id, "watermark": candidate.next_sequence.saturating_sub(1),
                     "outcome": outcome});

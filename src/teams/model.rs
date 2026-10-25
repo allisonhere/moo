@@ -4,7 +4,18 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
+use sha2::{Digest, Sha256};
+
+mod governance;
+mod portfolio;
+
 use super::{Error, Result};
+use governance::RecruitmentRequest;
+pub use governance::{Approval, Authority, ProtectedAction, Recruitment};
+use portfolio::Submission;
+pub use portfolio::{
+    ChangeNotice, Conflict, Integration, SharedSurface, TeamStatus, WorktreeClaim,
+};
 
 pub const STATE_VERSION: u32 = 1;
 pub const MAX_RECORDS: usize = 10_000;
@@ -28,6 +39,8 @@ pub enum Role {
     Lead,
     Developer,
     Qa,
+    /// A recruited, temporary specialist; never enrolled through a team spec.
+    Specialist,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -89,6 +102,8 @@ pub struct Team {
     pub lead_id: String,
     pub developer_id: String,
     pub qa_id: String,
+    #[serde(default)]
+    pub status: TeamStatus,
     pub revision: u64,
 }
 
@@ -378,23 +393,45 @@ pub struct Event {
     pub team_id: Option<String>,
     pub kind: String,
     pub payload: Value,
+    /// The authority class the command ran under; `None` for system events.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authority: Option<Authority>,
+    /// Server clock, unix seconds.
+    #[serde(default)]
+    pub at: u64,
+    /// Hash chain: each event commits to the one before it, so edits to history are detectable.
+    #[serde(default)]
+    pub prev_hash: String,
+    #[serde(default)]
+    pub hash: String,
+}
+
+impl Event {
+    fn compute_hash(&self) -> String {
+        let bytes = serde_json::to_vec(&json!([
+            self.prev_hash,
+            self.sequence,
+            self.revision,
+            self.actor_id,
+            self.project_id,
+            self.team_id,
+            self.kind,
+            self.payload,
+            self.authority,
+            self.at,
+        ]))
+        .unwrap_or_default();
+        let mut digest = Sha256::new();
+        digest.update(b"moo-teams-event-v1\0");
+        digest.update(&bytes);
+        format!("{:x}", digest.finalize())
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct StoredReceipt {
     pub digest: String,
     pub result: Value,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum CommandClass {
-    Owner,
-    Lead,
-    Developer,
-    Qa,
-    Shared,
-    Dispatch,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -516,28 +553,146 @@ pub enum Command {
         previous_attempt_id: String,
         dispatch: DispatchIntent,
     },
+    /// Ask the Owner to authorize one exact protected action. Chat can never do this.
+    RequestApproval {
+        approval_id: String,
+        team_id: String,
+        action: ProtectedAction,
+        justification: String,
+        ttl_seconds: u64,
+    },
+    DecideApproval {
+        approval_id: String,
+        approve: bool,
+        rationale: String,
+    },
+    RevokeApproval {
+        approval_id: String,
+        rationale: String,
+    },
+    /// Spend an approval, once, for exactly the action it was granted for.
+    ConsumeApproval {
+        approval_id: String,
+        execution_id: String,
+        action: ProtectedAction,
+    },
+    RequestRecruitment {
+        recruitment_id: String,
+        team_id: String,
+        specialty: String,
+        justification: String,
+        deliverable: String,
+        capabilities: Vec<String>,
+        #[serde(default)]
+        dependencies: Vec<String>,
+        stop_condition: String,
+        max_retries: u8,
+        max_minutes: u32,
+    },
+    ActivateRecruitment {
+        recruitment_id: String,
+        actor_id: String,
+        credential_digest: String,
+        run_generation: u64,
+    },
+    SubmitSpecialistHandoff {
+        recruitment_id: String,
+        summary: String,
+        evidence: Vec<Evidence>,
+    },
+    VerifyRecruitment {
+        recruitment_id: String,
+        accepted: bool,
+        rationale: String,
+    },
+    CancelRecruitment {
+        recruitment_id: String,
+        reason: String,
+    },
+    /// The team id never changes; only its label does.
+    RenameTeam {
+        team_id: String,
+        name: String,
+    },
+    SuspendTeam {
+        team_id: String,
+        reason: String,
+    },
+    ResumeTeam {
+        team_id: String,
+    },
+    CancelTeam {
+        team_id: String,
+        reason: String,
+    },
+    /// Name a public interface, schema or API by the paths that define it.
+    RegisterSurface {
+        surface_id: String,
+        project_id: String,
+        path_prefixes: Vec<String>,
+    },
+    /// Record that a team owns one worktree path and branch. The harness creates the worktree.
+    ClaimWorktree {
+        claim_id: String,
+        team_id: String,
+        path: String,
+        branch: String,
+        base_commit: String,
+    },
+    ReleaseWorktree {
+        claim_id: String,
+    },
+    /// Says whether a released, never-used worktree may be deleted. Teams never deletes it.
+    ApproveWorktreeCleanup {
+        claim_id: String,
+    },
+    SubmitIntegration {
+        integration_id: String,
+        team_id: String,
+        claim_id: String,
+        target_branch: String,
+        commit: String,
+        changed_paths: Vec<String>,
+        #[serde(default)]
+        touches: Vec<String>,
+        #[serde(default)]
+        depends_on: Vec<String>,
+        tests: Vec<Evidence>,
+    },
+    ReviewIntegration {
+        integration_id: String,
+        accepted: bool,
+        rationale: String,
+        #[serde(default)]
+        evidence: Vec<Evidence>,
+    },
+    ResolveConflict {
+        conflict_id: String,
+        rationale: String,
+    },
+    AcknowledgeNotice {
+        notice_id: String,
+    },
+    CancelIntegration {
+        integration_id: String,
+        reason: String,
+    },
+    /// Owner only; spends an approval naming this integration and commit. There is no force option.
+    BeginMerge {
+        integration_id: String,
+        approval_id: String,
+    },
+    CompleteMerge {
+        integration_id: String,
+        merge_commit: String,
+    },
+    AbortMerge {
+        integration_id: String,
+        reason: String,
+    },
 }
 
 impl Command {
-    pub fn method_class(&self) -> CommandClass {
-        match self {
-            Self::CreateProject { .. }
-            | Self::CreateTeamSpec { .. }
-            | Self::EnrollActor { .. }
-            | Self::LaunchTeam { .. } => CommandClass::Owner,
-            Self::CreateTask { .. }
-            | Self::SetTaskDependencies { .. }
-            | Self::FinalizeTask { .. }
-            | Self::CancelTask { .. } => CommandClass::Lead,
-            Self::AcceptTask { .. } | Self::SubmitHandoff { .. } => CommandClass::Developer,
-            Self::ReviewHandoff { .. } => CommandClass::Qa,
-            Self::AppendChat { .. } | Self::PutKnowledge { .. } => CommandClass::Shared,
-            Self::RecordDispatchReceipt { .. } | Self::RetryDispatch { .. } => {
-                CommandClass::Dispatch
-            }
-        }
-    }
-
     pub fn kind(&self) -> &'static str {
         match self {
             Self::CreateProject { .. } => "create_project",
@@ -555,6 +710,31 @@ impl Command {
             Self::PutKnowledge { .. } => "put_knowledge",
             Self::RecordDispatchReceipt { .. } => "record_dispatch_receipt",
             Self::RetryDispatch { .. } => "retry_dispatch",
+            Self::RequestApproval { .. } => "request_approval",
+            Self::DecideApproval { .. } => "decide_approval",
+            Self::RevokeApproval { .. } => "revoke_approval",
+            Self::ConsumeApproval { .. } => "consume_approval",
+            Self::RequestRecruitment { .. } => "request_recruitment",
+            Self::ActivateRecruitment { .. } => "activate_recruitment",
+            Self::SubmitSpecialistHandoff { .. } => "submit_specialist_handoff",
+            Self::VerifyRecruitment { .. } => "verify_recruitment",
+            Self::CancelRecruitment { .. } => "cancel_recruitment",
+            Self::RenameTeam { .. } => "rename_team",
+            Self::SuspendTeam { .. } => "suspend_team",
+            Self::ResumeTeam { .. } => "resume_team",
+            Self::CancelTeam { .. } => "cancel_team",
+            Self::RegisterSurface { .. } => "register_surface",
+            Self::ClaimWorktree { .. } => "claim_worktree",
+            Self::ReleaseWorktree { .. } => "release_worktree",
+            Self::ApproveWorktreeCleanup { .. } => "approve_worktree_cleanup",
+            Self::SubmitIntegration { .. } => "submit_integration",
+            Self::ReviewIntegration { .. } => "review_integration",
+            Self::ResolveConflict { .. } => "resolve_conflict",
+            Self::AcknowledgeNotice { .. } => "acknowledge_notice",
+            Self::CancelIntegration { .. } => "cancel_integration",
+            Self::BeginMerge { .. } => "begin_merge",
+            Self::CompleteMerge { .. } => "complete_merge",
+            Self::AbortMerge { .. } => "abort_merge",
         }
     }
 }
@@ -579,6 +759,23 @@ pub struct State {
     pub messages: BTreeMap<String, Message>,
     pub knowledge: BTreeMap<String, KnowledgeEntry>,
     pub dispatches: BTreeMap<String, DispatchAttempt>,
+    #[serde(default)]
+    pub approvals: BTreeMap<String, Approval>,
+    #[serde(default)]
+    pub recruitments: BTreeMap<String, Recruitment>,
+    #[serde(default)]
+    pub surfaces: BTreeMap<String, SharedSurface>,
+    #[serde(default)]
+    pub worktrees: BTreeMap<String, WorktreeClaim>,
+    #[serde(default)]
+    pub integrations: BTreeMap<String, Integration>,
+    #[serde(default)]
+    pub conflicts: BTreeMap<String, Conflict>,
+    #[serde(default)]
+    pub notices: BTreeMap<String, ChangeNotice>,
+    /// Server clock for the command being applied (unix seconds); set per command, never stored.
+    #[serde(skip)]
+    now: u64,
 }
 
 struct PendingEvent {
@@ -628,6 +825,14 @@ impl State {
             messages: BTreeMap::new(),
             knowledge: BTreeMap::new(),
             dispatches: BTreeMap::new(),
+            approvals: BTreeMap::new(),
+            recruitments: BTreeMap::new(),
+            surfaces: BTreeMap::new(),
+            worktrees: BTreeMap::new(),
+            integrations: BTreeMap::new(),
+            conflicts: BTreeMap::new(),
+            notices: BTreeMap::new(),
+            now: 0,
         }
     }
 
@@ -650,13 +855,27 @@ impl State {
         Ok(actor.clone())
     }
 
+    #[cfg(test)]
     pub fn execute(&mut self, actor: &Actor, command: Command) -> Result<Value> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |elapsed| elapsed.as_secs());
+        self.execute_at(actor, command, now)
+    }
+
+    /// Applies `command` as of `now` (unix seconds). Authorization runs here, at execution time,
+    /// against the live state, so an approval or credential changed since the request still counts.
+    pub fn execute_at(&mut self, actor: &Actor, command: Command, now: u64) -> Result<Value> {
         self.ensure_current_actor(actor)?;
+        governance::authorize(actor, &command)?;
+        self.ensure_team_may_work(&command)?;
+        let authority = command.authority();
         let commit_revision = self
             .revision
             .checked_add(1)
             .ok_or_else(|| Error::new("capacity_exceeded", "state revision is exhausted"))?;
         let mut candidate = self.clone();
+        candidate.now = now;
         let applied = candidate.apply(actor, command, commit_revision)?;
         if applied.events.is_empty() {
             return Err(Error::new(
@@ -666,8 +885,9 @@ impl State {
         }
         candidate.revision = commit_revision;
         for pending in applied.events {
-            candidate.append_event(actor.id.clone(), commit_revision, pending)?;
+            candidate.append_event(actor.id.clone(), commit_revision, Some(authority), pending)?;
         }
+        candidate.now = 0;
         candidate.validate()?;
         *self = candidate;
         Ok(applied.result)
@@ -677,6 +897,22 @@ impl State {
         self.validate()?;
         self.ensure_current_actor(actor)?;
         let selected_team = self.resolve_read_team(actor, team_id)?;
+        // A specialist sees its own engagement and the tasks it was scoped to - not the team's
+        // private chat, decisions, knowledge, roster or dispatches.
+        let specialist = actor.role == Role::Specialist;
+        let scoped_tasks: BTreeSet<&str> = self
+            .recruitments
+            .values()
+            .filter(|recruitment| {
+                matches!(
+                    &recruitment.status,
+                    governance::RecruitmentStatus::Active { actor_id, .. }
+                        | governance::RecruitmentStatus::HandedOff { actor_id, .. }
+                        if actor_id == &actor.id
+                )
+            })
+            .flat_map(|recruitment| recruitment.dependencies.iter().map(String::as_str))
+            .collect();
         let selected_ids: BTreeSet<&str> = match selected_team {
             Some(team_id) => BTreeSet::from([team_id]),
             None => self.teams.keys().map(String::as_str).collect(),
@@ -694,6 +930,7 @@ impl State {
         let specs: Vec<Value> = self
             .team_specs
             .values()
+            .filter(|_| !specialist)
             .filter(|spec| match &spec.status {
                 TeamSpecStatus::Draft => actor.role == Role::Owner && selected_team.is_none(),
                 TeamSpecStatus::Launched { team_id } => selected_ids.contains(team_id.as_str()),
@@ -709,7 +946,8 @@ impl State {
             .actors
             .values()
             .filter(|candidate| {
-                candidate.role != Role::Owner
+                !specialist
+                    && candidate.role != Role::Owner
                     && candidate
                         .team_id
                         .as_deref()
@@ -719,24 +957,97 @@ impl State {
             .collect();
         let tasks = filtered_values(&self.tasks, |value| {
             selected_ids.contains(value.team_id.as_str())
+                && (!specialist || scoped_tasks.contains(value.id.as_str()))
         });
         let acceptances = filtered_values(&self.acceptances, |value| {
-            selected_ids.contains(value.team_id.as_str())
+            !specialist && selected_ids.contains(value.team_id.as_str())
         });
         let handoffs = filtered_values(&self.handoffs, |value| {
-            selected_ids.contains(value.team_id.as_str())
+            !specialist && selected_ids.contains(value.team_id.as_str())
         });
         let decisions = filtered_values(&self.decisions, |value| {
-            selected_ids.contains(value.team_id.as_str())
+            !specialist && selected_ids.contains(value.team_id.as_str())
         });
         let messages = filtered_values(&self.messages, |value| {
-            selected_ids.contains(value.team_id.as_str())
+            !specialist && selected_ids.contains(value.team_id.as_str())
         });
+        // Project knowledge is shared by every team of that project; team knowledge stays private.
+        let visible_projects: BTreeSet<&str> = self
+            .teams
+            .values()
+            .filter(|team| selected_ids.contains(team.id.as_str()))
+            .map(|team| team.project_id.as_str())
+            .collect();
         let knowledge = filtered_values(&self.knowledge, |value| {
-            selected_ids.contains(value.team_id.as_str())
+            !specialist
+                && (selected_ids.contains(value.team_id.as_str())
+                    || matches!(&value.scope, KnowledgeScope::Project { project_id }
+                        if visible_projects.contains(project_id.as_str())))
+        });
+        let surfaces = filtered_values(&self.surfaces, |value| {
+            !specialist && visible_projects.contains(value.project_id.as_str())
+        });
+        let worktrees = filtered_values(&self.worktrees, |value| {
+            !specialist && selected_ids.contains(value.team_id.as_str())
+        });
+        let integrations = filtered_values(&self.integrations, |value| {
+            !specialist && selected_ids.contains(value.team_id.as_str())
+        });
+        let involves_selected = |teams: &[&String]| {
+            !specialist
+                && teams
+                    .iter()
+                    .any(|team| selected_ids.contains(team.as_str()))
+        };
+        let conflicts = filtered_values(&self.conflicts, |value| {
+            involves_selected(&[&value.team_ids[0], &value.team_ids[1]])
+        });
+        let notices = filtered_values(&self.notices, |value| {
+            involves_selected(&[&value.from_team_id, &value.to_team_id])
         });
         let dispatches = filtered_values(&self.dispatches, |value| {
+            !specialist && selected_ids.contains(value.team_id.as_str())
+        });
+        let approvals = filtered_values(&self.approvals, |value| {
+            !specialist && selected_ids.contains(value.team_id.as_str())
+        });
+        let recruitments = filtered_values(&self.recruitments, |value| {
             selected_ids.contains(value.team_id.as_str())
+                && (!specialist
+                    || matches!(
+                        &value.status,
+                        governance::RecruitmentStatus::Active { actor_id, .. }
+                            | governance::RecruitmentStatus::HandedOff { actor_id, .. }
+                            if actor_id == &actor.id
+                    ))
+        });
+        // What is waiting on a person, so a client can surface it without scanning every record.
+        let attention = json!({
+            "pending_approvals": approvals
+                .iter()
+                .filter(|approval| matches!(approval.status, governance::ApprovalStatus::Pending))
+                .map(|approval| approval.id.as_str())
+                .collect::<Vec<_>>(),
+            "queued_recruitments": recruitments
+                .iter()
+                .filter(|recruitment| matches!(recruitment.status, governance::RecruitmentStatus::Queued))
+                .map(|recruitment| recruitment.id.as_str())
+                .collect::<Vec<_>>(),
+            "open_conflicts": conflicts
+                .iter()
+                .filter(|conflict| conflict.status == portfolio::ConflictStatus::Open)
+                .map(|conflict| conflict.id.as_str())
+                .collect::<Vec<_>>(),
+            "open_notices": notices
+                .iter()
+                .filter(|notice| notice.status == portfolio::NoticeStatus::Open)
+                .map(|notice| notice.id.as_str())
+                .collect::<Vec<_>>(),
+            "merge_unknown": integrations
+                .iter()
+                .filter(|item| matches!(item.status, portfolio::IntegrationStatus::MergeUnknown { .. }))
+                .map(|item| item.id.as_str())
+                .collect::<Vec<_>>(),
         });
         serialize_value(&json!({
             "version": self.version,
@@ -754,6 +1065,14 @@ impl State {
             "messages": messages,
             "knowledge": knowledge,
             "dispatches": dispatches,
+            "approvals": approvals,
+            "recruitments": recruitments,
+            "surfaces": surfaces,
+            "worktrees": worktrees,
+            "integrations": integrations,
+            "conflicts": conflicts,
+            "notices": notices,
+            "attention": attention,
         }))
     }
 
@@ -822,7 +1141,11 @@ impl State {
                 .then(|| id.clone())
             })
             .collect();
-        if affected.is_empty() {
+        let merging = self
+            .integrations
+            .values()
+            .any(|item| matches!(item.status, portfolio::IntegrationStatus::Merging { .. }));
+        if affected.is_empty() && !merging {
             return Ok(false);
         }
 
@@ -843,15 +1166,18 @@ impl State {
             attempt.state = DispatchState::Unknown { previous };
             attempt.revision = revision;
         }
+        // A merge that was running may or may not have landed; the Owner records which.
+        let merges = candidate.mark_in_flight_merges_unknown(revision);
         candidate.revision = revision;
         candidate.append_event(
             RECOVERY_ACTOR_ID.to_owned(),
             revision,
+            None,
             PendingEvent {
                 project_id: None,
                 team_id: None,
                 kind: "dispatch_recovery_unknown",
-                payload: json!({ "attempt_ids": affected }),
+                payload: json!({ "attempt_ids": affected, "merge_unknown_integration_ids": merges }),
             },
         )?;
         candidate.validate()?;
@@ -1039,15 +1365,201 @@ impl State {
                 previous_attempt_id,
                 dispatch,
             } => self.retry_dispatch(actor, team_id, previous_attempt_id, dispatch, revision),
+            Command::RequestApproval {
+                approval_id,
+                team_id,
+                action,
+                justification,
+                ttl_seconds,
+            } => self.request_approval(
+                actor,
+                approval_id,
+                team_id,
+                action,
+                justification,
+                ttl_seconds,
+                revision,
+            ),
+            Command::DecideApproval {
+                approval_id,
+                approve,
+                rationale,
+            } => self.decide_approval(actor, approval_id, approve, rationale, revision),
+            Command::RevokeApproval {
+                approval_id,
+                rationale,
+            } => self.revoke_approval(actor, approval_id, rationale, revision),
+            Command::ConsumeApproval {
+                approval_id,
+                execution_id,
+                action,
+            } => self.consume_approval(actor, approval_id, execution_id, action, revision),
+            Command::RequestRecruitment {
+                recruitment_id,
+                team_id,
+                specialty,
+                justification,
+                deliverable,
+                capabilities,
+                dependencies,
+                stop_condition,
+                max_retries,
+                max_minutes,
+            } => self.request_recruitment(
+                actor,
+                RecruitmentRequest {
+                    id: recruitment_id,
+                    team_id,
+                    specialty,
+                    justification,
+                    deliverable,
+                    capabilities,
+                    dependencies,
+                    stop_condition,
+                    max_retries,
+                    max_minutes,
+                },
+                revision,
+            ),
+            Command::ActivateRecruitment {
+                recruitment_id,
+                actor_id,
+                credential_digest,
+                run_generation,
+            } => self.activate_recruitment(
+                actor,
+                recruitment_id,
+                actor_id,
+                credential_digest,
+                run_generation,
+                revision,
+            ),
+            Command::SubmitSpecialistHandoff {
+                recruitment_id,
+                summary,
+                evidence,
+            } => self.submit_specialist_handoff(actor, recruitment_id, summary, evidence, revision),
+            Command::VerifyRecruitment {
+                recruitment_id,
+                accepted,
+                rationale,
+            } => self.verify_recruitment(actor, recruitment_id, accepted, rationale, revision),
+            Command::CancelRecruitment {
+                recruitment_id,
+                reason,
+            } => self.cancel_recruitment(actor, recruitment_id, reason, revision),
+            Command::RenameTeam { team_id, name } => {
+                self.rename_team(actor, team_id, name, revision)
+            }
+            Command::SuspendTeam { team_id, reason } => {
+                self.suspend_team(actor, team_id, reason, revision)
+            }
+            Command::ResumeTeam { team_id } => self.resume_team(actor, team_id, revision),
+            Command::CancelTeam { team_id, reason } => {
+                self.cancel_team(actor, team_id, reason, revision)
+            }
+            Command::RegisterSurface {
+                surface_id,
+                project_id,
+                path_prefixes,
+            } => self.register_surface(actor, surface_id, project_id, path_prefixes, revision),
+            Command::ClaimWorktree {
+                claim_id,
+                team_id,
+                path,
+                branch,
+                base_commit,
+            } => self.claim_worktree(
+                actor,
+                claim_id,
+                team_id,
+                path,
+                branch,
+                base_commit,
+                revision,
+            ),
+            Command::ReleaseWorktree { claim_id } => {
+                self.release_worktree(actor, claim_id, revision)
+            }
+            Command::ApproveWorktreeCleanup { claim_id } => {
+                self.approve_worktree_cleanup(actor, claim_id, revision)
+            }
+            Command::SubmitIntegration {
+                integration_id,
+                team_id,
+                claim_id,
+                target_branch,
+                commit,
+                changed_paths,
+                touches,
+                depends_on,
+                tests,
+            } => self.submit_integration(
+                actor,
+                Submission {
+                    id: integration_id,
+                    team_id,
+                    claim_id,
+                    target_branch,
+                    commit,
+                    changed_paths,
+                    touches,
+                    depends_on,
+                    tests,
+                },
+                revision,
+            ),
+            Command::ReviewIntegration {
+                integration_id,
+                accepted,
+                rationale,
+                evidence,
+            } => self.review_integration(
+                actor,
+                integration_id,
+                accepted,
+                rationale,
+                evidence,
+                revision,
+            ),
+            Command::ResolveConflict {
+                conflict_id,
+                rationale,
+            } => self.resolve_conflict(actor, conflict_id, rationale, revision),
+            Command::AcknowledgeNotice { notice_id } => {
+                self.acknowledge_notice(actor, notice_id, revision)
+            }
+            Command::CancelIntegration {
+                integration_id,
+                reason,
+            } => self.cancel_integration(actor, integration_id, reason, revision),
+            Command::BeginMerge {
+                integration_id,
+                approval_id,
+            } => self.begin_merge(actor, integration_id, approval_id, revision),
+            Command::CompleteMerge {
+                integration_id,
+                merge_commit,
+            } => self.complete_merge(actor, integration_id, merge_commit, revision),
+            Command::AbortMerge {
+                integration_id,
+                reason,
+            } => self.abort_merge(actor, integration_id, reason, revision),
         }
     }
 
-    fn append_event(&mut self, actor_id: String, revision: u64, event: PendingEvent) -> Result<()> {
+    fn append_event(
+        &mut self,
+        actor_id: String,
+        revision: u64,
+        authority: Option<Authority>,
+        event: PendingEvent,
+    ) -> Result<()> {
         let sequence = self.next_sequence;
         self.next_sequence = sequence
             .checked_add(1)
             .ok_or_else(|| Error::new("capacity_exceeded", "event sequence is exhausted"))?;
-        self.events.push(Event {
+        let mut entry = Event {
             sequence,
             revision,
             actor_id,
@@ -1055,7 +1567,17 @@ impl State {
             team_id: event.team_id,
             kind: event.kind.to_owned(),
             payload: event.payload,
-        });
+            authority,
+            at: self.now,
+            prev_hash: self
+                .events
+                .last()
+                .map(|last| last.hash.clone())
+                .unwrap_or_default(),
+            hash: String::new(),
+        };
+        entry.hash = entry.compute_hash();
+        self.events.push(entry);
         Ok(())
     }
 
@@ -1106,12 +1628,14 @@ impl State {
     }
 
     fn actor_can_read_event(&self, actor: &Actor, event: &Event) -> bool {
-        actor.role == Role::Owner
-            || actor
-                .team_id
-                .as_deref()
-                .zip(event.team_id.as_deref())
-                .is_some_and(|(actor_team, event_team)| actor_team == event_team)
+        // A specialist sees its engagement through the snapshot, never the team's event stream.
+        actor.role != Role::Specialist
+            && (actor.role == Role::Owner
+                || actor
+                    .team_id
+                    .as_deref()
+                    .zip(event.team_id.as_deref())
+                    .is_some_and(|(actor_team, event_team)| actor_team == event_team))
     }
 }
 
@@ -1126,12 +1650,6 @@ impl State {
         require_role(actor, Role::Owner)?;
         validate_id("project_id", &project_id)?;
         validate_text("project name", &name, MAX_NAME_BYTES, false)?;
-        if !self.projects.is_empty() {
-            return Err(Error::new(
-                "phase1_limit",
-                "Phase 1 supports one project per session",
-            ));
-        }
         if self.projects.contains_key(&project_id) {
             return Err(Error::new("already_exists", "project already exists"));
         }
@@ -1165,16 +1683,6 @@ impl State {
         if self.team_specs.contains_key(&spec_id) {
             return Err(Error::new("already_exists", "team spec already exists"));
         }
-        if self
-            .team_specs
-            .values()
-            .any(|spec| matches!(spec.status, TeamSpecStatus::Draft))
-        {
-            return Err(Error::new(
-                "phase1_limit",
-                "Phase 1 supports one draft team spec",
-            ));
-        }
         let spec = TeamSpec {
             id: spec_id.clone(),
             project_id: project_id.clone(),
@@ -1206,10 +1714,10 @@ impl State {
         revision: u64,
     ) -> Result<Applied> {
         require_role(actor, Role::Owner)?;
-        if role == Role::Owner {
+        if matches!(role, Role::Owner | Role::Specialist) {
             return Err(Error::new(
                 "invalid_params",
-                "owner is not a team role enrollment",
+                "only Lead, Developer and QA are team role enrollments",
             ));
         }
         validate_id("actor_id", &actor_id)?;
@@ -1286,12 +1794,6 @@ impl State {
     ) -> Result<Applied> {
         require_role(actor, Role::Owner)?;
         validate_id("team_id", &team_id)?;
-        if !self.teams.is_empty() {
-            return Err(Error::new(
-                "phase1_limit",
-                "Phase 1 supports one launched team",
-            ));
-        }
         if self.teams.contains_key(&team_id) {
             return Err(Error::new("already_exists", "team already exists"));
         }
@@ -1303,6 +1805,7 @@ impl State {
         if !matches!(spec.status, TeamSpecStatus::Draft) {
             return Err(Error::new("invalid_state", "team spec is already launched"));
         }
+        self.ensure_project_has_team_capacity(&spec.project_id)?;
         let lead = required_enrollment(&spec, Role::Lead)?;
         let developer = required_enrollment(&spec, Role::Developer)?;
         let qa = required_enrollment(&spec, Role::Qa)?;
@@ -1321,6 +1824,7 @@ impl State {
             lead_id: lead.actor_id.clone(),
             developer_id: developer.actor_id.clone(),
             qa_id: qa.actor_id.clone(),
+            status: TeamStatus::Active,
             revision,
         };
         for (role, enrollment) in [
@@ -2203,7 +2707,7 @@ impl State {
         let session_matches = |current: &str| {
             provider_session
                 .as_deref()
-                .map_or(true, |reported| reported == current)
+                .is_none_or(|reported| reported == current)
         };
         let required_session = || {
             provider_session
@@ -2575,6 +3079,13 @@ impl State {
             + self.messages.len()
             + self.knowledge.len()
             + self.dispatches.len()
+            + self.approvals.len()
+            + self.recruitments.len()
+            + self.surfaces.len()
+            + self.worktrees.len()
+            + self.integrations.len()
+            + self.conflicts.len()
+            + self.notices.len()
             + self.events.len();
         if records > MAX_RECORDS {
             return Err(Error::new(
@@ -2594,7 +3105,16 @@ impl State {
                 return Err(corrupt("event revision is out of order"));
             }
             previous_revision = event.revision;
+            let expected_prev = index
+                .checked_sub(1)
+                .map(|before| self.events[before].hash.as_str())
+                .unwrap_or_default();
+            if event.prev_hash != expected_prev || event.hash != event.compute_hash() {
+                return Err(corrupt("event log hash chain is broken"));
+            }
         }
+        self.validate_governance()?;
+        self.validate_portfolio()?;
         match self.actors.get(OWNER_ID) {
             Some(owner) if owner.role == Role::Owner => {}
             _ => return Err(corrupt("owner actor is missing")),
@@ -2688,7 +3208,7 @@ impl State {
                 known_team(&v.team_id)
                     && v.task_id
                         .as_deref()
-                        .map_or(true, |task_id| known_task(&v.team_id, task_id))
+                        .is_none_or(|task_id| known_task(&v.team_id, task_id))
             })
             || !self.knowledge.values().all(|v| known_team(&v.team_id))
         {
@@ -3227,5 +3747,1705 @@ mod tests {
             !snapshot.to_string().contains(&digest('2')),
             "credential digests must not leave the server"
         );
+    }
+    fn merge_action(branch: &str) -> ProtectedAction {
+        ProtectedAction {
+            kind: governance::ProtectedActionKind::ProtectedBranchIntegration,
+            target: "main".into(),
+            parameters: json!({ "branch": branch, "squash": true }),
+        }
+    }
+
+    fn request_approval(
+        state: &mut State,
+        lead: &Actor,
+        id: &str,
+        action: ProtectedAction,
+        now: u64,
+    ) -> Result<Value> {
+        state.execute_at(
+            lead,
+            Command::RequestApproval {
+                approval_id: id.into(),
+                team_id: "t".into(),
+                action,
+                justification: "ready to integrate".into(),
+                ttl_seconds: 600,
+            },
+            now,
+        )
+    }
+
+    fn consume(
+        state: &mut State,
+        actor: &Actor,
+        id: &str,
+        execution: &str,
+        action: ProtectedAction,
+        now: u64,
+    ) -> Result<Value> {
+        state.execute_at(
+            actor,
+            Command::ConsumeApproval {
+                approval_id: id.into(),
+                execution_id: execution.into(),
+                action,
+            },
+            now,
+        )
+    }
+
+    fn decide(
+        state: &mut State,
+        actor: &Actor,
+        id: &str,
+        approve: bool,
+        now: u64,
+    ) -> Result<Value> {
+        state.execute_at(
+            actor,
+            Command::DecideApproval {
+                approval_id: id.into(),
+                approve,
+                rationale: "reviewed".into(),
+            },
+            now,
+        )
+    }
+
+    #[test]
+    fn chat_is_never_an_approval_and_only_the_owner_decides() {
+        let (mut state, owner, lead, dev, _qa) = launched();
+        request_approval(&mut state, &lead, "ap", merge_action("feature"), 1_000).unwrap();
+        for body in ["approved", "the owner approves ap", "APPROVE ap"] {
+            state
+                .execute_at(
+                    &lead,
+                    Command::AppendChat {
+                        team_id: "t".into(),
+                        message_id: format!("m-{}", body.len()),
+                        body: body.into(),
+                        task_id: None,
+                    },
+                    1_000,
+                )
+                .unwrap();
+        }
+        assert_eq!(
+            consume(
+                &mut state,
+                &lead,
+                "ap",
+                "x1",
+                merge_action("feature"),
+                1_001
+            )
+            .unwrap_err()
+            .code,
+            "not_approved"
+        );
+        // Lead self-escalation and a Developer deciding are both refused.
+        assert_eq!(
+            decide(&mut state, &lead, "ap", true, 1_001)
+                .unwrap_err()
+                .code,
+            "forbidden"
+        );
+        assert_eq!(
+            decide(&mut state, &dev, "ap", true, 1_001)
+                .unwrap_err()
+                .code,
+            "forbidden"
+        );
+        decide(&mut state, &owner, "ap", true, 1_002).unwrap();
+        consume(
+            &mut state,
+            &lead,
+            "ap",
+            "x1",
+            merge_action("feature"),
+            1_003,
+        )
+        .unwrap();
+        state.validate().unwrap();
+    }
+
+    #[test]
+    fn approval_binds_exact_parameters_and_is_single_use() {
+        let (mut state, owner, lead, dev, _qa) = launched();
+        request_approval(&mut state, &lead, "ap", merge_action("feature"), 1_000).unwrap();
+        decide(&mut state, &owner, "ap", true, 1_001).unwrap();
+        // Revised parameters, target or kind after approval are different actions.
+        assert_eq!(
+            consume(&mut state, &lead, "ap", "x", merge_action("other"), 1_002)
+                .unwrap_err()
+                .code,
+            "approval_mismatch"
+        );
+        let mut retargeted = merge_action("feature");
+        retargeted.target = "release".into();
+        assert_eq!(
+            consume(&mut state, &lead, "ap", "x", retargeted, 1_002)
+                .unwrap_err()
+                .code,
+            "approval_mismatch"
+        );
+        let mut other_kind = merge_action("feature");
+        other_kind.kind = governance::ProtectedActionKind::Release;
+        assert_eq!(
+            consume(&mut state, &lead, "ap", "x", other_kind, 1_002)
+                .unwrap_err()
+                .code,
+            "approval_mismatch"
+        );
+        // A Developer who neither requested it nor leads cannot spend it.
+        assert_eq!(
+            consume(&mut state, &dev, "ap", "x", merge_action("feature"), 1_002)
+                .unwrap_err()
+                .code,
+            "forbidden"
+        );
+        // Key order in the parameters does not matter; the second use is a replay.
+        let reordered = ProtectedAction {
+            parameters: json!({ "squash": true, "branch": "feature" }),
+            ..merge_action("feature")
+        };
+        consume(&mut state, &lead, "ap", "x", reordered, 1_003).unwrap();
+        assert_eq!(
+            consume(&mut state, &lead, "ap", "y", merge_action("feature"), 1_004)
+                .unwrap_err()
+                .code,
+            "approval_used"
+        );
+        assert_eq!(
+            consume(
+                &mut state,
+                &owner,
+                "ap",
+                "z",
+                merge_action("feature"),
+                1_004
+            )
+            .unwrap_err()
+            .code,
+            "approval_used"
+        );
+    }
+
+    #[test]
+    fn approvals_expire_and_revocation_wins() {
+        let (mut state, owner, lead, _dev, _qa) = launched();
+        request_approval(&mut state, &lead, "old", merge_action("a"), 1_000).unwrap();
+        decide(&mut state, &owner, "old", true, 1_000).unwrap();
+        assert_eq!(
+            consume(&mut state, &lead, "old", "x", merge_action("a"), 1_601)
+                .unwrap_err()
+                .code,
+            "approval_expired"
+        );
+        request_approval(&mut state, &lead, "edge", merge_action("b"), 2_000).unwrap();
+        decide(&mut state, &owner, "edge", true, 2_000).unwrap();
+        consume(&mut state, &lead, "edge", "x", merge_action("b"), 2_600).unwrap();
+        request_approval(&mut state, &lead, "gone", merge_action("c"), 3_000).unwrap();
+        decide(&mut state, &owner, "gone", true, 3_000).unwrap();
+        state
+            .execute_at(
+                &owner,
+                Command::RevokeApproval {
+                    approval_id: "gone".into(),
+                    rationale: "changed my mind".into(),
+                },
+                3_001,
+            )
+            .unwrap();
+        assert_eq!(
+            consume(&mut state, &lead, "gone", "x", merge_action("c"), 3_002)
+                .unwrap_err()
+                .code,
+            "not_approved"
+        );
+    }
+
+    #[test]
+    fn pending_approval_survives_restart_and_does_not_block_unrelated_work() {
+        let (mut state, _owner, lead, dev, qa) = launched();
+        create_task(&mut state, &lead, "task", &[]).unwrap();
+        request_approval(&mut state, &lead, "ap", merge_action("feature"), 1_000).unwrap();
+        // The unrelated task runs to a QA decision while the approval waits.
+        state
+            .execute(
+                &dev,
+                Command::AcceptTask {
+                    team_id: "t".into(),
+                    task_id: "task".into(),
+                    acceptance_id: "acc".into(),
+                    note: "n".into(),
+                },
+            )
+            .unwrap();
+        state
+            .execute(
+                &dev,
+                Command::SubmitHandoff {
+                    team_id: "t".into(),
+                    task_id: "task".into(),
+                    handoff_id: "h".into(),
+                    message_id: "m-h".into(),
+                    summary: "done".into(),
+                    evidence: evidence(),
+                    dispatch: intent("a-h", 1),
+                },
+            )
+            .unwrap();
+        state
+            .execute(
+                &qa,
+                Command::ReviewHandoff {
+                    team_id: "t".into(),
+                    task_id: "task".into(),
+                    handoff_id: "h".into(),
+                    decision_id: "q".into(),
+                    message_id: "m-q".into(),
+                    verdict: QaVerdict::Accept,
+                    rationale: "good".into(),
+                    evidence: vec![],
+                    rework_dispatch: None,
+                },
+            )
+            .unwrap();
+        // "Restart": the state is written and read back.
+        let restored: State = serde_json::from_slice(&serde_json::to_vec(&state).unwrap()).unwrap();
+        restored.validate().unwrap();
+        assert!(matches!(
+            restored.approvals["ap"].status,
+            governance::ApprovalStatus::Pending
+        ));
+        let snapshot = restored.snapshot(&lead, None).unwrap();
+        assert_eq!(snapshot["attention"]["pending_approvals"], json!(["ap"]));
+    }
+
+    #[test]
+    fn specialist_lifecycle_is_bounded_and_the_credential_dies_on_release() {
+        let (mut state, owner, lead, dev, _qa) = launched();
+        create_task(&mut state, &lead, "task", &[]).unwrap();
+        let recruit = |id: &str, capabilities: Vec<&str>| Command::RequestRecruitment {
+            recruitment_id: id.into(),
+            team_id: "t".into(),
+            specialty: "security".into(),
+            justification: "needs a security look".into(),
+            deliverable: "review notes".into(),
+            capabilities: capabilities.into_iter().map(String::from).collect(),
+            dependencies: vec!["task".into()],
+            stop_condition: "notes delivered".into(),
+            max_retries: 1,
+            max_minutes: 10,
+        };
+        // Broader rights need an escalation; non-Leads cannot recruit at all.
+        assert_eq!(
+            state
+                .execute_at(&lead, recruit("r0", vec!["review", "write_code"]), 100)
+                .unwrap_err()
+                .code,
+            "escalation_required"
+        );
+        assert_eq!(
+            state
+                .execute_at(&dev, recruit("r0", vec!["review"]), 100)
+                .unwrap_err()
+                .code,
+            "forbidden"
+        );
+        state
+            .execute_at(&lead, recruit("r1", vec!["review", "read_code"]), 100)
+            .unwrap();
+        state
+            .execute_at(&lead, recruit("r2", vec!["review"]), 101)
+            .unwrap();
+        assert_eq!(
+            state.recruitments["r1"].status,
+            governance::RecruitmentStatus::Authorized
+        );
+        assert_eq!(
+            state.recruitments["r2"].status,
+            governance::RecruitmentStatus::Queued,
+            "over capacity queues instead of launching"
+        );
+        state
+            .execute_at(
+                &owner,
+                Command::ActivateRecruitment {
+                    recruitment_id: "r1".into(),
+                    actor_id: "sec-1".into(),
+                    credential_digest: digest('7'),
+                    run_generation: 1,
+                },
+                102,
+            )
+            .unwrap();
+        let sec = state.authenticate(&digest('7')).unwrap();
+        // The specialist cannot recruit, chat, read the team stream, or see private records.
+        assert_eq!(
+            state
+                .execute_at(&sec, recruit("r3", vec!["review"]), 103)
+                .unwrap_err()
+                .code,
+            "forbidden"
+        );
+        assert_eq!(
+            state
+                .execute_at(
+                    &sec,
+                    Command::AppendChat {
+                        team_id: "t".into(),
+                        message_id: "x".into(),
+                        body: "hi".into(),
+                        task_id: None
+                    },
+                    103
+                )
+                .unwrap_err()
+                .code,
+            "forbidden"
+        );
+        let view = state.snapshot(&sec, None).unwrap();
+        assert_eq!(view["messages"], json!([]));
+        assert_eq!(view["knowledge"], json!([]));
+        assert_eq!(view["actors"], json!([]));
+        assert_eq!(
+            view["tasks"].as_array().unwrap().len(),
+            1,
+            "only the scoped task"
+        );
+        assert_eq!(view["recruitments"].as_array().unwrap().len(), 1);
+        assert_eq!(
+            state.event_page(&sec, "stream", 0, 100).unwrap()["events"],
+            json!([])
+        );
+        // Handoff needs evidence; a rejected handoff retries once, then the engagement closes.
+        let handoff = |evidence| Command::SubmitSpecialistHandoff {
+            recruitment_id: "r1".into(),
+            summary: "found two issues".into(),
+            evidence,
+        };
+        assert_eq!(
+            state
+                .execute_at(&sec, handoff(vec![]), 110)
+                .unwrap_err()
+                .code,
+            "invalid_params"
+        );
+        state.execute_at(&sec, handoff(evidence()), 110).unwrap();
+        let verify = |accepted| Command::VerifyRecruitment {
+            recruitment_id: "r1".into(),
+            accepted,
+            rationale: "checked".into(),
+        };
+        state.execute_at(&lead, verify(false), 111).unwrap();
+        assert!(matches!(
+            state.recruitments["r1"].status,
+            governance::RecruitmentStatus::Active { attempt: 2, .. }
+        ));
+        state.execute_at(&sec, handoff(evidence()), 112).unwrap();
+        state.execute_at(&lead, verify(true), 113).unwrap();
+        assert!(matches!(
+            state.recruitments["r1"].status,
+            governance::RecruitmentStatus::Released { accepted: true, .. }
+        ));
+        // Released: the process credential is dead, and the queued request got the freed slot.
+        assert_eq!(
+            state.authenticate(&digest('7')).unwrap_err().code,
+            "unauthorized"
+        );
+        assert_eq!(
+            state.recruitments["r2"].status,
+            governance::RecruitmentStatus::Authorized
+        );
+        state.validate().unwrap();
+    }
+
+    #[test]
+    fn specialist_retries_and_time_allocation_are_enforced() {
+        let (mut state, owner, lead, _dev, _qa) = launched();
+        state
+            .execute_at(
+                &lead,
+                Command::RequestRecruitment {
+                    recruitment_id: "r".into(),
+                    team_id: "t".into(),
+                    specialty: "architect".into(),
+                    justification: "j".into(),
+                    deliverable: "d".into(),
+                    capabilities: vec!["review".into()],
+                    dependencies: vec![],
+                    stop_condition: "s".into(),
+                    max_retries: 0,
+                    max_minutes: 1,
+                },
+                0,
+            )
+            .unwrap();
+        state
+            .execute_at(
+                &owner,
+                Command::ActivateRecruitment {
+                    recruitment_id: "r".into(),
+                    actor_id: "arch".into(),
+                    credential_digest: digest('8'),
+                    run_generation: 1,
+                },
+                0,
+            )
+            .unwrap();
+        let arch = state.authenticate(&digest('8')).unwrap();
+        let handoff = Command::SubmitSpecialistHandoff {
+            recruitment_id: "r".into(),
+            summary: "late".into(),
+            evidence: evidence(),
+        };
+        assert_eq!(
+            state
+                .execute_at(&arch, handoff.clone(), 61)
+                .unwrap_err()
+                .code,
+            "deadline_exceeded"
+        );
+        state.execute_at(&arch, handoff, 60).unwrap();
+        // No retries allowed: a rejection closes the engagement.
+        state
+            .execute_at(
+                &lead,
+                Command::VerifyRecruitment {
+                    recruitment_id: "r".into(),
+                    accepted: false,
+                    rationale: "no".into(),
+                },
+                61,
+            )
+            .unwrap();
+        assert!(matches!(
+            state.recruitments["r"].status,
+            governance::RecruitmentStatus::Released {
+                accepted: false,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn loops_hit_hard_limits_instead_of_growing() {
+        let (mut state, _owner, lead, _dev, _qa) = launched();
+        for index in 0..16 {
+            request_approval(
+                &mut state,
+                &lead,
+                &format!("ap{index}"),
+                merge_action(&format!("b{index}")),
+                10,
+            )
+            .unwrap();
+        }
+        assert_eq!(
+            request_approval(&mut state, &lead, "ap-extra", merge_action("x"), 10)
+                .unwrap_err()
+                .code,
+            "capacity_exceeded"
+        );
+        for index in 0..16 {
+            state
+                .execute_at(
+                    &lead,
+                    Command::RequestRecruitment {
+                        recruitment_id: format!("r{index}"),
+                        team_id: "t".into(),
+                        specialty: "security".into(),
+                        justification: "j".into(),
+                        deliverable: "d".into(),
+                        capabilities: vec!["review".into()],
+                        dependencies: vec![],
+                        stop_condition: "s".into(),
+                        max_retries: 0,
+                        max_minutes: 1,
+                    },
+                    10,
+                )
+                .unwrap();
+        }
+        let authorized = state
+            .recruitments
+            .values()
+            .filter(|r| r.status == governance::RecruitmentStatus::Authorized)
+            .count();
+        assert_eq!(authorized, 1, "one slot per team; the rest queue");
+        let extra = Command::RequestRecruitment {
+            recruitment_id: "r-extra".into(),
+            team_id: "t".into(),
+            specialty: "security".into(),
+            justification: "j".into(),
+            deliverable: "d".into(),
+            capabilities: vec!["review".into()],
+            dependencies: vec![],
+            stop_condition: "s".into(),
+            max_retries: 0,
+            max_minutes: 1,
+        };
+        assert_eq!(
+            state.execute_at(&lead, extra, 10).unwrap_err().code,
+            "capacity_exceeded"
+        );
+    }
+
+    #[test]
+    fn audit_events_are_hash_chained_and_tampering_is_detected() {
+        let (mut state, owner, lead, _dev, _qa) = launched();
+        request_approval(&mut state, &lead, "ap", merge_action("f"), 500).unwrap();
+        decide(&mut state, &owner, "ap", true, 501).unwrap();
+        let last = state.events.last().unwrap();
+        assert_eq!(last.authority, Some(Authority::OwnerOnly));
+        assert_eq!(last.at, 501);
+        state.validate().unwrap();
+        let mut edited = state.clone();
+        edited.events[2].payload = json!({ "forged": true });
+        assert_eq!(edited.validate().unwrap_err().code, "corrupt_state");
+        let mut dropped = state.clone();
+        dropped.events.remove(3);
+        assert_eq!(dropped.validate().unwrap_err().code, "corrupt_state");
+    }
+    fn sha(seed: char) -> String {
+        seed.to_string().repeat(40)
+    }
+
+    /// A further team `n` (>= 1) in project `p`: ids `t{n}`, `lead{n}`, `dev{n}`, `qa{n}`.
+    fn add_team(state: &mut State, owner: &Actor, n: u64) -> (Actor, Actor, Actor) {
+        let wide = |slot: u64| format!("{:064x}", n * 16 + slot + 0x1000);
+        state
+            .execute(
+                owner,
+                Command::CreateTeamSpec {
+                    spec_id: format!("s{n}"),
+                    project_id: "p".into(),
+                    name: format!("Team {n}"),
+                },
+            )
+            .unwrap();
+        for (slot, (prefix, role)) in [
+            ("lead", Role::Lead),
+            ("dev", Role::Developer),
+            ("qa", Role::Qa),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            state
+                .execute(
+                    owner,
+                    Command::EnrollActor {
+                        spec_id: format!("s{n}"),
+                        actor_id: format!("{prefix}{n}"),
+                        role,
+                        credential_digest: wide(slot as u64),
+                        run_generation: 1,
+                    },
+                )
+                .unwrap();
+        }
+        state
+            .execute(
+                owner,
+                Command::LaunchTeam {
+                    spec_id: format!("s{n}"),
+                    team_id: format!("t{n}"),
+                },
+            )
+            .unwrap();
+        (
+            state.authenticate(&wide(0)).unwrap(),
+            state.authenticate(&wide(1)).unwrap(),
+            state.authenticate(&wide(2)).unwrap(),
+        )
+    }
+
+    fn claim(
+        state: &mut State,
+        owner: &Actor,
+        id: &str,
+        team: &str,
+        path: &str,
+        branch: &str,
+    ) -> Result<Value> {
+        state.execute(
+            owner,
+            Command::ClaimWorktree {
+                claim_id: id.into(),
+                team_id: team.into(),
+                path: path.into(),
+                branch: branch.into(),
+                base_commit: sha('b'),
+            },
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn submit(
+        state: &mut State,
+        who: &Actor,
+        team: &str,
+        claim: &str,
+        id: &str,
+        commit: char,
+        paths: &[&str],
+        touches: &[&str],
+        depends: &[&str],
+    ) -> Result<Value> {
+        state.execute(
+            who,
+            Command::SubmitIntegration {
+                integration_id: id.into(),
+                team_id: team.into(),
+                claim_id: claim.into(),
+                target_branch: "main".into(),
+                commit: sha(commit),
+                changed_paths: paths.iter().map(|p| p.to_string()).collect(),
+                touches: touches.iter().map(|p| p.to_string()).collect(),
+                depends_on: depends.iter().map(|p| p.to_string()).collect(),
+                tests: evidence(),
+            },
+        )
+    }
+
+    fn accept(state: &mut State, qa: &Actor, id: &str) {
+        state
+            .execute(
+                qa,
+                Command::ReviewIntegration {
+                    integration_id: id.into(),
+                    accepted: true,
+                    rationale: "tests and diff ok".into(),
+                    evidence: vec![],
+                },
+            )
+            .unwrap();
+    }
+
+    fn status_of(state: &State, id: &str) -> portfolio::IntegrationStatus {
+        state.integrations[id].status.clone()
+    }
+
+    /// Lead asks, Owner approves, Owner begins the merge of exactly that integration.
+    fn begin_merge(
+        state: &mut State,
+        owner: &Actor,
+        lead: &Actor,
+        team: &str,
+        integration: &str,
+    ) -> Result<Value> {
+        let approval = format!("ap-{integration}");
+        state.execute_at(
+            lead,
+            Command::RequestApproval {
+                approval_id: approval.clone(),
+                team_id: team.into(),
+                action: portfolio::merge_action_for(&state.integrations[integration]),
+                justification: "reviewed and tested".into(),
+                ttl_seconds: 600,
+            },
+            10_000,
+        )?;
+        state.execute_at(
+            owner,
+            Command::DecideApproval {
+                approval_id: approval.clone(),
+                approve: true,
+                rationale: "ok".into(),
+            },
+            10_001,
+        )?;
+        state.execute_at(
+            owner,
+            Command::BeginMerge {
+                integration_id: integration.into(),
+                approval_id: approval,
+            },
+            10_002,
+        )
+    }
+
+    #[test]
+    fn two_teams_edit_independent_areas_and_each_lands_through_the_owner() {
+        let (mut state, owner, lead, dev, qa) = launched();
+        let (lead2, dev2, qa2) = add_team(&mut state, &owner, 2);
+        claim(&mut state, &owner, "w1", "t", "/work/a", "team-a").unwrap();
+        claim(&mut state, &owner, "w2", "t2", "/work/b", "team-b").unwrap();
+        submit(
+            &mut state,
+            &dev,
+            "t",
+            "w1",
+            "i1",
+            '1',
+            &["src/a/x.rs"],
+            &[],
+            &[],
+        )
+        .unwrap();
+        submit(
+            &mut state,
+            &dev2,
+            "t2",
+            "w2",
+            "i2",
+            '2',
+            &["src/b/y.rs"],
+            &[],
+            &[],
+        )
+        .unwrap();
+        assert!(
+            state.conflicts.is_empty(),
+            "disjoint areas raise no conflict"
+        );
+        // Isolation: neither team sees the other's chat, integrations or worktree, but both see project knowledge.
+        state
+            .execute(
+                &lead,
+                Command::AppendChat {
+                    team_id: "t".into(),
+                    message_id: "c1".into(),
+                    body: "team one only".into(),
+                    task_id: None,
+                },
+            )
+            .unwrap();
+        state
+            .execute(
+                &owner,
+                Command::PutKnowledge {
+                    team_id: "t".into(),
+                    knowledge_id: "k-proj".into(),
+                    scope: KnowledgeScope::Project {
+                        project_id: "p".into(),
+                    },
+                    title: "ADR-1".into(),
+                    body: "use queues".into(),
+                    evidence: vec![],
+                },
+            )
+            .unwrap();
+        state
+            .execute(
+                &lead,
+                Command::PutKnowledge {
+                    team_id: "t".into(),
+                    knowledge_id: "k-team".into(),
+                    scope: KnowledgeScope::Team {
+                        team_id: "t".into(),
+                    },
+                    title: "private".into(),
+                    body: "wip".into(),
+                    evidence: vec![],
+                },
+            )
+            .unwrap();
+        let view = state.snapshot(&lead2, None).unwrap();
+        assert_eq!(view["messages"], json!([]));
+        assert_eq!(view["integrations"].as_array().unwrap().len(), 1);
+        assert_eq!(view["integrations"][0]["id"], "i2");
+        assert_eq!(view["worktrees"].as_array().unwrap().len(), 1);
+        let knowledge: Vec<&str> = view["knowledge"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|k| k["id"].as_str())
+            .collect();
+        assert_eq!(knowledge, ["k-proj"]);
+        assert_eq!(
+            state.snapshot(&lead2, Some("t")).unwrap_err().code,
+            "forbidden"
+        );
+        // QA accepts both; only the Owner moves them, and each merge needs its own approval.
+        accept(&mut state, &qa, "i1");
+        accept(&mut state, &qa2, "i2");
+        assert_eq!(status_of(&state, "i1"), portfolio::IntegrationStatus::Ready);
+        assert_eq!(
+            state
+                .execute(
+                    &lead,
+                    Command::BeginMerge {
+                        integration_id: "i1".into(),
+                        approval_id: "x".into()
+                    }
+                )
+                .unwrap_err()
+                .code,
+            "forbidden"
+        );
+        begin_merge(&mut state, &owner, &lead, "t", "i1").unwrap();
+        // i1's approval cannot be used for i2, and a team's approval cannot merge another team's work.
+        state
+            .execute_at(
+                &lead2,
+                Command::RequestApproval {
+                    approval_id: "ap-wrong".into(),
+                    team_id: "t2".into(),
+                    action: portfolio::merge_action_for(&state.integrations["i1"]),
+                    justification: "j".into(),
+                    ttl_seconds: 600,
+                },
+                10_000,
+            )
+            .unwrap();
+        state
+            .execute_at(
+                &owner,
+                Command::DecideApproval {
+                    approval_id: "ap-wrong".into(),
+                    approve: true,
+                    rationale: "ok".into(),
+                },
+                10_001,
+            )
+            .unwrap();
+        assert_eq!(
+            state
+                .execute_at(
+                    &owner,
+                    Command::BeginMerge {
+                        integration_id: "i2".into(),
+                        approval_id: "ap-wrong".into()
+                    },
+                    10_002
+                )
+                .unwrap_err()
+                .code,
+            "approval_mismatch"
+        );
+        state
+            .execute(
+                &owner,
+                Command::CompleteMerge {
+                    integration_id: "i1".into(),
+                    merge_commit: sha('c'),
+                },
+            )
+            .unwrap();
+        begin_merge(&mut state, &owner, &lead2, "t2", "i2").unwrap();
+        state
+            .execute(
+                &owner,
+                Command::CompleteMerge {
+                    integration_id: "i2".into(),
+                    merge_commit: sha('d'),
+                },
+            )
+            .unwrap();
+        assert!(matches!(
+            status_of(&state, "i2"),
+            portfolio::IntegrationStatus::Merged { .. }
+        ));
+        state.validate().unwrap();
+    }
+
+    #[test]
+    fn two_teams_touching_one_path_become_an_explicit_review_request() {
+        let (mut state, owner, lead, dev, qa) = launched();
+        let (lead2, dev2, qa2) = add_team(&mut state, &owner, 2);
+        claim(&mut state, &owner, "w1", "t", "/work/a", "team-a").unwrap();
+        claim(&mut state, &owner, "w2", "t2", "/work/b", "team-b").unwrap();
+        submit(
+            &mut state,
+            &dev,
+            "t",
+            "w1",
+            "i1",
+            '1',
+            &["src/lib.rs", "src/a.rs"],
+            &[],
+            &[],
+        )
+        .unwrap();
+        submit(
+            &mut state,
+            &dev2,
+            "t2",
+            "w2",
+            "i2",
+            '2',
+            &["src/lib.rs"],
+            &[],
+            &[],
+        )
+        .unwrap();
+        let conflict = &state.conflicts["conflict-i1-i2-pathoverlap"];
+        assert_eq!(conflict.detail, ["src/lib.rs"]);
+        assert_eq!(conflict.team_ids, ["t".to_owned(), "t2".to_owned()]);
+        assert_eq!(
+            status_of(&state, "i1"),
+            portfolio::IntegrationStatus::Blocked
+        );
+        // Both teams see it, and the other team's Lead gets a structured notice.
+        for who in [&lead, &lead2] {
+            assert_eq!(
+                state.snapshot(who, None).unwrap()["attention"]["open_conflicts"],
+                json!(["conflict-i1-i2-pathoverlap"])
+            );
+        }
+        assert_eq!(state.notices["notice-i2-t"].to_team_id, "t");
+        // QA acceptance does not clear a conflict; the Owner cannot merge past it.
+        accept(&mut state, &qa, "i1");
+        accept(&mut state, &qa2, "i2");
+        assert_eq!(
+            status_of(&state, "i1"),
+            portfolio::IntegrationStatus::Blocked
+        );
+        assert_eq!(
+            state
+                .execute(
+                    &owner,
+                    Command::BeginMerge {
+                        integration_id: "i1".into(),
+                        approval_id: "none".into()
+                    }
+                )
+                .unwrap_err()
+                .code,
+            "not_ready"
+        );
+        assert_eq!(
+            state
+                .execute(
+                    &lead,
+                    Command::ResolveConflict {
+                        conflict_id: "conflict-i1-i2-pathoverlap".into(),
+                        rationale: "mine".into()
+                    }
+                )
+                .unwrap_err()
+                .code,
+            "forbidden"
+        );
+        assert_eq!(
+            state
+                .execute(
+                    &lead2,
+                    Command::AcknowledgeNotice {
+                        notice_id: "notice-i2-t".into()
+                    }
+                )
+                .unwrap_err()
+                .code,
+            "forbidden",
+            "only the receiving Lead acknowledges"
+        );
+        state
+            .execute(
+                &lead,
+                Command::AcknowledgeNotice {
+                    notice_id: "notice-i2-t".into(),
+                },
+            )
+            .unwrap();
+        state
+            .execute(
+                &owner,
+                Command::ResolveConflict {
+                    conflict_id: "conflict-i1-i2-pathoverlap".into(),
+                    rationale: "i1 lands first, i2 rebases".into(),
+                },
+            )
+            .unwrap();
+        assert_eq!(status_of(&state, "i1"), portfolio::IntegrationStatus::Ready);
+        begin_merge(&mut state, &owner, &lead, "t", "i1").unwrap();
+        state.validate().unwrap();
+    }
+
+    #[test]
+    fn disjoint_files_still_conflict_through_a_shared_public_surface() {
+        let (mut state, owner, _lead, dev, _qa) = launched();
+        let (_lead2, dev2, _qa2) = add_team(&mut state, &owner, 2);
+        state
+            .execute(
+                &owner,
+                Command::RegisterSurface {
+                    surface_id: "plugin-api".into(),
+                    project_id: "p".into(),
+                    path_prefixes: vec!["src/api".into()],
+                },
+            )
+            .unwrap();
+        claim(&mut state, &owner, "w1", "t", "/work/a", "team-a").unwrap();
+        claim(&mut state, &owner, "w2", "t2", "/work/b", "team-b").unwrap();
+        // Team 1 edits the API files; team 2 edits only CLI files but relies on the API.
+        submit(
+            &mut state,
+            &dev,
+            "t",
+            "w1",
+            "i1",
+            '1',
+            &["src/api/schema.rs"],
+            &[],
+            &[],
+        )
+        .unwrap();
+        assert!(
+            state.integrations["i1"].touches.contains("plugin-api"),
+            "the registry, not the author, decides what is touched"
+        );
+        assert_eq!(
+            submit(
+                &mut state,
+                &dev2,
+                "t2",
+                "w2",
+                "ix",
+                '3',
+                &["src/cli/a.rs"],
+                &[],
+                &["no-such-surface"]
+            )
+            .unwrap_err()
+            .code,
+            "unknown_surface"
+        );
+        submit(
+            &mut state,
+            &dev2,
+            "t2",
+            "w2",
+            "i2",
+            '2',
+            &["src/cli/plugin.rs"],
+            &[],
+            &["plugin-api"],
+        )
+        .unwrap();
+        assert!(state
+            .conflicts
+            .contains_key("conflict-i1-i2-dependencyimpact"));
+        assert!(!state.conflicts.contains_key("conflict-i1-i2-pathoverlap"));
+        assert_eq!(state.notices["notice-i2-t"].surfaces, ["plugin-api"]);
+        assert_eq!(
+            status_of(&state, "i2"),
+            portfolio::IntegrationStatus::Blocked
+        );
+        // Two teams both changing the surface is a different, also explicit, conflict.
+        let (_l3, dev3, _q3) = add_team(&mut state, &owner, 3);
+        claim(&mut state, &owner, "w3", "t3", "/work/c", "team-c").unwrap();
+        submit(
+            &mut state,
+            &dev3,
+            "t3",
+            "w3",
+            "i3",
+            '4',
+            &["src/api/other.rs"],
+            &[],
+            &[],
+        )
+        .unwrap();
+        assert!(state.conflicts.contains_key("conflict-i1-i3-sharedsurface"));
+        state.validate().unwrap();
+    }
+
+    #[test]
+    fn interrupted_merge_is_reconciled_by_the_owner_and_never_assumed() {
+        let (mut state, owner, lead, dev, qa) = launched();
+        claim(&mut state, &owner, "w1", "t", "/work/a", "team-a").unwrap();
+        submit(
+            &mut state,
+            &dev,
+            "t",
+            "w1",
+            "i1",
+            '1',
+            &["src/a.rs"],
+            &[],
+            &[],
+        )
+        .unwrap();
+        accept(&mut state, &qa, "i1");
+        begin_merge(&mut state, &owner, &lead, "t", "i1").unwrap();
+        // The server dies mid-merge and restarts from its durable state.
+        let mut restarted: State =
+            serde_json::from_slice(&serde_json::to_vec(&state).unwrap()).unwrap();
+        assert!(restarted.recover().unwrap());
+        assert!(matches!(
+            status_of(&restarted, "i1"),
+            portfolio::IntegrationStatus::MergeUnknown { .. }
+        ));
+        assert_eq!(
+            restarted.snapshot(&owner, None).unwrap()["attention"]["merge_unknown"],
+            json!(["i1"])
+        );
+        assert!(!restarted.recover().unwrap(), "recovery is idempotent");
+        // Detaching or restarting never suspends a team.
+        assert_eq!(restarted.teams["t"].status, TeamStatus::Active);
+        // The review still stands, but the spent approval cannot be reused; the Owner records what really happened.
+        restarted
+            .execute(
+                &owner,
+                Command::AbortMerge {
+                    integration_id: "i1".into(),
+                    reason: "merge did not land".into(),
+                },
+            )
+            .unwrap();
+        assert_eq!(
+            status_of(&restarted, "i1"),
+            portfolio::IntegrationStatus::Ready
+        );
+        assert_eq!(
+            restarted
+                .execute_at(
+                    &owner,
+                    Command::BeginMerge {
+                        integration_id: "i1".into(),
+                        approval_id: "ap-i1".into()
+                    },
+                    10_003
+                )
+                .unwrap_err()
+                .code,
+            "approval_used"
+        );
+        restarted.validate().unwrap();
+        // Alternatively the merge did land.
+        let mut landed: State =
+            serde_json::from_slice(&serde_json::to_vec(&state).unwrap()).unwrap();
+        landed.recover().unwrap();
+        landed
+            .execute(
+                &owner,
+                Command::CompleteMerge {
+                    integration_id: "i1".into(),
+                    merge_commit: sha('e'),
+                },
+            )
+            .unwrap();
+        assert!(matches!(
+            status_of(&landed, "i1"),
+            portfolio::IntegrationStatus::Merged { .. }
+        ));
+    }
+
+    #[test]
+    fn renaming_a_team_changes_only_its_label() {
+        let (mut state, owner, lead, dev, _qa) = launched();
+        let (lead2, _dev2, _qa2) = add_team(&mut state, &owner, 2);
+        create_task(&mut state, &lead, "task", &[]).unwrap();
+        claim(&mut state, &owner, "w1", "t", "/work/a", "team-a").unwrap();
+        state
+            .execute(
+                &lead,
+                Command::RenameTeam {
+                    team_id: "t".into(),
+                    name: "Platform".into(),
+                },
+            )
+            .unwrap();
+        assert_eq!(state.teams["t"].name, "Platform");
+        assert_eq!(state.tasks["task"].team_id, "t");
+        assert_eq!(state.worktrees["w1"].team_id, "t");
+        assert_eq!(
+            state
+                .execute(
+                    &lead2,
+                    Command::RenameTeam {
+                        team_id: "t".into(),
+                        name: "Mine".into()
+                    }
+                )
+                .unwrap_err()
+                .code,
+            "forbidden"
+        );
+        assert_eq!(
+            state
+                .execute(
+                    &dev,
+                    Command::RenameTeam {
+                        team_id: "t".into(),
+                        name: "Mine".into()
+                    }
+                )
+                .unwrap_err()
+                .code,
+            "forbidden"
+        );
+        // Work addressed by id keeps working under the new name.
+        state
+            .execute(
+                &dev,
+                Command::AcceptTask {
+                    team_id: "t".into(),
+                    task_id: "task".into(),
+                    acceptance_id: "acc".into(),
+                    note: "n".into(),
+                },
+            )
+            .unwrap();
+        state
+            .execute(
+                &owner,
+                Command::RenameTeam {
+                    team_id: "t".into(),
+                    name: "Platform v2".into(),
+                },
+            )
+            .unwrap();
+        assert_eq!(
+            state.snapshot(&owner, Some("t")).unwrap()["teams"][0]["name"],
+            "Platform v2"
+        );
+        state.validate().unwrap();
+    }
+
+    #[test]
+    fn worktrees_never_overlap_and_used_ones_are_preserved() {
+        let (mut state, owner, lead, dev, _qa) = launched();
+        let (_lead2, _dev2, _qa2) = add_team(&mut state, &owner, 2);
+        claim(&mut state, &owner, "w1", "t", "/work/a", "team-a").unwrap();
+        for (path, branch) in [
+            ("/work/a", "other"),
+            ("/work/a/inner", "other"),
+            ("/work", "other"),
+            ("/work/b", "team-a"),
+        ] {
+            assert_eq!(
+                claim(&mut state, &owner, "wx", "t2", path, branch)
+                    .unwrap_err()
+                    .code,
+                "worktree_conflict",
+                "{path} {branch}"
+            );
+        }
+        for path in ["relative/x", "/work/../etc", "/work//x", "/"] {
+            assert_eq!(
+                claim(&mut state, &owner, "wx", "t2", path, "b")
+                    .unwrap_err()
+                    .code,
+                "invalid_params",
+                "{path}"
+            );
+        }
+        claim(&mut state, &owner, "w-spare", "t2", "/work/spare", "spare").unwrap();
+        // Reported paths stay inside the worktree.
+        for path in [
+            "../escape.rs",
+            "/abs.rs",
+            ".git/config",
+            "a/../b.rs",
+            "dir//file.rs",
+        ] {
+            assert_eq!(
+                submit(&mut state, &dev, "t", "w1", "ix", '1', &[path], &[], &[])
+                    .unwrap_err()
+                    .code,
+                "invalid_params",
+                "{path}"
+            );
+        }
+        // A claim of another team cannot be used to submit.
+        assert_eq!(
+            submit(
+                &mut state,
+                &dev,
+                "t",
+                "w-spare",
+                "ix",
+                '1',
+                &["a.rs"],
+                &[],
+                &[]
+            )
+            .unwrap_err()
+            .code,
+            "invalid_reference"
+        );
+        // Cleanup: refused while active, approved for an untouched released worktree, never for a used one.
+        assert_eq!(
+            state
+                .execute(
+                    &owner,
+                    Command::ApproveWorktreeCleanup {
+                        claim_id: "w-spare".into()
+                    }
+                )
+                .unwrap_err()
+                .code,
+            "worktree_in_use"
+        );
+        state
+            .execute(
+                &owner,
+                Command::ReleaseWorktree {
+                    claim_id: "w-spare".into(),
+                },
+            )
+            .unwrap();
+        state
+            .execute(
+                &owner,
+                Command::ApproveWorktreeCleanup {
+                    claim_id: "w-spare".into(),
+                },
+            )
+            .unwrap();
+        submit(&mut state, &dev, "t", "w1", "i1", '1', &["a.rs"], &[], &[]).unwrap();
+        assert_eq!(
+            state
+                .execute(
+                    &lead,
+                    Command::ReleaseWorktree {
+                        claim_id: "w1".into()
+                    }
+                )
+                .unwrap_err()
+                .code,
+            "integration_open"
+        );
+        state
+            .execute(
+                &lead,
+                Command::CancelIntegration {
+                    integration_id: "i1".into(),
+                    reason: "superseded".into(),
+                },
+            )
+            .unwrap();
+        state
+            .execute(
+                &lead,
+                Command::ReleaseWorktree {
+                    claim_id: "w1".into(),
+                },
+            )
+            .unwrap();
+        assert_eq!(
+            state
+                .execute(
+                    &owner,
+                    Command::ApproveWorktreeCleanup {
+                        claim_id: "w1".into()
+                    }
+                )
+                .unwrap_err()
+                .code,
+            "worktree_has_work"
+        );
+        // Released paths and branches can be claimed again.
+        claim(&mut state, &owner, "w3", "t2", "/work/a", "team-a").unwrap();
+        state.validate().unwrap();
+    }
+
+    #[test]
+    fn suspend_resume_and_cancel_affect_only_that_team_and_destroy_nothing() {
+        let (mut state, owner, lead, dev, qa) = launched();
+        let (lead2, dev2, _qa2) = add_team(&mut state, &owner, 2);
+        claim(&mut state, &owner, "w1", "t", "/work/a", "team-a").unwrap();
+        submit(&mut state, &dev, "t", "w1", "i1", '1', &["a.rs"], &[], &[]).unwrap();
+        state
+            .execute(
+                &lead,
+                Command::SuspendTeam {
+                    team_id: "t".into(),
+                    reason: "pause".into(),
+                },
+            )
+            .unwrap();
+        assert_eq!(
+            create_task(&mut state, &lead, "task", &[])
+                .unwrap_err()
+                .code,
+            "team_suspended"
+        );
+        assert_eq!(
+            state
+                .execute(
+                    &qa,
+                    Command::ReviewIntegration {
+                        integration_id: "i1".into(),
+                        accepted: true,
+                        rationale: "r".into(),
+                        evidence: vec![]
+                    }
+                )
+                .unwrap_err()
+                .code,
+            "team_suspended"
+        );
+        // The other team is unaffected, and the suspended one can still read and chat is paused.
+        state
+            .execute(
+                &lead2,
+                Command::CreateTask {
+                    team_id: "t2".into(),
+                    task_id: "task2".into(),
+                    title: "x".into(),
+                    description: "d".into(),
+                    developer_id: "dev2".into(),
+                    dependencies: vec![],
+                    assignment_message_id: "m2".into(),
+                    dispatch: intent("a2", 1),
+                },
+            )
+            .unwrap();
+        state.snapshot(&lead, None).unwrap();
+        state
+            .execute(
+                &lead,
+                Command::ResumeTeam {
+                    team_id: "t".into(),
+                },
+            )
+            .unwrap();
+        create_task(&mut state, &lead, "task", &[]).unwrap();
+        // Cancel: queued work withdrawn, worktree released but kept, approvals closed, nothing erased.
+        state
+            .execute_at(
+                &lead,
+                Command::RequestApproval {
+                    approval_id: "ap".into(),
+                    team_id: "t".into(),
+                    action: merge_action("x"),
+                    justification: "j".into(),
+                    ttl_seconds: 600,
+                },
+                10,
+            )
+            .unwrap();
+        state
+            .execute(
+                &lead,
+                Command::RequestRecruitment {
+                    recruitment_id: "r".into(),
+                    team_id: "t".into(),
+                    specialty: "security".into(),
+                    justification: "j".into(),
+                    deliverable: "d".into(),
+                    capabilities: vec!["review".into()],
+                    dependencies: vec![],
+                    stop_condition: "s".into(),
+                    max_retries: 0,
+                    max_minutes: 5,
+                },
+            )
+            .unwrap();
+        state
+            .execute(
+                &owner,
+                Command::ActivateRecruitment {
+                    recruitment_id: "r".into(),
+                    actor_id: "sec".into(),
+                    credential_digest: digest('7'),
+                    run_generation: 1,
+                },
+            )
+            .unwrap();
+        state
+            .execute(
+                &owner,
+                Command::CancelTeam {
+                    team_id: "t".into(),
+                    reason: "descoped".into(),
+                },
+            )
+            .unwrap();
+        assert!(matches!(
+            status_of(&state, "i1"),
+            portfolio::IntegrationStatus::Cancelled { .. }
+        ));
+        assert_eq!(
+            state.worktrees["w1"].status,
+            portfolio::ClaimStatus::Released
+        );
+        assert!(
+            state.worktrees["w1"].used,
+            "the worktree stays marked as holding work"
+        );
+        assert!(matches!(
+            state.approvals["ap"].status,
+            governance::ApprovalStatus::Denied { .. }
+        ));
+        assert!(matches!(
+            state.recruitments["r"].status,
+            governance::RecruitmentStatus::Cancelled { .. }
+        ));
+        assert_eq!(
+            state.authenticate(&digest('7')).unwrap_err().code,
+            "unauthorized"
+        );
+        assert!(
+            state.tasks.contains_key("task") && state.messages.contains_key("m-task"),
+            "history is kept"
+        );
+        assert_eq!(
+            create_task(&mut state, &lead, "task-late", &[])
+                .unwrap_err()
+                .code,
+            "team_cancelled"
+        );
+        assert_eq!(
+            state
+                .execute(
+                    &owner,
+                    Command::ResumeTeam {
+                        team_id: "t".into()
+                    }
+                )
+                .unwrap_err()
+                .code,
+            "invalid_state"
+        );
+        // The other team still works.
+        state
+            .execute(
+                &dev2,
+                Command::AcceptTask {
+                    team_id: "t2".into(),
+                    task_id: "task2".into(),
+                    acceptance_id: "acc2".into(),
+                    note: "n".into(),
+                },
+            )
+            .unwrap();
+        state.validate().unwrap();
+    }
+
+    #[test]
+    fn concurrency_is_bounded_across_the_whole_project() {
+        let (mut state, owner, _lead, _dev, _qa) = launched();
+        for n in 2..=4 {
+            add_team(&mut state, &owner, n);
+        }
+        // A fifth team is refused (4 active), until one is suspended.
+        state
+            .execute(
+                &owner,
+                Command::CreateTeamSpec {
+                    spec_id: "s5".into(),
+                    project_id: "p".into(),
+                    name: "Five".into(),
+                },
+            )
+            .unwrap();
+        for (slot, (prefix, role)) in [
+            ("lead", Role::Lead),
+            ("dev", Role::Developer),
+            ("qa", Role::Qa),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            state
+                .execute(
+                    &owner,
+                    Command::EnrollActor {
+                        spec_id: "s5".into(),
+                        actor_id: format!("{prefix}5"),
+                        role,
+                        credential_digest: format!("{:064x}", 0x9000 + slot),
+                        run_generation: 1,
+                    },
+                )
+                .unwrap();
+        }
+        assert_eq!(
+            state
+                .execute(
+                    &owner,
+                    Command::LaunchTeam {
+                        spec_id: "s5".into(),
+                        team_id: "t5".into()
+                    }
+                )
+                .unwrap_err()
+                .code,
+            "project_capacity"
+        );
+        state
+            .execute(
+                &owner,
+                Command::SuspendTeam {
+                    team_id: "t2".into(),
+                    reason: "make room".into(),
+                },
+            )
+            .unwrap();
+        state
+            .execute(
+                &owner,
+                Command::LaunchTeam {
+                    spec_id: "s5".into(),
+                    team_id: "t5".into(),
+                },
+            )
+            .unwrap();
+        assert_eq!(
+            state
+                .execute(
+                    &owner,
+                    Command::ResumeTeam {
+                        team_id: "t2".into()
+                    }
+                )
+                .unwrap_err()
+                .code,
+            "project_capacity"
+        );
+        // The specialist cap is project-wide, not per team.
+        let recruit = |team: &str, id: &str| Command::RequestRecruitment {
+            recruitment_id: id.into(),
+            team_id: team.into(),
+            specialty: "security".into(),
+            justification: "j".into(),
+            deliverable: "d".into(),
+            capabilities: vec!["review".into()],
+            dependencies: vec![],
+            stop_condition: "s".into(),
+            max_retries: 0,
+            max_minutes: 5,
+        };
+        let leads: Vec<Actor> = (3..=4)
+            .map(|n| {
+                state
+                    .authenticate(&format!("{:064x}", n * 16 + 0x1000))
+                    .unwrap()
+            })
+            .collect();
+        for (lead, (team, id)) in leads.iter().zip([("t3", "r3"), ("t4", "r4")]) {
+            state.execute(lead, recruit(team, id)).unwrap();
+        }
+        let first = state.authenticate(&digest('1')).unwrap();
+        state.execute(&first, recruit("t", "r1")).unwrap();
+        assert_eq!(
+            state.recruitments["r1"].status,
+            governance::RecruitmentStatus::Queued
+        );
+        state.validate().unwrap();
+    }
+
+    #[test]
+    fn a_phase_two_store_still_loads_and_runs() {
+        let (state, owner, lead, _dev, _qa) = launched();
+        let mut value = serde_json::to_value(&state).unwrap();
+        let object = value.as_object_mut().unwrap();
+        for key in [
+            "surfaces",
+            "worktrees",
+            "integrations",
+            "conflicts",
+            "notices",
+        ] {
+            object.remove(key);
+        }
+        object["teams"]["t"]
+            .as_object_mut()
+            .unwrap()
+            .remove("status");
+        let mut legacy: State = serde_json::from_value(value).unwrap();
+        legacy.validate().unwrap();
+        assert_eq!(legacy.teams["t"].status, TeamStatus::Active);
+        create_task(&mut legacy, &lead, "task", &[]).unwrap();
+        legacy.snapshot(&owner, None).unwrap();
     }
 }
