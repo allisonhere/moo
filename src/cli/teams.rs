@@ -11,6 +11,17 @@ pub(super) fn command() -> Command {
     Command::new("teams")
         .about("Manage local Teams collaboration through versioned JSON requests")
         .subcommand_required(true)
+        .subcommand(
+            Command::new("ui")
+                .about("Open the Teams screen: navigator, chat, tasks and decisions")
+                .arg(
+                    Arg::new("credential-file")
+                        .long("credential-file")
+                        .value_name("PATH")
+                        .help("Credential to act as; defaults to the session's owner credential")
+                        .value_parser(clap::value_parser!(PathBuf)),
+                ),
+        )
         .subcommand(Command::new("init").about("Create the session's private owner credential"))
         .subcommand(
             Command::new("keygen")
@@ -56,6 +67,20 @@ pub(super) fn run(args: &[String]) -> io::Result<i32> {
             let path =
                 crate::teams::initialize(&crate::session::data_dir()).map_err(io::Error::other)?;
             super::print_response(&json!({"result": {"owner_credential_file": path}}))
+        }
+        Some(("ui", args)) => {
+            let credential = args
+                .get_one::<PathBuf>("credential-file")
+                .cloned()
+                .unwrap_or_else(|| crate::session::data_dir().join("teams-owner.key"));
+            let token = crate::teams::read_credential(&credential).map_err(io::Error::other)?;
+            let client = super::target::api_client()?;
+            crate::teams_ui::run(
+                client,
+                token,
+                crate::session::data_dir().join("teams-ui-state.json"),
+            )?;
+            Ok(0)
         }
         Some(("keygen", args)) => {
             let path = required_path(args, "path")?;

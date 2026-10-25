@@ -1053,6 +1053,7 @@ impl State {
             "version": self.version,
             "revision": self.revision,
             "stream_id": self.stream_id,
+            "viewer": { "id": actor.id, "role": actor.role, "team_id": actor.team_id },
             "last_event_sequence": self.next_sequence.saturating_sub(1),
             "projects": projects,
             "team_specs": specs,
@@ -1133,13 +1134,13 @@ impl State {
         let affected: Vec<String> = self
             .dispatches
             .iter()
-            .filter_map(|(id, attempt)| {
+            .filter(|(_, attempt)| {
                 matches!(
                     attempt.state,
                     DispatchState::Attempted | DispatchState::Submitted { .. }
                 )
-                .then(|| id.clone())
             })
+            .map(|(id, _)| id.clone())
             .collect();
         let merging = self
             .integrations

@@ -56,6 +56,7 @@ mod server;
 mod session;
 mod sound;
 mod teams;
+mod teams_ui;
 mod terminal;
 mod terminal_effects;
 mod terminal_modes;

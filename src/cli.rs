@@ -36,6 +36,11 @@ mod status;
 pub(crate) mod tab;
 mod target;
 mod teams;
+
+#[cfg(test)]
+pub(crate) fn teams_command_for_tests() -> clap::Command {
+    teams::command()
+}
 mod title;
 mod workspace;
 pub(crate) mod workspace_bindings;
