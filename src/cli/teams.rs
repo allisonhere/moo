@@ -95,9 +95,16 @@ pub(super) fn run(args: &[String]) -> io::Result<i32> {
         Some(("ui", args)) => {
             let credential = match args.get_one::<PathBuf>("credential-file") {
                 Some(path) => path.clone(),
-                // The first time the screen opens there is no store yet; create it.
-                None => crate::teams::initialize(&crate::session::data_dir())
-                    .map_err(io::Error::other)?,
+                None => {
+                    let path = crate::session::data_dir().join("teams-owner.key");
+                    // The first time the screen opens there is no store yet; create it. Once it
+                    // exists the server holds it, so it must not be set up again.
+                    if !path.exists() {
+                        crate::teams::initialize(&crate::session::data_dir())
+                            .map_err(io::Error::other)?;
+                    }
+                    path
+                }
             };
             let token = crate::teams::read_credential(&credential).map_err(io::Error::other)?;
             let client = super::target::api_client()?;
