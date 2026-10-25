@@ -66,6 +66,9 @@ pub fn render(buf: &mut Buffer, area: Rect, screen: &Screen, palette: &Palette) 
     if let Some(builder) = &screen.builder {
         draw_builder(buf, area, builder, &tide);
     }
+    if let Some(providers) = &screen.providers {
+        draw_providers(buf, area, screen, providers, &tide);
+    }
     if screen.palette.is_some() {
         draw_palette(buf, area, screen, &tide);
     }
@@ -1533,6 +1536,264 @@ fn draw_modal(buf: &mut Buffer, area: Rect, screen: &Screen, tide: &Tide) {
     );
 }
 
+fn draw_providers(
+    buf: &mut Buffer,
+    area: Rect,
+    screen: &Screen,
+    providers: &super::providers::Providers,
+    tide: &Tide,
+) {
+    let rect = centered(area, 100.min(area.width), 26.min(area.height));
+    Clear.render(rect, buf);
+    let inner = panel(buf, rect, "providers and models", true, tide);
+    if inner.width < 20 || inner.height < 6 {
+        return;
+    }
+    let width = inner.width as usize;
+    let snapshot = &screen.snapshot;
+    let dim = Style::default().fg(tide.dim);
+    let fit_line = |text: String| fit(&text, width, tide.glyphs.ellipsis);
+    let mut row = 0u16;
+    let line = |buf: &mut Buffer, row: &mut u16, text: Line<'_>| {
+        if *row < inner.height.saturating_sub(1) {
+            put(buf, inner, *row, text);
+        }
+        *row += 1;
+    };
+    line(
+        buf,
+        &mut row,
+        Line::styled(
+            fit_line(
+                "You declare these. Teams records them and never checks what they can do.".into(),
+            ),
+            dim,
+        ),
+    );
+    row += 1;
+    line(
+        buf,
+        &mut row,
+        Line::styled(
+            "providers",
+            Style::default()
+                .fg(tide.accent)
+                .add_modifier(Modifier::BOLD),
+        ),
+    );
+    if snapshot.providers.is_empty() {
+        line(
+            buf,
+            &mut row,
+            Line::styled(
+                "  none yet - press a to declare one",
+                Style::default().fg(tide.muted),
+            ),
+        );
+    }
+    for (index, provider) in snapshot.providers.iter().enumerate() {
+        let selected = index == providers.cursor;
+        let models = if provider.models.is_empty() {
+            "no models".to_owned()
+        } else {
+            provider
+                .models
+                .iter()
+                .map(|m| m.id.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+        let cap = if provider.hard_spend_limit {
+            ", can cap spend"
+        } else {
+            ""
+        };
+        let text = format!(
+            "{} {:<12} {:<18} {}  [{}{}]",
+            if selected { tide.glyphs.rail } else { " " },
+            provider.id,
+            provider.label,
+            models,
+            provider.metering,
+            cap
+        );
+        line(
+            buf,
+            &mut row,
+            Line::styled(fit_line(text), Style::default().fg(tide.text))
+                .style(row_style(selected, tide)),
+        );
+        if selected && !provider.capabilities.is_empty() {
+            line(
+                buf,
+                &mut row,
+                Line::styled(
+                    fit_line(format!("    can do: {}", provider.capabilities.join(", "))),
+                    dim,
+                ),
+            );
+        }
+    }
+    row += 1;
+    line(
+        buf,
+        &mut row,
+        Line::styled(
+            "preferred when a plan picks providers",
+            Style::default()
+                .fg(tide.accent)
+                .add_modifier(Modifier::BOLD),
+        ),
+    );
+    if snapshot.preferences.is_empty() {
+        line(
+            buf,
+            &mut row,
+            Line::styled(
+                "  none - press p to prefer one for a role",
+                Style::default().fg(tide.muted),
+            ),
+        );
+    }
+    for pref in &snapshot.preferences {
+        let model = pref.model_id.as_deref().unwrap_or("default model");
+        line(
+            buf,
+            &mut row,
+            Line::styled(
+                fit_line(format!(
+                    "  {:<11} {} / {}",
+                    pref.role_key, pref.provider_id, model
+                )),
+                Style::default().fg(tide.text),
+            ),
+        );
+    }
+    row += 1;
+    line(
+        buf,
+        &mut row,
+        Line::styled(
+            "in use by teams",
+            Style::default()
+                .fg(tide.accent)
+                .add_modifier(Modifier::BOLD),
+        ),
+    );
+    if snapshot.role_assignments.is_empty() {
+        line(
+            buf,
+            &mut row,
+            Line::styled(
+                "  none - press e to give a team's role a provider",
+                Style::default().fg(tide.muted),
+            ),
+        );
+    }
+    for assigned in &snapshot.role_assignments {
+        let model = assigned.model_id.as_deref().unwrap_or("default model");
+        line(
+            buf,
+            &mut row,
+            Line::styled(
+                fit_line(format!(
+                    "  {:<18} {:<10} {} / {}",
+                    assigned.team_id, assigned.role_key, assigned.provider_id, model
+                )),
+                Style::default().fg(tide.text),
+            ),
+        );
+    }
+    put(
+        buf,
+        inner,
+        inner.height - 1,
+        Line::styled(
+            fit_line(
+                "a declare   p prefer   e give a role a provider   j/k move   esc close".into(),
+            ),
+            dim,
+        ),
+    );
+    if let Some(form) = &providers.form {
+        draw_provider_form(buf, area, form, tide);
+    }
+}
+
+fn draw_provider_form(buf: &mut Buffer, area: Rect, form: &super::providers::Form, tide: &Tide) {
+    use super::providers::FieldKind;
+    let height = (form.fields.len() as u16 * 2 + 6).min(area.height);
+    let rect = centered(area, 84.min(area.width), height);
+    Clear.render(rect, buf);
+    let inner = panel(buf, rect, form.title, true, tide);
+    if inner.width < 20 {
+        return;
+    }
+    let width = inner.width as usize;
+    let cursor = if tide.options.ascii { "_" } else { "▏" };
+    for (index, field) in form.fields.iter().enumerate() {
+        let selected = index == form.current;
+        let rail = if selected { tide.glyphs.rail } else { " " };
+        let value = match (&field.kind, selected) {
+            (FieldKind::Text, true) => format!("{}{cursor}", field.value),
+            (FieldKind::Text, false) => field.value.clone(),
+            (FieldKind::Choice, _) if field.options.is_empty() => {
+                "< nothing to choose >".to_owned()
+            }
+            (FieldKind::Choice, _) => format!("< {} >", field.value),
+        };
+        let row = index as u16 * 2;
+        put(
+            buf,
+            inner,
+            row,
+            Line::from(vec![
+                Span::styled(
+                    format!("{rail} {:<10}", field.label),
+                    Style::default().fg(if selected { tide.accent } else { tide.muted }),
+                ),
+                Span::styled(
+                    fit(&value, width.saturating_sub(13), tide.glyphs.ellipsis),
+                    Style::default().fg(tide.text),
+                ),
+            ])
+            .style(row_style(selected, tide)),
+        );
+        if selected {
+            put(
+                buf,
+                inner,
+                row + 1,
+                Line::styled(
+                    format!(
+                        "  {}",
+                        fit(field.hint, width.saturating_sub(2), tide.glyphs.ellipsis)
+                    ),
+                    Style::default().fg(tide.dim),
+                ),
+            );
+        }
+    }
+    let last = form.fields.len() as u16 * 2;
+    let (text, color) = match &form.error {
+        Some(error) => (error.clone(), tide.warn),
+        None => (
+            "tab next field   left/right choose   enter on the last field saves   esc cancels"
+                .to_owned(),
+            tide.dim,
+        ),
+    };
+    put(
+        buf,
+        inner,
+        last,
+        Line::styled(
+            fit(&text, width, tide.glyphs.ellipsis),
+            Style::default().fg(color),
+        ),
+    );
+}
+
 fn draw_help(buf: &mut Buffer, area: Rect, tide: &Tide) {
     let lines = [
         (
@@ -1544,6 +1805,10 @@ fn draw_help(buf: &mut Buffer, area: Rect, tide: &Tide) {
         ("1 2 3 4  [ ]", "terminals, chat, tasks, decisions"),
         ("c", "write in the team chat (enter sends, esc leaves)"),
         ("a d v x", "decisions: approve, deny, revoke, resolve"),
+        (
+            "P",
+            "providers and models (Owner): declare, prefer, give a role one",
+        ),
         ("n  i", "show or hide the navigator and the inspector"),
         ("D  A  H", "density, ascii glyphs, high-contrast focus"),
         ("r  q", "refresh now; quit (sessions keep running)"),

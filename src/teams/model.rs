@@ -1393,6 +1393,7 @@ impl State {
             "usage": usage,
             "context_notes": context_notes,
             "providers": self.providers.values().collect::<Vec<_>>(),
+            "preferences": self.preferences.values().collect::<Vec<_>>(),
             "attention": attention,
         }))
     }

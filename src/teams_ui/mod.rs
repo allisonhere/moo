@@ -7,6 +7,7 @@
 mod builder;
 mod data;
 mod layout;
+mod providers;
 mod render;
 mod run;
 mod state;

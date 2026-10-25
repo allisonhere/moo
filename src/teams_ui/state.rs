@@ -11,6 +11,7 @@ use serde_json::{json, Value};
 use super::builder::{Draft, Preview};
 use super::data::{tag, Snapshot};
 use super::layout::{self, Area, Frame, Mode, Visibility};
+use super::providers::{Form, Providers};
 use super::theme::{Density, Options};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -189,6 +190,7 @@ pub enum Intent {
     RenameTeam,
     SuspendTeam,
     ResumeTeam,
+    Providers,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -222,6 +224,7 @@ pub struct Screen {
     pub composer: String,
     pub modal: Option<Modal>,
     pub builder: Option<Builder>,
+    pub providers: Option<Providers>,
     pub palette: Option<PaletteState>,
     /// A built-in theme chosen for this session; `None` follows the configured one.
     pub theme: Option<String>,
@@ -258,6 +261,7 @@ impl Screen {
             composer: String::new(),
             modal: None,
             builder: None,
+            providers: None,
             palette: None,
             theme: None,
             help: false,
@@ -627,6 +631,9 @@ impl Screen {
         if self.builder.is_some() {
             return self.builder_key(key);
         }
+        if self.providers.is_some() {
+            return self.providers_key(key);
+        }
         if self.palette.is_some() {
             return self.palette_key(key);
         }
@@ -656,6 +663,7 @@ impl Screen {
             KeyCode::Char('T') => self.theme = None,
             KeyCode::Char(':') => self.palette = Some(PaletteState::default()),
             KeyCode::Char('H') => self.options.high_contrast = !self.options.high_contrast,
+            KeyCode::Char('P') => self.open_providers(),
             KeyCode::Char('n') => self.toggle(Area::Navigator),
             KeyCode::Char('i') => self.toggle(Area::Inspector),
             KeyCode::Tab => self.cycle_focus(true),
@@ -1226,6 +1234,7 @@ impl Screen {
         if owner {
             items.push(("new team (manual builder)".into(), Intent::NewTeam));
             items.push(("propose a team from a goal".into(), Intent::ProposeTeam));
+            items.push(("providers and models".into(), Intent::Providers));
         }
         items.extend([
             ("toggle navigator".into(), Intent::ToggleNavigator),
@@ -1315,6 +1324,7 @@ impl Screen {
             Intent::CycleTheme => self.cycle_theme(),
             Intent::Refresh => return vec![Effect::Refresh],
             Intent::Help => self.help = true,
+            Intent::Providers => self.open_providers(),
             Intent::Quit => return vec![Effect::Quit],
             Intent::Decide(action) => return self.open_modal(action),
             Intent::NewTeam => {
@@ -1396,6 +1406,61 @@ impl Screen {
                     }];
                 }
             }
+        }
+        Vec::new()
+    }
+
+    // ---- providers and models ---------------------------------------------------------------
+
+    /// Opens the providers screen. Only the Owner declares providers and gives roles their models.
+    pub fn open_providers(&mut self) {
+        if self.is_owner() {
+            self.providers = Some(Providers::default());
+        } else {
+            self.toast = Some("only the Owner manages providers and models".into());
+        }
+    }
+
+    fn providers_key(&mut self, key: KeyEvent) -> Vec<Effect> {
+        let team = match &self.scope {
+            Scope::Team(id) => Some(id.clone()),
+            _ => None,
+        };
+        let Some(screen) = self.providers.as_mut() else {
+            return Vec::new();
+        };
+        if let Some(form) = screen.form.as_mut() {
+            match key.code {
+                KeyCode::Esc => screen.form = None,
+                KeyCode::Tab | KeyCode::Down => form.next(),
+                KeyCode::BackTab | KeyCode::Up => form.previous(),
+                KeyCode::Left => form.step_choice(false, &self.snapshot),
+                KeyCode::Right => form.step_choice(true, &self.snapshot),
+                KeyCode::Backspace => form.backspace(),
+                KeyCode::Char(c) => form.type_char(c),
+                KeyCode::Enter if !form.is_last() => form.next(),
+                KeyCode::Enter => match form.command(&self.snapshot) {
+                    Ok(command) => {
+                        screen.form = None;
+                        return vec![Effect::Mutate { command }];
+                    }
+                    Err(message) => form.error = Some(message),
+                },
+                _ => {}
+            }
+            return Vec::new();
+        }
+        let count = self.snapshot.providers.len();
+        match key.code {
+            KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('P') => self.providers = None,
+            KeyCode::Down | KeyCode::Char('j') => {
+                screen.cursor = (screen.cursor + 1).min(count.saturating_sub(1))
+            }
+            KeyCode::Up | KeyCode::Char('k') => screen.cursor = screen.cursor.saturating_sub(1),
+            KeyCode::Char('a') => screen.form = Some(Form::add_provider()),
+            KeyCode::Char('e') => screen.form = Some(Form::assign(&self.snapshot, team.as_deref())),
+            KeyCode::Char('p') => screen.form = Some(Form::prefer(&self.snapshot)),
+            _ => {}
         }
         Vec::new()
     }

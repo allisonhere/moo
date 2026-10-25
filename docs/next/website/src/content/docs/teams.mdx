@@ -29,8 +29,8 @@ Teams works for local sessions on Linux and macOS. It is not available on Window
 
 You rarely need to design a team by hand. Describe the goal and let Teams draft a plan you can read and change.
 
-1. **Declare your providers.** A provider is a coding agent service you use, such as a CLI agent with one or more models. You tell Teams what it can do (`code_edit`, `shell`, `review`, and so on), which models it has, and how it reports usage. Teams takes your word for it. It never tests a provider, and every provider shows as unverified. If a role needs something no provider you declared offers, the plan says so instead of guessing.
-2. **Say what you prefer.** You can prefer a provider and model per role. A preference only wins if that provider declares what the role needs.
+1. **Declare your providers.** Press `P` in the Teams screen (or `:` and *providers and models*). A provider is a coding agent service you use, such as a CLI agent with one or more models. Press `a` and fill in a short id, a name, what it can do (`code_edit`, `shell`, `review`, and so on), its model names and how it reports usage. Teams takes your word for it. It never tests a provider, and every provider shows as unverified. If a role needs something no provider you declared offers, the plan says so instead of guessing.
+2. **Say what you prefer.** On the same screen, `p` prefers a provider and model for a role. A preference only wins if that provider declares what the role needs. `e` gives one team's role a provider and model directly. Choose "(provider default)" to name a provider without naming a model.
 3. **Propose a plan.** Give Teams a goal in plain words. It returns a draft: a team, tasks in order with their dependencies, a provider for each role, and any specialist the goal calls for. Every choice comes with the words of your goal that caused it.
 4. **Review and edit.** Rename the team, add or drop tasks, change dependencies, drop a specialist, choose a different provider. Nothing exists yet, so nothing is at stake.
 5. **Launch.** One step creates the team, the credentials and the tasks together, or nothing at all. If something is wrong, you get the reason and no half-built team.
@@ -147,6 +147,6 @@ Check what your build supports with `moo teams schema` or the `teams.capabilitie
 
 ## Limitations
 
-- The Teams screen currently covers teams, chat, tasks, decisions and the new-team flow. Plans, providers, disputes, usage limits and the all-teams summary are used through the API (for example with `moo teams call`) and are not yet screens of their own.
+- The Teams screen currently covers teams, chat, tasks, decisions, the new-team flow and providers and models. Plans, disputes, usage limits and the all-teams summary are used through the API (for example with `moo teams call`) and are not yet screens of their own.
 - Mock agents and scripted checks are not a measure of how real models behave. Provider capabilities, costs and metering are only as good as what you declared.
 - Teams does not make agents agree, write good code or stay inside their sandbox. It makes the handoffs, approvals and limits visible and checkable.

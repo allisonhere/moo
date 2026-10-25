@@ -36,6 +36,50 @@ pub struct Snapshot {
     pub bindings: Vec<Binding>,
     #[serde(default)]
     pub attention: Attention,
+    #[serde(default)]
+    pub providers: Vec<ProviderInfo>,
+    #[serde(default)]
+    pub preferences: Vec<PreferenceInfo>,
+    #[serde(default)]
+    pub role_assignments: Vec<RoleAssignmentInfo>,
+}
+
+/// A provider as the Owner declared it. Teams never checks any of this.
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct ProviderInfo {
+    pub id: String,
+    #[serde(default)]
+    pub label: String,
+    #[serde(default)]
+    pub capabilities: Vec<String>,
+    #[serde(default)]
+    pub models: Vec<ModelInfo>,
+    #[serde(default)]
+    pub metering: String,
+    #[serde(default)]
+    pub hard_spend_limit: bool,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct ModelInfo {
+    pub id: String,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct PreferenceInfo {
+    pub role_key: String,
+    pub provider_id: String,
+    #[serde(default)]
+    pub model_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct RoleAssignmentInfo {
+    pub team_id: String,
+    pub role_key: String,
+    pub provider_id: String,
+    #[serde(default)]
+    pub model_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]

@@ -911,3 +911,117 @@ fn the_active_view_is_a_rounded_tab_open_to_the_workspace_and_ascii_mode_has_no_
         .collect();
     assert!(tabs.contains("| 1 terminals |"), "{tabs}");
 }
+
+fn tap(s: &mut Screen, code: KeyCode) -> Vec<Effect> {
+    s.key(key(code))
+}
+
+fn type_text(s: &mut Screen, text: &str) {
+    for c in text.chars() {
+        tap(s, KeyCode::Char(c));
+    }
+}
+
+#[test]
+fn only_the_owner_opens_the_providers_screen() {
+    let mut owner = screen(120, 40, "owner");
+    tap(&mut owner, KeyCode::Char('P'));
+    assert!(owner.providers.is_some());
+    tap(&mut owner, KeyCode::Esc);
+    assert!(owner.providers.is_none());
+
+    let mut lead = screen(120, 40, "lead");
+    tap(&mut lead, KeyCode::Char('P'));
+    assert!(lead.providers.is_none());
+    assert!(lead.toast.as_deref().unwrap_or("").contains("Owner"));
+}
+
+#[test]
+fn a_provider_is_declared_from_the_form_and_sent_as_a_teams_command() {
+    let mut s = screen(120, 40, "owner");
+    tap(&mut s, KeyCode::Char('P'));
+    let empty = text(&draw(&s));
+    assert!(
+        empty.contains("none yet - press a to declare one"),
+        "{empty}"
+    );
+    tap(&mut s, KeyCode::Char('a'));
+    type_text(&mut s, "claude");
+    tap(&mut s, KeyCode::Enter);
+    type_text(&mut s, "Claude Code");
+    tap(&mut s, KeyCode::Enter);
+    tap(&mut s, KeyCode::Enter); // keep the suggested abilities
+    type_text(&mut s, "opus, sonnet");
+    tap(&mut s, KeyCode::Enter);
+    tap(&mut s, KeyCode::Enter); // usage: estimated
+    let effects = tap(&mut s, KeyCode::Enter); // spend cap: no, the last field saves
+    let [Effect::Mutate { command }] = effects.as_slice() else {
+        panic!("expected one command, got {effects:?}");
+    };
+    assert_eq!(command["kind"], "declare_provider");
+    assert_eq!(command["provider_id"], "claude");
+    assert_eq!(command["models"], json!([{"id": "opus"}, {"id": "sonnet"}]));
+    assert!(s.providers.as_ref().unwrap().form.is_none());
+}
+
+#[test]
+fn an_invalid_form_stays_open_and_says_why() {
+    let mut s = screen(120, 40, "owner");
+    tap(&mut s, KeyCode::Char('P'));
+    tap(&mut s, KeyCode::Char('a'));
+    for _ in 0..6 {
+        tap(&mut s, KeyCode::Enter);
+    }
+    let form = s.providers.as_ref().unwrap().form.as_ref().unwrap();
+    assert!(form.error.as_deref().unwrap_or("").contains("id"));
+    assert!(text(&draw(&s)).contains("the id needs"));
+}
+
+#[test]
+fn providers_preferences_and_role_assignments_are_listed_and_a_role_can_be_assigned() {
+    let mut snapshot = fixture("owner");
+    snapshot.providers = serde_json::from_value(json!([
+        {"id": "claude", "label": "Claude Code", "capabilities": ["code_edit", "shell"], "models": [{"id": "opus"}], "metering": "estimated"}
+    ]))
+    .unwrap();
+    snapshot.preferences = serde_json::from_value(json!([
+        {"role_key": "developer", "provider_id": "claude", "model_id": "opus"}
+    ]))
+    .unwrap();
+    snapshot.role_assignments = serde_json::from_value(json!([
+        {"team_id": "alpha", "role_key": "qa", "provider_id": "claude", "model_id": null}
+    ]))
+    .unwrap();
+    let mut s = Screen::new(Rect::new(0, 0, 120, 40));
+    s.apply_snapshot(snapshot);
+    tap(&mut s, KeyCode::Char('P'));
+    let t = text(&draw(&s));
+    assert!(
+        t.contains("claude") && t.contains("Claude Code") && t.contains("opus"),
+        "{t}"
+    );
+    assert!(
+        t.contains("developer") && t.contains("alpha") && t.contains("default model"),
+        "{t}"
+    );
+
+    tap(&mut s, KeyCode::Char('e'));
+    // team alpha, role lead, provider claude; pick model opus on the last field and save.
+    for _ in 0..3 {
+        tap(&mut s, KeyCode::Enter);
+    }
+    tap(&mut s, KeyCode::Right);
+    let effects = tap(&mut s, KeyCode::Enter);
+    let [Effect::Mutate { command }] = effects.as_slice() else {
+        panic!("expected one command, got {effects:?}");
+    };
+    assert_eq!(command["kind"], "assign_role_provider");
+    assert_eq!(
+        (
+            command["team_id"].as_str(),
+            command["role_key"].as_str(),
+            command["model_id"].as_str()
+        ),
+        (Some("alpha"), Some("lead"), Some("opus"))
+    );
+}
