@@ -1,3 +1,4 @@
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -102,6 +103,7 @@ esac
 """
 
 
+@unittest.skipIf(os.name == "nt", "the fake moo is a POSIX shell script")
 class VerifyTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
