@@ -12,6 +12,35 @@ const METERING: [&str; 3] = ["estimated", "metered", "none"];
 const NO_MODEL: &str = "(provider default)";
 const DEFAULT_CAPABILITIES: &str = "code_edit, shell, review";
 
+/// Agent CLIs Moo can start, with the model names they accept. Picking one in a form declares it
+/// when it is not declared yet, so nobody types a provider that is already known. Models are
+/// only a starting list: declare the provider yourself (`a`) to use others.
+const KNOWN_PROVIDERS: &[(&str, &str, &[&str])] = &[
+    ("claude", "Claude Code", &["opus", "sonnet", "haiku"]),
+    ("codex", "Codex", &["gpt-5-codex", "gpt-5"]),
+    (
+        "gemini",
+        "Gemini CLI",
+        &["gemini-2.5-pro", "gemini-2.5-flash"],
+    ),
+    ("opencode", "opencode", &[]),
+    ("amp", "Amp", &[]),
+    ("cursor", "Cursor", &[]),
+    ("droid", "Droid", &[]),
+    ("kimi", "Kimi", &[]),
+    ("qwen", "Qwen Code", &[]),
+];
+
+fn chosen_model(value: &str) -> Option<String> {
+    (value != NO_MODEL && !value.is_empty()).then(|| value.to_owned())
+}
+
+fn known_provider(
+    id: &str,
+) -> Option<&'static (&'static str, &'static str, &'static [&'static str])> {
+    KNOWN_PROVIDERS.iter().find(|(known, _, _)| *known == id)
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FormKind {
     AddProvider,
@@ -65,6 +94,8 @@ pub struct Form {
     pub fields: Vec<Field>,
     pub current: usize,
     pub error: Option<String>,
+    /// The agent to start with the chosen provider once the form is saved.
+    pub start: Option<String>,
 }
 
 fn words(text: &str) -> Vec<String> {
@@ -110,6 +141,7 @@ impl Form {
             ],
             current: 0,
             error: None,
+            start: None,
         }
     }
 
@@ -135,7 +167,23 @@ impl Form {
             ],
             current: 0,
             error: None,
+            start: None,
         };
+        form.refresh(snapshot);
+        form
+    }
+
+    /// Pick the agent for one role and start it: the assign form for that agent's team and role.
+    pub fn start(snapshot: &Snapshot, team: &str, role: &str, actor_id: &str) -> Self {
+        let mut form = Self::assign(snapshot, Some(team));
+        form.title = "pick the agent for this role";
+        form.start = Some(actor_id.to_owned());
+        if let Some(field) = form.fields.iter_mut().find(|f| f.label == "role") {
+            if field.options.iter().any(|o| o == role) {
+                field.value = role.to_owned();
+            }
+        }
+        form.current = 2;
         form.refresh(snapshot);
         form
     }
@@ -155,6 +203,7 @@ impl Form {
             ],
             current: 0,
             error: None,
+            start: None,
         };
         form.refresh(snapshot);
         form
@@ -171,6 +220,8 @@ impl Form {
         let mut models = vec![NO_MODEL.to_owned()];
         if let Some(info) = snapshot.providers.iter().find(|p| p.id == provider) {
             models.extend(info.models.iter().map(|m| m.id.clone()));
+        } else if let Some((_, _, known)) = known_provider(&provider) {
+            models.extend(known.iter().map(|m| (*m).to_owned()));
         }
         let model = &mut self.fields[provider_at + 1];
         if !models.contains(&model.value) {
@@ -223,6 +274,38 @@ impl Form {
         self.refresh(snapshot);
     }
 
+    /// The commands this form sends: choosing a known provider that is not declared yet declares it
+    /// first, so the role can be given it in one step.
+    pub fn commands(&self, snapshot: &Snapshot) -> Result<Vec<Value>, String> {
+        let command = self.command(snapshot)?;
+        let provider = self.value("provider");
+        let undeclared = self.kind != FormKind::AddProvider
+            && !snapshot.providers.iter().any(|p| p.id == provider);
+        let Some((id, label, models)) = known_provider(provider).filter(|_| undeclared) else {
+            return Ok(vec![command]);
+        };
+        let declare = json!({
+            "kind": "declare_provider",
+            "provider_id": id,
+            "label": label,
+            "capabilities": words(DEFAULT_CAPABILITIES),
+            "models": models.iter().map(|m| json!({ "id": m })).collect::<Vec<_>>(),
+            "metering": "estimated",
+            "hard_spend_limit": false,
+        });
+        Ok(vec![declare, command])
+    }
+
+    /// The provider chosen in the form.
+    pub fn provider(&self) -> &str {
+        self.value("provider")
+    }
+
+    /// The model chosen in the form, or none for the provider's default.
+    pub fn model(&self) -> Option<String> {
+        chosen_model(self.value("model"))
+    }
+
     fn value(&self, label: &str) -> &str {
         self.fields
             .iter()
@@ -232,8 +315,7 @@ impl Form {
 
     /// The command this form sends, or why it cannot be sent yet.
     pub fn command(&self, snapshot: &Snapshot) -> Result<Value, String> {
-        let model =
-            |value: &str| (value != NO_MODEL && !value.is_empty()).then(|| value.to_owned());
+        let model = chosen_model;
         match self.kind {
             FormKind::AddProvider => {
                 let id = self.value("id").trim().to_owned();
@@ -297,8 +379,15 @@ impl Form {
     }
 }
 
+/// Declared providers first, then the known ones that are not declared yet.
 fn provider_ids(snapshot: &Snapshot) -> Vec<String> {
-    snapshot.providers.iter().map(|p| p.id.clone()).collect()
+    let mut ids: Vec<String> = snapshot.providers.iter().map(|p| p.id.clone()).collect();
+    for (known, _, _) in KNOWN_PROVIDERS {
+        if !ids.iter().any(|id| id == known) {
+            ids.push((*known).to_owned());
+        }
+    }
+    ids
 }
 
 /// The providers screen: the list behind the forms.
@@ -387,9 +476,36 @@ mod tests {
     }
 
     #[test]
+    fn a_known_provider_is_listed_with_its_models_and_declared_when_chosen() {
+        let empty: Snapshot = serde_json::from_value(json!({"teams": [{"id": "alpha"}]})).unwrap();
+        let mut form = Form::assign(&empty, None);
+        assert_eq!(form.fields[2].value, "claude");
+        assert_eq!(
+            form.fields[3].options,
+            ["(provider default)", "opus", "sonnet", "haiku"]
+        );
+        form.current = 3;
+        form.step_choice(true, &empty);
+        let commands = form.commands(&empty).unwrap();
+        assert_eq!(commands.len(), 2);
+        assert_eq!(commands[0]["kind"], "declare_provider");
+        assert_eq!(commands[0]["provider_id"], "claude");
+        assert_eq!(commands[1]["kind"], "assign_role_provider");
+        assert_eq!(commands[1]["model_id"], "opus");
+
+        // Once declared it is sent alone.
+        let declared = snapshot();
+        assert_eq!(
+            Form::assign(&declared, None)
+                .commands(&declared)
+                .unwrap()
+                .len(),
+            1
+        );
+    }
+
+    #[test]
     fn a_preference_needs_a_declared_provider() {
-        let empty: Snapshot = serde_json::from_value(json!({})).unwrap();
-        assert!(Form::prefer(&empty).command(&empty).is_err());
         let snap = snapshot();
         let mut form = Form::prefer(&snap);
         form.current = 2;

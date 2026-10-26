@@ -1,5 +1,6 @@
 //! Pure drawing: `Screen` + palette in, cells out. Nothing here reads a clock, a socket or the terminal.
 
+use crossterm::event::KeyCode;
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
@@ -13,7 +14,9 @@ use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use super::data::{tag, task_progress, AgentStatus};
 use super::layout::{Area, Mode};
-use super::state::{compact_json, view_tabs, Card, Focus, Link, NavNode, Scope, Screen, View};
+use super::state::{
+    compact_json, view_tabs, Card, Focus, Launch, Link, NavNode, RunState, Scope, Screen, View,
+};
 use super::theme::{Density, Tide};
 use crate::app::state::Palette;
 
@@ -291,9 +294,9 @@ fn draw_header(buf: &mut Buffer, rect: Rect, screen: &Screen, tide: &Tide, mode:
     put(buf, rect, 0, Line::from(spans));
 }
 
-fn draw_footer(buf: &mut Buffer, rect: Rect, screen: &Screen, tide: &Tide) {
-    // Highest priority first; whatever does not fit is dropped from the end, never clipped.
-    let mut hints: Vec<(&str, &str)> = Vec::new();
+/// The key hints for what is on screen, most important first. Each one is also a button.
+fn footer_hints(screen: &Screen) -> Vec<(&'static str, &'static str)> {
+    let mut hints: Vec<(&'static str, &'static str)> = Vec::new();
     if screen.modal.is_some() {
         hints.extend([("enter", "confirm"), ("esc", "cancel")]);
     } else if let Some(builder) = &screen.builder {
@@ -322,7 +325,13 @@ fn draw_footer(buf: &mut Buffer, rect: Rect, screen: &Screen, tide: &Tide) {
             Focus::Navigator => hints.extend([("j/k", "move"), ("enter", "open"), ("h/l", "fold")]),
             _ => match screen.view {
                 View::Terminals => {
-                    hints.extend([("j/k", "move"), ("enter", "focus pane"), ("b", "bind pane")]);
+                    hints.extend([
+                        ("j/k", "move"),
+                        ("enter", "focus pane"),
+                        ("s", "start"),
+                        ("S", "start team"),
+                        ("b", "bind pane"),
+                    ]);
                 }
                 View::Chat => hints.extend([("j/k", "scroll"), ("c", "write")]),
                 View::Tasks => hints.extend([("j/k", "move")]),
@@ -344,15 +353,17 @@ fn draw_footer(buf: &mut Buffer, rect: Rect, screen: &Screen, tide: &Tide) {
             ("q", "quit"),
         ]);
     }
-    let width = rect.width as usize;
-    let mut spans: Vec<Span> = Vec::new();
-    let mut used = 1;
-    spans.push(Span::raw(" "));
-    for (key, what) in hints {
-        let cost = key.width() + what.width() + 4;
-        if used + cost > width {
-            break;
-        }
+    hints
+}
+
+fn draw_footer(buf: &mut Buffer, rect: Rect, screen: &Screen, tide: &Tide) {
+    draw_hints(buf, rect, &footer_hints(screen), tide);
+}
+
+/// Hints in a row; whatever does not fit is dropped from the end, never clipped.
+fn draw_hints(buf: &mut Buffer, rect: Rect, hints: &[(&str, &str)], tide: &Tide) {
+    let mut spans: Vec<Span> = vec![Span::raw(" ")];
+    for (_, (key, what)) in hint_slots(rect, hints) {
         spans.push(Span::styled(
             key.to_owned(),
             Style::default().fg(tide.accent),
@@ -361,9 +372,61 @@ fn draw_footer(buf: &mut Buffer, rect: Rect, screen: &Screen, tide: &Tide) {
             format!(" {what}   "),
             Style::default().fg(tide.muted),
         ));
-        used += cost;
     }
     put(buf, rect, 0, Line::from(spans));
+}
+
+/// Where each hint that fits is drawn: from column 1, `key what` and three spaces apart.
+fn hint_slots<'a>(rect: Rect, hints: &[(&'a str, &'a str)]) -> Vec<(Rect, (&'a str, &'a str))> {
+    let mut slots = Vec::new();
+    let mut used = 1usize;
+    for &(key, what) in hints {
+        let cost = key.width() + what.width() + 4;
+        if used + cost > rect.width as usize {
+            break;
+        }
+        let cell = Rect::new(
+            rect.x + used as u16,
+            rect.y,
+            (key.width() + 1 + what.width()) as u16,
+            1,
+        );
+        slots.push((cell, (key, what)));
+        used += cost;
+    }
+    slots
+}
+
+/// The key a hint stands for, when it names exactly one (`j/k` and `1-4` do not).
+fn hint_key(name: &str) -> Option<KeyCode> {
+    match name {
+        "enter" => Some(KeyCode::Enter),
+        "esc" => Some(KeyCode::Esc),
+        "tab" => Some(KeyCode::Tab),
+        _ => {
+            let mut chars = name.chars();
+            match (chars.next(), chars.next()) {
+                (Some(c), None) => Some(KeyCode::Char(c)),
+                _ => None,
+            }
+        }
+    }
+}
+
+fn clickable(rect: Rect, hints: &[(&str, &str)]) -> Vec<(Rect, KeyCode)> {
+    hint_slots(rect, hints)
+        .into_iter()
+        .filter_map(|(cell, (key, _))| Some((cell, hint_key(key)?)))
+        .collect()
+}
+
+/// What a click on the key-hint row presses.
+pub fn footer_cells(screen: &Screen) -> Vec<(Rect, KeyCode)> {
+    let frame = super::layout::compute(screen.area, screen.visibility());
+    match frame.footer {
+        Some(footer) => clickable(footer, &footer_hints(screen)),
+        None => Vec::new(),
+    }
 }
 
 // ---- navigator ------------------------------------------------------------------------------
@@ -681,6 +744,7 @@ fn draw_terminals(buf: &mut Buffer, body: Rect, screen: &Screen, tide: &Tide) {
         }
         for actor in snap.team_agents(team_id) {
             let status = snap.agent_status(actor);
+            let run = screen.run_state(&actor.id);
             let selected = index == cursor && screen.focus == Focus::Main;
             let task = snap
                 .tasks
@@ -696,21 +760,43 @@ fn draw_terminals(buf: &mut Buffer, body: Rect, screen: &Screen, tide: &Tide) {
             } else {
                 " "
             };
+            // Work status only means something once the agent has a terminal.
+            let (glyph, word, color) = match run {
+                RunState::Running(_) => (
+                    tide.status_glyph(status),
+                    status.word(),
+                    tide.status_color(status),
+                ),
+                RunState::NotStarted => (tide.glyphs.idle, run.word(), tide.muted),
+                RunState::Launch(launch) => (
+                    tide.glyphs.waiting,
+                    run.word(),
+                    match launch {
+                        Launch::Starting | Launch::Briefing => tide.accent,
+                        Launch::NeedsYou => tide.warn,
+                        Launch::Failed(_) => tide.danger,
+                    },
+                ),
+            };
             let fixed = format!(
-                "{rail}{} {:<id_width$} {:<9} {:<9} ",
-                tide.status_glyph(status),
+                "{rail}{glyph} {:<id_width$} {:<9} {:<11} ",
                 fit(&actor.id, id_width, tide.glyphs.ellipsis),
                 actor.role,
-                status.word()
+                word
             );
-            let task = fit(
-                &task,
-                width.saturating_sub(fixed.width()),
-                tide.glyphs.ellipsis,
-            );
+            let button = match run.action() {
+                "" => String::new(),
+                action => format!("[{action}]"),
+            };
+            let room = width.saturating_sub(fixed.width() + ROW_BUTTON_WIDTH);
+            let task = pad(&fit(&task, room, tide.glyphs.ellipsis), room);
             let line = Line::from(vec![
-                Span::styled(fixed, Style::default().fg(tide.status_color(status))),
+                Span::styled(fixed, Style::default().fg(color)),
                 Span::styled(task, Style::default().fg(tide.text)),
+                Span::styled(
+                    format!("{button:>ROW_BUTTON_WIDTH$}"),
+                    Style::default().fg(tide.accent),
+                ),
             ])
             .style(row_style(selected, tide));
             put(buf, body, row, line);
@@ -1543,7 +1629,7 @@ fn draw_providers(
     providers: &super::providers::Providers,
     tide: &Tide,
 ) {
-    let rect = centered(area, 100.min(area.width), 26.min(area.height));
+    let rect = providers_rect(area);
     Clear.render(rect, buf);
     let inner = panel(buf, rect, "providers and models", true, tide);
     if inner.width < 20 || inner.height < 6 {
@@ -1704,26 +1790,144 @@ fn draw_providers(
             ),
         );
     }
-    put(
+    draw_hints(
         buf,
-        inner,
-        inner.height - 1,
-        Line::styled(
-            fit_line(
-                "a declare   p prefer   e give a role a provider   j/k move   esc close".into(),
-            ),
-            dim,
-        ),
+        Rect::new(inner.x, inner.bottom() - 1, inner.width, 1),
+        PROVIDER_HINTS,
+        tide,
     );
     if let Some(form) = &providers.form {
         draw_provider_form(buf, area, form, tide);
     }
 }
 
+const PROVIDER_HINTS: &[(&str, &str)] = &[
+    ("a", "declare"),
+    ("p", "prefer"),
+    ("e", "give a role a provider"),
+    ("j/k", "move"),
+    ("esc", "close"),
+];
+
+const FORM_BUTTONS: &[(&str, &str)] = &[("enter", "next / save"), ("esc", "cancel")];
+
+fn providers_rect(area: Rect) -> Rect {
+    centered(area, 100.min(area.width), 26.min(area.height))
+}
+
+fn provider_form_rect(area: Rect, form: &super::providers::Form) -> Rect {
+    let height = (form.fields.len() as u16 * 2 + 6).min(area.height);
+    centered(area, 84.min(area.width), height)
+}
+
+/// What a click on the providers screen does. The form, when one is open, sits on top of the list.
+pub enum ProvidersClick {
+    /// Press this key.
+    Key(KeyCode),
+    /// Make this provider the current one.
+    Provider(usize),
+    /// Focus this form field; a choice field also steps to its next value.
+    Field(usize),
+}
+
+pub fn providers_click(screen: &Screen, x: u16, y: u16) -> Option<ProvidersClick> {
+    let providers = screen.providers.as_ref()?;
+    let inside = |r: Rect| x >= r.x && x < r.right() && y >= r.y && y < r.bottom();
+    let area = screen.area;
+    if let Some(form) = &providers.form {
+        let inner = inset(provider_form_rect(area, form));
+        let buttons = Rect::new(
+            inner.x,
+            inner.y + form.fields.len() as u16 * 2 + 2,
+            inner.width,
+            1,
+        );
+        if let Some((_, key)) = clickable(buttons, FORM_BUTTONS)
+            .into_iter()
+            .find(|(r, _)| inside(*r))
+        {
+            return Some(ProvidersClick::Key(key));
+        }
+        let field = (y.checked_sub(inner.y)? / 2) as usize;
+        let on_field_row = (y - inner.y).is_multiple_of(2) && inside(inner);
+        return (on_field_row && field < form.fields.len()).then_some(ProvidersClick::Field(field));
+    }
+    let inner = inset(providers_rect(area));
+    let hints = Rect::new(inner.x, inner.bottom().saturating_sub(1), inner.width, 1);
+    if let Some((_, key)) = clickable(hints, PROVIDER_HINTS)
+        .into_iter()
+        .find(|(r, _)| inside(*r))
+    {
+        return Some(ProvidersClick::Key(key));
+    }
+    // Rows: a note, a gap, the "providers" heading, then one row per provider (the current one
+    // has a second row listing what it can do).
+    let mut row = inner.y + 3;
+    for (index, provider) in screen.snapshot.providers.iter().enumerate() {
+        let current = index == providers.cursor && !provider.capabilities.is_empty();
+        let height = if current { 2 } else { 1 };
+        if y >= row && y < row + height && inside(inner) {
+            return Some(ProvidersClick::Provider(index));
+        }
+        row += height;
+    }
+    None
+}
+
+/// The area inside a panel's border.
+fn inset(rect: Rect) -> Rect {
+    Rect::new(
+        rect.x + 1,
+        rect.y + 1,
+        rect.width.saturating_sub(2),
+        rect.height.saturating_sub(2),
+    )
+}
+
+/// The agent shown on the terminals row at (x, y), when there is one. Mirrors `draw_terminals`.
+/// The width of the button at the right end of a Terminals row: `[start]` or `[open]`.
+const ROW_BUTTON_WIDTH: usize = 7;
+
+/// Whether column `x` is on the button of a Terminals row.
+pub fn terminal_action_at(screen: &Screen, x: u16) -> bool {
+    let frame = super::layout::compute(screen.area, screen.visibility());
+    let inner = inset(frame.main);
+    x < inner.right() && usize::from(inner.right() - x) <= ROW_BUTTON_WIDTH
+}
+
+pub fn terminal_agent_at(screen: &Screen, x: u16, y: u16) -> Option<usize> {
+    let frame = super::layout::compute(screen.area, screen.visibility());
+    let inner = inset(frame.main);
+    let body = Rect::new(
+        inner.x,
+        inner.y + 3,
+        inner.width,
+        inner.height.saturating_sub(3),
+    );
+    if x < body.x || x >= body.right() || y < body.y || y >= body.bottom() {
+        return None;
+    }
+    let step = 1 + u16::from(screen.options.density == Density::Comfortable);
+    let mut row = 0u16;
+    let mut index = 0usize;
+    for team_id in screen.scope_team_ids() {
+        if matches!(screen.scope, Scope::All | Scope::Project(_)) {
+            row += 1;
+        }
+        for _ in screen.snapshot.team_agents(team_id) {
+            if y - body.y >= row && y - body.y < row + step {
+                return Some(index);
+            }
+            row += step;
+            index += 1;
+        }
+    }
+    None
+}
+
 fn draw_provider_form(buf: &mut Buffer, area: Rect, form: &super::providers::Form, tide: &Tide) {
     use super::providers::FieldKind;
-    let height = (form.fields.len() as u16 * 2 + 6).min(area.height);
-    let rect = centered(area, 84.min(area.width), height);
+    let rect = provider_form_rect(area, form);
     Clear.render(rect, buf);
     let inner = panel(buf, rect, form.title, true, tide);
     if inner.width < 20 {
@@ -1778,8 +1982,7 @@ fn draw_provider_form(buf: &mut Buffer, area: Rect, form: &super::providers::For
     let (text, color) = match &form.error {
         Some(error) => (error.clone(), tide.warn),
         None => (
-            "tab next field   left/right choose   enter on the last field saves   esc cancels"
-                .to_owned(),
+            "click a field, or tab; left/right or a click on a choice changes it".to_owned(),
             tide.dim,
         ),
     };
@@ -1792,6 +1995,12 @@ fn draw_provider_form(buf: &mut Buffer, area: Rect, form: &super::providers::For
             Style::default().fg(color),
         ),
     );
+    draw_hints(
+        buf,
+        Rect::new(inner.x, inner.y + last + 2, inner.width, 1),
+        FORM_BUTTONS,
+        tide,
+    );
 }
 
 fn draw_help(buf: &mut Buffer, area: Rect, tide: &Tide) {
@@ -1803,6 +2012,7 @@ fn draw_help(buf: &mut Buffer, area: Rect, tide: &Tide) {
         ("j k / arrows", "move; h l fold and unfold in the navigator"),
         ("enter", "open the row; on an agent, show its terminal"),
         ("1 2 3 4  [ ]", "terminals, chat, tasks, decisions"),
+        ("s  S", "terminals: start the agent; start its whole team"),
         ("c", "write in the team chat (enter sends, esc leaves)"),
         ("a d v x", "decisions: approve, deny, revoke, resolve"),
         (

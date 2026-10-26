@@ -3,10 +3,10 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use serde_json::json;
 
-use super::data::Snapshot;
+use super::data::{RoleAssignmentInfo, Snapshot};
 use super::layout::Area;
 use super::render::render;
-use super::state::{Effect, Focus, Link, Scope, Screen, View};
+use super::state::{Effect, Focus, Launch, Link, Scope, Screen, View};
 use crate::app::state::Palette;
 
 fn fixture(viewer_role: &str) -> Snapshot {
@@ -1024,4 +1024,281 @@ fn providers_preferences_and_role_assignments_are_listed_and_a_role_can_be_assig
         ),
         (Some("alpha"), Some("lead"), Some("opus"))
     );
+}
+
+#[test]
+fn start_runs_the_provider_assigned_to_the_role_and_says_what_is_missing() {
+    let mut s = screen(120, 40, "owner");
+    s.scope = Scope::Team("alpha".into());
+    s.focus = Focus::Main;
+    s.view = View::Terminals;
+    let id = s.selected_agent_id().expect("an agent is selected");
+    let actor = s.snapshot.actor(&id).expect("actor").clone();
+    assert!(
+        s.snapshot.binding(&id).is_none(),
+        "fixture: {id} is unbound"
+    );
+
+    // No provider assigned to the role: the pick form opens, and saving it assigns and starts.
+    assert!(tap(&mut s, KeyCode::Char('s')).is_empty());
+    let form = s.providers.as_ref().and_then(|p| p.form.as_ref());
+    assert_eq!(form.and_then(|f| f.start.as_deref()), Some(id.as_str()));
+    let effects = (0..2)
+        .flat_map(|_| tap(&mut s, KeyCode::Enter))
+        .collect::<Vec<_>>();
+    assert!(
+        matches!(
+            effects.as_slice(),
+            [Effect::MutateAll { .. }, Effect::StartAgent { kind, .. }] if kind == "claude"
+        ),
+        "{effects:?}"
+    );
+    tap(&mut s, KeyCode::Esc);
+
+    s.snapshot.role_assignments.push(RoleAssignmentInfo {
+        team_id: actor.team_id.clone().expect("team"),
+        role_key: actor.role.clone(),
+        provider_id: "claude".into(),
+        model_id: Some("opus".into()),
+    });
+    assert_eq!(
+        tap(&mut s, KeyCode::Char('s')),
+        vec![Effect::StartAgent {
+            actor_id: id,
+            team_id: actor.team_id.clone().unwrap(),
+            role: actor.role.clone(),
+            kind: "claude".into(),
+            model: Some("opus".into()),
+            existing: None
+        }]
+    );
+}
+
+#[test]
+fn start_on_an_agent_with_a_recorded_pane_hands_that_pane_to_the_check() {
+    let mut s = screen(120, 40, "owner");
+    s.scope = Scope::Team("alpha".into());
+    s.focus = Focus::Main;
+    s.view = View::Terminals;
+    for _ in 0..12 {
+        if s.selected_agent_id().as_deref() == Some("dev1") {
+            break;
+        }
+        tap(&mut s, KeyCode::Char('j'));
+    }
+    s.snapshot.role_assignments.push(RoleAssignmentInfo {
+        team_id: "alpha".into(),
+        role_key: "developer".into(),
+        provider_id: "claude".into(),
+        model_id: None,
+    });
+    assert_eq!(
+        tap(&mut s, KeyCode::Char('s')),
+        vec![Effect::StartAgent {
+            actor_id: "dev1".into(),
+            team_id: "alpha".into(),
+            role: "developer".into(),
+            kind: "claude".into(),
+            model: None,
+            existing: Some("pane-7".into())
+        }]
+    );
+}
+
+/// Click the first place `needle` is drawn at or right of column `from`, found in the rendered
+/// screen so a click is proven to land where the text is.
+fn click_text_from(s: &mut Screen, needle: &str, from: u16) -> Vec<Effect> {
+    let rows = rows(&draw(s));
+    let found = rows.iter().enumerate().find_map(|(y, row)| {
+        let tail: String = row.chars().skip(from as usize).collect();
+        let at = tail.find(needle)?;
+        Some((y, from + tail[..at].chars().count() as u16))
+    });
+    let (y, x) =
+        found.unwrap_or_else(|| panic!("{needle:?} is not on screen:\n{}", rows.join("\n")));
+    s.mouse(MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: x,
+        row: y as u16,
+        modifiers: KeyModifiers::NONE,
+    })
+}
+
+fn click_text(s: &mut Screen, needle: &str) -> Vec<Effect> {
+    click_text_from(s, needle, 0)
+}
+
+#[test]
+fn every_step_of_adding_an_agent_works_with_the_mouse() {
+    let mut s = screen(120, 40, "owner");
+    s.scope = Scope::Team("alpha".into());
+    s.view = View::Terminals;
+    // Clicking an agent's row selects it.
+    let main_x = s.frame().main.x;
+    click_text_from(&mut s, "qa1", main_x);
+    assert_eq!(s.selected_agent_id().as_deref(), Some("qa1"));
+    // The "start" key hint is a button; with no provider yet it opens the picker.
+    assert!(click_text(&mut s, "s start").is_empty());
+    assert!(s.providers.as_ref().is_some_and(|p| p.form.is_some()));
+    // Clicking the model field steps through its choices.
+    let before = s.providers.as_ref().unwrap().form.as_ref().unwrap().fields[3]
+        .value
+        .clone();
+    click_text(&mut s, "model ");
+    let after = s.providers.as_ref().unwrap().form.as_ref().unwrap().fields[3]
+        .value
+        .clone();
+    assert_ne!(before, after);
+    // The save button sends the commands and the start.
+    s.providers.as_mut().unwrap().form.as_mut().unwrap().current = 3;
+    let effects = click_text(&mut s, "next / save");
+    assert!(
+        matches!(
+            effects.as_slice(),
+            [Effect::MutateAll { .. }, Effect::StartAgent { .. }]
+        ),
+        "{effects:?}"
+    );
+}
+
+fn alpha_terminals() -> Screen {
+    let mut s = screen(120, 40, "owner");
+    s.scope = Scope::Team("alpha".into());
+    s.focus = Focus::Main;
+    s.view = View::Terminals;
+    for (role, provider) in [("lead", "claude"), ("developer", "claude"), ("qa", "codex")] {
+        s.snapshot.role_assignments.push(RoleAssignmentInfo {
+            team_id: "alpha".into(),
+            role_key: role.into(),
+            provider_id: provider.into(),
+            model_id: None,
+        });
+    }
+    s
+}
+
+fn row_of(s: &Screen, id: &str) -> String {
+    rows(&draw(s))
+        .into_iter()
+        .find(|row| row.contains(&format!(" {id} ")))
+        .unwrap_or_else(|| panic!("no row for {id}"))
+}
+
+#[test]
+fn a_row_says_whether_its_agent_runs_and_follows_a_start_to_the_end() {
+    let mut s = alpha_terminals();
+    // Never started: no work status, a start button.
+    let lead = row_of(&s, "lead1");
+    assert!(
+        lead.contains("not started") && lead.contains("[start]"),
+        "{lead}"
+    );
+    assert!(!lead.contains("idle"), "{lead}");
+    // Bound: its work status and an open button.
+    let dev = row_of(&s, "dev1");
+    assert!(dev.contains("working") && dev.contains("[open]"), "{dev}");
+
+    s.launches.insert("lead1".into(), Launch::Starting);
+    let lead = row_of(&s, "lead1");
+    assert!(lead.contains("starting") && !lead.contains('['), "{lead}");
+    s.launches.insert("lead1".into(), Launch::NeedsYou);
+    assert!(row_of(&s, "lead1").contains("needs you"));
+    s.launches.insert("lead1".into(), Launch::Briefing);
+    assert!(row_of(&s, "lead1").contains("briefing"));
+
+    // A failure stays on the row, with the reason in the toast, until the next start.
+    s.finish_launch(
+        "lead1",
+        Err("lead1 has w1:p2, but claude exited before it was ready".into()),
+    );
+    let lead = row_of(&s, "lead1");
+    assert!(
+        lead.contains("failed") && lead.contains("[start]"),
+        "{lead}"
+    );
+    assert!(s.toast.as_deref().is_some_and(|t| t.contains("exited")));
+
+    // Success hands the row back to the binding.
+    s.finish_launch("lead1", Ok("lead1 is running claude - see Chat".into()));
+    assert!(
+        row_of(&s, "lead1").contains("not started"),
+        "no binding in this fixture yet"
+    );
+    assert!(s.launches.is_empty());
+}
+
+#[test]
+fn a_failed_start_while_the_agent_needs_the_user_keeps_saying_so() {
+    let mut s = alpha_terminals();
+    s.launches.insert("lead1".into(), Launch::NeedsYou);
+    s.finish_launch(
+        "lead1",
+        Err("lead1 has w1:p2, but claude is waiting for an answer".into()),
+    );
+    assert_eq!(s.launches.get("lead1"), Some(&Launch::NeedsYou));
+}
+
+#[test]
+fn the_row_button_starts_or_opens_its_agent() {
+    let mut s = alpha_terminals();
+    let row = rows(&draw(&s))
+        .iter()
+        .position(|r| r.contains(" lead1 "))
+        .expect("lead1 row") as u16;
+    let button = rows(&draw(&s))[row as usize]
+        .chars()
+        .collect::<Vec<_>>()
+        .windows(7)
+        .position(|w| w.iter().collect::<String>() == "[start]")
+        .expect("start button") as u16;
+    let effects = s.mouse(MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: button + 2,
+        row,
+        modifiers: KeyModifiers::NONE,
+    });
+    assert!(
+        matches!(effects.as_slice(), [Effect::StartAgent { actor_id, .. }] if actor_id == "lead1"),
+        "{effects:?}"
+    );
+    // A click on the name only selects.
+    let main_x = s.frame().main.x;
+    assert!(click_text_from(&mut s, " qa1 ", main_x).is_empty());
+    assert_eq!(s.selected_agent_id().as_deref(), Some("qa1"));
+    // A bound agent's button opens its pane.
+    let effects = click_text(&mut s, "[open]");
+    assert!(
+        matches!(effects.as_slice(), [Effect::FocusAgent { actor_id, .. }] if actor_id == "dev1"),
+        "{effects:?}"
+    );
+}
+
+#[test]
+fn start_team_starts_everyone_not_running_and_a_start_in_progress_is_not_repeated() {
+    let mut s = alpha_terminals();
+    let started: Vec<String> = tap(&mut s, KeyCode::Char('S'))
+        .into_iter()
+        .filter_map(|effect| match effect {
+            Effect::StartAgent { actor_id, .. } => Some(actor_id),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(started, ["lead1", "qa1"], "dev1 already has a pane");
+
+    s.launches.insert("lead1".into(), Launch::Starting);
+    assert!(tap(&mut s, KeyCode::Char('s')).is_empty());
+    assert!(s
+        .toast
+        .as_deref()
+        .is_some_and(|t| t.contains("already starting")));
+
+    // A role without a provider is named, not skipped silently.
+    s.launches.clear();
+    s.snapshot.role_assignments.retain(|a| a.role_key != "qa");
+    let effects = tap(&mut s, KeyCode::Char('S'));
+    assert_eq!(effects.len(), 1, "{effects:?}");
+    assert!(s
+        .toast
+        .as_deref()
+        .is_some_and(|t| t.contains("qa1 need a provider")));
 }

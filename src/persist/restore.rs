@@ -631,7 +631,28 @@ fn restore_tab(
             continue;
         }
 
-        let runtime_result = {
+        // The Teams screen is relaunched on a cold restore. Other saved launch commands are not:
+        // restarting must not run a command again.
+        let teams_relaunch = saved_launch_argv
+            .clone()
+            .filter(|argv| !was_imported && is_teams_screen(argv));
+        let runtime_result = if let Some(argv) = &teams_relaunch {
+            TerminalRuntime::spawn_argv_command(
+                *id,
+                rows,
+                cols,
+                cwd.clone(),
+                argv,
+                &launch_env,
+                crate::pane::AgentDetection::Enabled,
+                runtime_context.scrollback_limit_bytes,
+                crate::terminal_theme::TerminalTheme::default(),
+                None,
+                runtime_context.events.clone(),
+                runtime_context.render_notify.clone(),
+                runtime_context.render_dirty.clone(),
+            )
+        } else {
             #[cfg(unix)]
             if let Some(imported) = imported_runtime {
                 TerminalRuntime::from_handoff_fd(
@@ -688,7 +709,7 @@ fn restore_tab(
             Ok(runtime) => {
                 let terminal_id = TerminalId::alloc();
                 let mut terminal = TerminalState::new(terminal_id.clone(), cwd.clone());
-                if was_imported {
+                if was_imported || teams_relaunch.is_some() {
                     if let Some(argv) = saved_launch_argv {
                         terminal = terminal.with_launch_argv(argv).with_respawn_shell_on_exit();
                     }
@@ -866,6 +887,11 @@ fn pane_restore_startup<'a>(
     }
 }
 
+/// Whether a saved launch command is the Teams screen (`<moo> teams ui ...`).
+fn is_teams_screen(argv: &[String]) -> bool {
+    matches!(argv, [_, teams, ui, ..] if teams == "teams" && ui == "ui")
+}
+
 fn saved_reported_resume(pane: &super::snapshot::PaneSnapshot) -> Option<&PaneAgentResumeSnapshot> {
     pane.agent_resume
         .as_ref()
@@ -1034,6 +1060,20 @@ mod tests {
     #[cfg(not(windows))]
     fn test_restore_shell() -> &'static str {
         "/bin/sh"
+    }
+
+    #[test]
+    fn only_the_teams_screen_is_relaunched_on_restore() {
+        let argv = |parts: &[&str]| parts.iter().map(|p| p.to_string()).collect::<Vec<_>>();
+        assert!(is_teams_screen(&argv(&["/bin/moo", "teams", "ui"])));
+        assert!(is_teams_screen(&argv(&[
+            "/bin/moo",
+            "teams",
+            "ui",
+            "--decisions"
+        ])));
+        assert!(!is_teams_screen(&argv(&["just", "dev"])));
+        assert!(!is_teams_screen(&argv(&["/bin/moo", "teams"])));
     }
 
     #[test]

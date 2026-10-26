@@ -49,6 +49,15 @@ impl App {
             let overlays: Vec<crate::persist::OverlayPane> = self
                 .overlay_panes
                 .iter()
+                // An overlay saved with its program (the Teams screen) is restored, not left out.
+                .filter(|(pane_id, overlay)| {
+                    self.state
+                        .workspaces
+                        .get(overlay.ws_idx)
+                        .and_then(|ws| ws.pane_state(**pane_id))
+                        .and_then(|pane| self.state.terminals.get(&pane.attached_terminal_id))
+                        .is_none_or(|terminal| terminal.launch_argv.is_none())
+                })
                 .map(|(pane_id, overlay)| crate::persist::OverlayPane {
                     workspace_index: overlay.ws_idx,
                     tab_index: overlay.tab_idx,

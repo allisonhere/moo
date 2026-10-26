@@ -136,6 +136,22 @@ pub enum Effect {
         actor_id: String,
         pane_id: Option<String>,
     },
+    /// Several Teams commands, sent in order and stopped at the first that fails.
+    MutateAll {
+        commands: Vec<Value>,
+    },
+    /// Open a tab for the agent, start the provider assigned to its role in it, and bind the pane.
+    StartAgent {
+        actor_id: String,
+        team_id: String,
+        role: String,
+        /// The provider id, which names the agent CLI to start.
+        kind: String,
+        /// The model the CLI is started with; none leaves it to the provider's default.
+        model: Option<String>,
+        /// The pane the agent is recorded in. Nothing starts while that pane still exists.
+        existing: Option<String>,
+    },
     /// Ask the server whether the draft is valid and what launching it would do.
     ValidateDraft {
         draft: Draft,
@@ -186,6 +202,8 @@ pub enum Intent {
     NewTeam,
     ProposeTeam,
     BindPane,
+    StartAgent,
+    StartTeam,
     UnbindPane,
     RenameTeam,
     SuspendTeam,
@@ -205,6 +223,55 @@ pub enum Card {
     Approval(usize),
     Conflict(usize),
     Decision(usize),
+}
+
+/// How far a start this screen asked for has got. Presentation only: the snapshot's binding says
+/// whether an agent has a pane, this says what the screen is doing to give it one.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Launch {
+    Starting,
+    Briefing,
+    /// The CLI stopped on a question (a trust or login prompt) that only the user can answer.
+    NeedsYou,
+    /// Why the start did not finish. Kept on the row until the next start.
+    Failed(String),
+}
+
+impl Launch {
+    /// A start that is still running; starting again would race it.
+    pub fn busy(&self) -> bool {
+        !matches!(self, Self::Failed(_))
+    }
+}
+
+/// Whether an agent has a terminal, as the Terminals view shows it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RunState<'a> {
+    NotStarted,
+    Launch(&'a Launch),
+    Running(&'a str),
+}
+
+impl RunState<'_> {
+    pub fn word(&self) -> &str {
+        match self {
+            Self::NotStarted => "not started",
+            Self::Launch(Launch::Starting) => "starting",
+            Self::Launch(Launch::Briefing) => "briefing",
+            Self::Launch(Launch::NeedsYou) => "needs you",
+            Self::Launch(Launch::Failed(_)) => "failed",
+            Self::Running(pane) => pane,
+        }
+    }
+
+    /// The row's button: what a click on it does.
+    pub fn action(&self) -> &'static str {
+        match self {
+            Self::NotStarted | Self::Launch(Launch::Failed(_)) => "start",
+            Self::Launch(Launch::Starting | Launch::Briefing) => "",
+            Self::Launch(Launch::NeedsYou) | Self::Running(_) => "open",
+        }
+    }
 }
 
 pub struct Screen {
@@ -234,6 +301,8 @@ pub struct Screen {
     pub area: Rect,
     pub cursor: BTreeMap<View, usize>,
     pub scroll: BTreeMap<View, usize>,
+    /// Starts this screen asked for that have not finished, or that failed, by agent id.
+    pub launches: BTreeMap<String, Launch>,
     next_message: u64,
 }
 
@@ -270,7 +339,54 @@ impl Screen {
             area,
             cursor: BTreeMap::new(),
             scroll: BTreeMap::new(),
+            launches: BTreeMap::new(),
             next_message: 0,
+        }
+    }
+
+    /// A start in progress or failed comes first; otherwise a bound pane means it runs.
+    pub fn run_state(&self, actor_id: &str) -> RunState<'_> {
+        if let Some(launch) = self.launches.get(actor_id) {
+            return RunState::Launch(launch);
+        }
+        match self.snapshot.binding(actor_id) {
+            Some(binding) => RunState::Running(&binding.pane_id),
+            None => RunState::NotStarted,
+        }
+    }
+
+    /// Starting `actor_id` with the provider assigned to its role, if one is.
+    fn assigned_start(&self, actor_id: &str) -> Option<Effect> {
+        let actor = self.snapshot.actor(actor_id)?;
+        let assigned = self
+            .snapshot
+            .role_assignments
+            .iter()
+            .find(|a| Some(&a.team_id) == actor.team_id.as_ref() && a.role_key == actor.role)?;
+        Some(Effect::StartAgent {
+            existing: self.snapshot.binding(actor_id).map(|b| b.pane_id.clone()),
+            team_id: actor.team_id.clone().unwrap_or_default(),
+            role: actor.role.clone(),
+            actor_id: actor_id.to_owned(),
+            kind: assigned.provider_id.clone(),
+            model: assigned.model_id.clone(),
+        })
+    }
+
+    /// The end of a start: success leaves the row to the binding, failure stays on the row.
+    pub fn finish_launch(&mut self, actor_id: &str, outcome: Result<String, String>) {
+        match outcome {
+            Ok(note) => {
+                self.launches.remove(actor_id);
+                self.toast = Some(note);
+            }
+            Err(message) => {
+                if self.launches.get(actor_id) != Some(&Launch::NeedsYou) {
+                    self.launches
+                        .insert(actor_id.to_owned(), Launch::Failed(message.clone()));
+                }
+                self.toast = Some(message);
+            }
         }
     }
 
@@ -813,6 +929,10 @@ impl Screen {
                     };
                     self.cursor.insert(self.view, last);
                 }
+                (View::Terminals, KeyCode::Char('s')) => {
+                    return self.run_intent(Intent::StartAgent)
+                }
+                (View::Terminals, KeyCode::Char('S')) => return self.run_intent(Intent::StartTeam),
                 (View::Terminals, KeyCode::Char('b')) => return self.run_intent(Intent::BindPane),
                 (View::Terminals, KeyCode::Char('B')) => {
                     return self.run_intent(Intent::UnbindPane)
@@ -1019,7 +1139,28 @@ impl Screen {
     }
 
     pub fn mouse(&mut self, event: MouseEvent) -> Vec<Effect> {
-        if self.modal.is_some() || self.help {
+        if self.help {
+            return Vec::new();
+        }
+        let left_click = matches!(event.kind, MouseEventKind::Down(MouseButton::Left));
+        // The key hints are buttons, on every screen: a click presses the key.
+        if left_click {
+            let cells = super::render::footer_cells(self);
+            if let Some((_, code)) = cells
+                .into_iter()
+                .find(|(rect, _)| contains(*rect, event.column, event.row))
+            {
+                return self.key(KeyEvent::new(code, KeyModifiers::NONE));
+            }
+        }
+        if self.providers.is_some() {
+            return if left_click {
+                self.providers_click(event.column, event.row)
+            } else {
+                Vec::new()
+            };
+        }
+        if self.modal.is_some() {
             return Vec::new();
         }
         if !matches!(event.kind, MouseEventKind::Down(MouseButton::Left)) {
@@ -1045,6 +1186,22 @@ impl Screen {
             self.focus = Focus::Inspector;
         } else if contains(frame.main, event.column, event.row) {
             self.focus = Focus::Main;
+            if self.view == View::Terminals && self.builder.is_none() {
+                if let Some(index) = super::render::terminal_agent_at(self, event.column, event.row)
+                {
+                    self.cursor.insert(View::Terminals, index);
+                    // The row's button does what its key does.
+                    if super::render::terminal_action_at(self, event.column) {
+                        let id = self.agent_at(index).unwrap_or_default();
+                        let code = match self.run_state(&id).action() {
+                            "start" => KeyCode::Char('s'),
+                            "open" => KeyCode::Enter,
+                            _ => return Vec::new(),
+                        };
+                        return self.key(KeyEvent::new(code, KeyModifiers::NONE));
+                    }
+                }
+            }
             for (rect, view) in view_tabs(frame.main) {
                 if contains(rect, event.column, event.row) {
                     self.view = view;
@@ -1052,6 +1209,30 @@ impl Screen {
             }
         }
         Vec::new()
+    }
+
+    /// A click on the providers screen or its form: the same thing the keys do. A choice field also
+    /// steps to its next value.
+    fn providers_click(&mut self, x: u16, y: u16) -> Vec<Effect> {
+        use super::render::ProvidersClick;
+        match super::render::providers_click(self, x, y) {
+            Some(ProvidersClick::Key(code)) => self.key(KeyEvent::new(code, KeyModifiers::NONE)),
+            Some(ProvidersClick::Provider(index)) => {
+                if let Some(providers) = self.providers.as_mut() {
+                    providers.cursor = index;
+                }
+                Vec::new()
+            }
+            Some(ProvidersClick::Field(index)) => {
+                let snapshot = self.snapshot.clone();
+                if let Some(form) = self.providers.as_mut().and_then(|p| p.form.as_mut()) {
+                    form.current = index;
+                    form.step_choice(true, &snapshot);
+                }
+                Vec::new()
+            }
+            None => Vec::new(),
+        }
     }
 
     /// First visible navigator row, so the cursor stays on screen.
@@ -1348,6 +1529,71 @@ impl Screen {
                     input: String::new(),
                 });
             }
+            Intent::StartAgent => {
+                let Some(id) = self.selected_agent_id() else {
+                    return Vec::new();
+                };
+                if self.launches.get(&id).is_some_and(Launch::busy) {
+                    self.toast = Some(format!("{id} is already starting"));
+                    return Vec::new();
+                }
+                if let Some(effect) = self.assigned_start(&id) {
+                    return vec![effect];
+                }
+                // No provider for the role yet: pick one, and saving the form starts the agent.
+                let Some(actor) = self.snapshot.actor(&id) else {
+                    return Vec::new();
+                };
+                let team = actor.team_id.clone().unwrap_or_default();
+                let providers = self.providers.get_or_insert_with(Default::default);
+                providers.form = Some(super::providers::Form::start(
+                    &self.snapshot,
+                    &team,
+                    &actor.role,
+                    &id,
+                ));
+            }
+            Intent::StartTeam => {
+                let Some(team) = self
+                    .selected_agent_id()
+                    .and_then(|id| self.snapshot.actor(&id))
+                    .and_then(|actor| actor.team_id.clone())
+                else {
+                    return Vec::new();
+                };
+                let waiting: Vec<String> = self
+                    .snapshot
+                    .team_agents(&team)
+                    .into_iter()
+                    .filter(|actor| super::start::startable(&actor.role))
+                    .map(|actor| actor.id.clone())
+                    .filter(|id| {
+                        matches!(
+                            self.run_state(id),
+                            RunState::NotStarted | RunState::Launch(Launch::Failed(_))
+                        )
+                    })
+                    .collect();
+                if waiting.is_empty() {
+                    self.toast = Some(format!("everyone in {team} is started"));
+                    return Vec::new();
+                }
+                let (effects, unassigned): (Vec<_>, Vec<_>) = waiting
+                    .iter()
+                    .map(|id| (id, self.assigned_start(id)))
+                    .partition(|(_, effect)| effect.is_some());
+                if !unassigned.is_empty() {
+                    let names: Vec<&str> = unassigned.iter().map(|(id, _)| id.as_str()).collect();
+                    self.toast = Some(format!(
+                        "{} need a provider first - select one and press s",
+                        names.join(", ")
+                    ));
+                }
+                return effects
+                    .into_iter()
+                    .filter_map(|(_, effect)| effect)
+                    .collect();
+            }
             Intent::BindPane => {
                 let Some(id) = self.selected_agent_id() else {
                     return Vec::new();
@@ -1431,7 +1677,14 @@ impl Screen {
         };
         if let Some(form) = screen.form.as_mut() {
             match key.code {
-                KeyCode::Esc => screen.form = None,
+                KeyCode::Esc => {
+                    // A form opened by `s` came from the terminals view, not the providers list.
+                    let from_terminals = form.start.is_some();
+                    screen.form = None;
+                    if from_terminals {
+                        self.providers = None;
+                    }
+                }
                 KeyCode::Tab | KeyCode::Down => form.next(),
                 KeyCode::BackTab | KeyCode::Up => form.previous(),
                 KeyCode::Left => form.step_choice(false, &self.snapshot),
@@ -1439,10 +1692,35 @@ impl Screen {
                 KeyCode::Backspace => form.backspace(),
                 KeyCode::Char(c) => form.type_char(c),
                 KeyCode::Enter if !form.is_last() => form.next(),
-                KeyCode::Enter => match form.command(&self.snapshot) {
-                    Ok(command) => {
+                KeyCode::Enter => match form.commands(&self.snapshot) {
+                    Ok(mut commands) => {
+                        let start = form.start.clone().map(|actor_id| {
+                            let existing =
+                                self.snapshot.binding(&actor_id).map(|b| b.pane_id.clone());
+                            (actor_id, form.provider().to_owned(), form.model(), existing)
+                        });
                         screen.form = None;
-                        return vec![Effect::Mutate { command }];
+                        if start.is_some() {
+                            self.providers = None;
+                        }
+                        let mut effects = vec![match commands.len() {
+                            1 => Effect::Mutate {
+                                command: commands.remove(0),
+                            },
+                            _ => Effect::MutateAll { commands },
+                        }];
+                        if let Some((actor_id, kind, model, existing)) = start {
+                            let actor = self.snapshot.actor(&actor_id);
+                            effects.push(Effect::StartAgent {
+                                team_id: actor.and_then(|a| a.team_id.clone()).unwrap_or_default(),
+                                role: actor.map(|a| a.role.clone()).unwrap_or_default(),
+                                actor_id,
+                                kind,
+                                model,
+                                existing,
+                            });
+                        }
+                        return effects;
                     }
                     Err(message) => form.error = Some(message),
                 },

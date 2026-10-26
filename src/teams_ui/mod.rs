@@ -10,6 +10,7 @@ mod layout;
 mod providers;
 mod render;
 mod run;
+mod start;
 mod state;
 mod theme;
 

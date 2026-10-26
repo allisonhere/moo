@@ -31,6 +31,9 @@ struct EndpointCommand {
     action: crate::protocol::ClientShellCommandAction,
 }
 
+/// How the Teams screen is started from the palette.
+const TEAMS_UI_COMMAND: &str = "\"$MOO_BIN_PATH\" teams ui";
+
 impl EndpointCommandRegistry {
     pub(super) fn new(bindings: &[crate::config::CustomCommandKeybind]) -> Self {
         let namespace = new_command_namespace();
@@ -59,7 +62,7 @@ impl EndpointCommandRegistry {
             |label: &str, args: &str, description: &str| crate::config::CustomCommandKeybind {
                 bindings: crate::config::ActionKeybinds::default(),
                 label: label.to_owned(),
-                command: format!("\"$MOO_BIN_PATH\" teams ui{args}"),
+                command: format!("{TEAMS_UI_COMMAND}{args}"),
                 action: crate::config::CustomCommandAction::Pane,
                 description: Some(description.to_owned()),
                 width: None,
@@ -437,7 +440,7 @@ impl App {
                 &self.terminal_runtimes,
             )
         });
-        let new_pane = ws.split_focused_command(
+        let mut new_pane = ws.split_focused_command(
             Direction::Horizontal,
             rows,
             cols,
@@ -449,6 +452,19 @@ impl App {
             self.state.host_terminal_appearance,
         )?;
         let new_pane_id = new_pane.pane_id;
+        // The Teams screen comes back after a restart: its program is saved with the pane so the
+        // session restores it, not a bare shell. Other pane commands stay temporary.
+        let teams_argv = command
+            .strip_prefix(TEAMS_UI_COMMAND)
+            .zip(std::env::current_exe().ok())
+            .map(|(args, exe)| {
+                let mut argv = vec![exe.display().to_string(), "teams".into(), "ui".into()];
+                argv.extend(args.split_whitespace().map(str::to_owned));
+                argv
+            });
+        if let Some(argv) = teams_argv {
+            new_pane.terminal = new_pane.terminal.with_launch_argv(argv);
+        }
         self.terminal_runtimes
             .insert(new_pane.terminal.id.clone(), new_pane.runtime);
         self.state
